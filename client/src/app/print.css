@@ -1,0 +1,163 @@
+/* ──────────────────────────────────────────────────────────────────────
+   Print-Friendly Stylesheet for POS Reports
+   Applied via @media print to produce clean, white-background paper output
+   ────────────────────────────────────────────────────────────────────── */
+
+@media print {
+  /* ── Reset page colors for paper ── */
+  *,
+  *::before,
+  *::after {
+    color: #000 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-color: #ccc !important;
+  }
+
+  body {
+    font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    line-height: 1.4;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ── Hide navigation, toolbars, and interactive controls ── */
+  nav,
+  header,
+  aside,
+  [data-sidebar],
+  [data-header],
+  .sidebar-wrapper,
+  .print\\:hidden,
+  button,
+  input[type="date"],
+  .scrollbar-none {
+    display: none !important;
+  }
+
+  /* ── Main content area: remove margins from sidebar offset ── */
+  main,
+  [class*="lg\\:ml-"] {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .flex.h-screen {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .flex-1.overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* ── Tables: full-width with visible borders ── */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9pt !important;
+    page-break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  th {
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    font-weight: 700 !important;
+    border-bottom: 2px solid #334155 !important;
+    padding: 6px 8px !important;
+    text-align: left !important;
+    font-size: 8pt !important;
+    text-transform: uppercase !important;
+  }
+
+  td {
+    padding: 5px 8px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    font-size: 9pt !important;
+  }
+
+  /* ── Cards and panels: flatten for paper ── */
+  [class*="rounded-"] {
+    border-radius: 0 !important;
+  }
+
+  [class*="bg-slate-900"],
+  [class*="bg-slate-950"],
+  [class*="bg-slate-800"] {
+    background: #fff !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  /* ── Summary KPI cards: compact inline layout ── */
+  .grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .grid > div {
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 8px !important;
+  }
+
+  /* ── Color overrides for key text ── */
+  [class*="text-emerald"],
+  [class*="text-indigo"],
+  [class*="text-purple"],
+  [class*="text-amber"] {
+    color: #000 !important;
+    font-weight: 700 !important;
+  }
+
+  [class*="text-rose"] {
+    color: #dc2626 !important;
+    font-weight: 700 !important;
+  }
+
+  /* ── Page margins & breaks ── */
+  @page {
+    margin: 15mm 12mm;
+    size: A4;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid !important;
+  }
+
+  /* ── Badges: make them visible on paper ── */
+  [class*="rounded-full"] {
+    border: 1px solid #94a3b8 !important;
+    padding: 2px 6px !important;
+    font-size: 8pt !important;
+  }
+
+  /* ── P&L Statement: special handling for the mono-font block ── */
+  .font-mono {
+    font-family: 'Courier New', monospace !important;
+    font-size: 9pt !important;
+  }
+
+  /* ── Show the report title area ── */
+  .space-y-6 > div:first-child {
+    border-bottom: 2px solid #334155 !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 12px !important;
+  }
+}

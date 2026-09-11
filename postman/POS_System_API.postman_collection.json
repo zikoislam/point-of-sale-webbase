@@ -1,0 +1,2765 @@
+{
+  "info": {
+    "_postman_id": "pos-cloud-system-api-v1",
+    "name": "POS & Shop Management System API",
+    "description": "Complete API collection for Enterprise Cloud-Based POS & Shop Management System.\nIncludes automated Bearer Token handling, comprehensive CRUD operations, Cashier Shifts, POS Checkout, GRN, and Analytics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "01. System & Health",
+      "description": "System health check and diagnostic endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Check if backend server is online and operational."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Authentication (Auth)",
+      "description": "User login, logout, terminal locking and profile inspection.",
+      "item": [
+        {
+          "name": "1. Admin Login (Auto Token Save)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    if (res && res.data && res.data.token) {",
+                  "        pm.environment.set(\"token\", res.data.token);",
+                  "        console.log(\"✅ Token successfully saved to environment: \" + res.data.token.substring(0, 20) + \"...\");",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\",\n  \"rememberMe\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in as Admin. The Postman test script automatically captures and saves the JWT token into the active environment variable `token`."
+          }
+        },
+        {
+          "name": "2. Cashier Login (Auto Token Save)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    if (res && res.data && res.data.token) {",
+                  "        pm.environment.set(\"token\", res.data.token);",
+                  "        console.log(\"✅ Token successfully saved to environment: \" + res.data.token.substring(0, 20) + \"...\");",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{cashier_username}}\",\n  \"password\": \"{{cashier_password}}\",\n  \"rememberMe\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logs in as Staff Cashier and automatically stores token."
+          }
+        },
+        {
+          "name": "3. Get Current User Profile (Me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Returns profile details and permissions for the currently authenticated session."
+          }
+        },
+        {
+          "name": "4. Lock Terminal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/lock-terminal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "lock-terminal"
+              ]
+            },
+            "description": "Locks POS screen for security."
+          }
+        },
+        {
+          "name": "5. Unlock Terminal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{admin_pin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/unlock-terminal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "unlock-terminal"
+              ]
+            },
+            "description": "Unlocks POS screen with 4-digit PIN."
+          }
+        },
+        {
+          "name": "6. Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Invalidates session token and clears auth cookie."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Users & Staff Management",
+      "description": "CRUD operations for staff, cashiers, and administrators.",
+      "item": [
+        {
+          "name": "1. List All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "Retrieve all users with roles."
+          }
+        },
+        {
+          "name": "2. Create New User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"staff_kamal\",\n  \"fullName\": \"Kamal Hossain\",\n  \"email\": \"kamal@superpos.com\",\n  \"phone\": \"+8801700998877\",\n  \"password\": \"Password@123\",\n  \"pin\": \"5566\",\n  \"roleId\": \"{{role_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "Create a new staff user with designated role."
+          }
+        },
+        {
+          "name": "3. Get User By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{user_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            },
+            "description": "Fetch specific user details."
+          }
+        },
+        {
+          "name": "4. Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Kamal Hossain Updated\",\n  \"phone\": \"+8801700998877\",\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{user_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            },
+            "description": "Update user profile details."
+          }
+        },
+        {
+          "name": "5. Update User PIN",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"9988\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{user_id}}/pin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}",
+                "pin"
+              ]
+            },
+            "description": "Update quick terminal unlock 4-digit PIN."
+          }
+        },
+        {
+          "name": "6. Deactivate User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{user_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{user_id}}"
+              ]
+            },
+            "description": "Soft delete / deactivate a staff user."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Roles & Permissions",
+      "description": "Manage RBAC security roles and system permissions.",
+      "item": [
+        {
+          "name": "1. List Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            },
+            "description": "List all existing security roles."
+          }
+        },
+        {
+          "name": "2. Get All System Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/roles/permissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "permissions"
+              ]
+            },
+            "description": "List all permission keys available in the system."
+          }
+        },
+        {
+          "name": "3. Create Custom Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"INVENTORY_OFFICER\",\n  \"description\": \"Stock management, purchase receiving & wastage adjustment\",\n  \"permissions\": [\n    \"inv:view\",\n    \"inv:manage\",\n    \"inv:adjust\",\n    \"procurement:view\",\n    \"procurement:receive\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            },
+            "description": "Define a new custom role with granular permissions."
+          }
+        },
+        {
+          "name": "4. Update Role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated role description\",\n  \"permissions\": [\n    \"inv:view\",\n    \"inv:manage\",\n    \"inv:adjust\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/roles/{{role_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{role_id}}"
+              ]
+            },
+            "description": "Modify permissions for an existing role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Categories & Brands",
+      "description": "Organize product catalog into hierarchical categories and manufacturer brands.",
+      "item": [
+        {
+          "name": "1. List Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "description": "List all product categories."
+          }
+        },
+        {
+          "name": "2. Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Frozen Foods\",\n  \"code\": \"FROZEN\",\n  \"defaultTaxRate\": 5,\n  \"description\": \"Frozen meat, fish, and snacks\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "description": "Add a new product category."
+          }
+        },
+        {
+          "name": "3. Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Frozen & Chilled Foods\",\n  \"defaultTaxRate\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{category_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{category_id}}"
+              ]
+            },
+            "description": "Update category info."
+          }
+        },
+        {
+          "name": "4. Delete Category",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{category_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{category_id}}"
+              ]
+            },
+            "description": "Remove a category."
+          }
+        },
+        {
+          "name": "5. List Brands",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brands",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands"
+              ]
+            },
+            "description": "List all registered brands."
+          }
+        },
+        {
+          "name": "6. Create Brand",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kazi Farms\",\n  \"originCountry\": \"Bangladesh\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/brands",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands"
+              ]
+            },
+            "description": "Create a brand entry."
+          }
+        },
+        {
+          "name": "7. Update Brand",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kazi Farms Kitchen\",\n  \"originCountry\": \"Bangladesh\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/brands/{{brand_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands",
+                "{{brand_id}}"
+              ]
+            },
+            "description": "Update brand info."
+          }
+        },
+        {
+          "name": "8. Delete Brand",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/brands/{{brand_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "brands",
+                "{{brand_id}}"
+              ]
+            },
+            "description": "Delete brand."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Products & Catalog",
+      "description": "Manage master items, multi-attribute variants, barcodes, pricing, and stock on hand.",
+      "item": [
+        {
+          "name": "1. List Products (with Search & Pagination)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=20&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Fetch paginated products catalog."
+          }
+        },
+        {
+          "name": "2. Lookup Product By Barcode",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/barcode/{{barcode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "barcode",
+                "{{barcode}}"
+              ]
+            },
+            "description": "Scan or search product by EAN/Code-128 barcode."
+          }
+        },
+        {
+          "name": "3. Get Product By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{product_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}"
+              ]
+            },
+            "description": "Fetch full product details and all variants."
+          }
+        },
+        {
+          "name": "4. Create Product (with Variants & Batches)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fresh Dairy Milk\",\n  \"categoryId\": \"{{category_id}}\",\n  \"brandId\": \"{{brand_id}}\",\n  \"supplierId\": \"{{supplier_id}}\",\n  \"unit\": \"Ltr\",\n  \"taxType\": \"INCLUSIVE\",\n  \"taxRate\": 5,\n  \"variants\": [\n    {\n      \"sku\": \"SKU-FDM-1000ML\",\n      \"barcode\": \"8941199000011\",\n      \"attributeName\": \"1 Liter Bottle\",\n      \"costPrice\": 80,\n      \"retailSellingPrice\": 95,\n      \"wholesaleSellingPrice\": 88,\n      \"currentStock\": 50,\n      \"alertQty\": 10,\n      \"batches\": [\n        {\n          \"batchNo\": \"BAT-2026-FDM01\",\n          \"costPrice\": 80,\n          \"quantity\": 50,\n          \"expiryDate\": \"2026-10-15T00:00:00.000Z\"\n        }\n      ],\n      \"isAvailable\": true\n    }\n  ],\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "description": "Add new product with multi-tier pricing and initial inventory."
+          }
+        },
+        {
+          "name": "5. Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fresh Dairy Milk Premium\",\n  \"taxRate\": 5,\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/{{product_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}"
+              ]
+            },
+            "description": "Update product information."
+          }
+        },
+        {
+          "name": "6. Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{product_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}"
+              ]
+            },
+            "description": "Soft delete or remove product."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Customers & CRM",
+      "description": "Customer profiles, credit limits, loyalty points, and receivables ledgers.",
+      "item": [
+        {
+          "name": "1. List Customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers?page=1&limit=20&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "List all customer accounts."
+          }
+        },
+        {
+          "name": "2. Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hasan Mahmud\",\n  \"phone\": \"+8801811223344\",\n  \"email\": \"hasan@example.com\",\n  \"creditLimit\": 15000,\n  \"address\": \"Dhanmondi, Dhaka\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "Register a new retail or trade customer."
+          }
+        },
+        {
+          "name": "3. Get Customer By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customer_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customer_id}}"
+              ]
+            },
+            "description": "View customer balance and profile."
+          }
+        },
+        {
+          "name": "4. Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hasan Mahmud (VIP)\",\n  \"creditLimit\": 25000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customer_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customer_id}}"
+              ]
+            },
+            "description": "Update credit limit or contact info."
+          }
+        },
+        {
+          "name": "5. Get Customer Ledger History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customer_id}}/ledger?page=1&limit=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customer_id}}",
+                "ledger"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "Audit statement of all sales, payments, and running balance."
+          }
+        },
+        {
+          "name": "6. Collect Customer Due Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500,\n  \"paymentMethod\": \"CASH\",\n  \"notes\": \"Customer cleared partial due at counter\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customer_id}}/pay-due",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customer_id}}",
+                "pay-due"
+              ]
+            },
+            "description": "Record customer due collection and automatically update ledger & till."
+          }
+        },
+        {
+          "name": "7. Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customer_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customer_id}}"
+              ]
+            },
+            "description": "Deactivate customer account."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Suppliers & Vendors",
+      "description": "Vendor master data, procurement balance, and payment disbursals.",
+      "item": [
+        {
+          "name": "1. List Suppliers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/suppliers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "suppliers"
+              ]
+            },
+            "description": "Retrieve all registered suppliers."
+          }
+        },
+        {
+          "name": "2. Create Supplier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Akij Food & Beverage Ltd\",\n  \"contactPerson\": \"Tanvir Ahmed\",\n  \"phone\": \"+8801711223344\",\n  \"email\": \"tanvir@akij.net\",\n  \"address\": \"Tejgaon I/A, Dhaka\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/suppliers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "suppliers"
+              ]
+            },
+            "description": "Create new vendor account."
+          }
+        },
+        {
+          "name": "3. Get Supplier By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/suppliers/{{supplier_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "suppliers",
+                "{{supplier_id}}"
+              ]
+            },
+            "description": "Get supplier profile and payable balance."
+          }
+        },
+        {
+          "name": "4. Update Supplier",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactPerson\": \"Tanvir Ahmed (Key Account Manager)\",\n  \"phone\": \"+8801711223344\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/suppliers/{{supplier_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "suppliers",
+                "{{supplier_id}}"
+              ]
+            },
+            "description": "Update vendor profile."
+          }
+        },
+        {
+          "name": "5. Get Supplier Ledger",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/suppliers/{{supplier_id}}/ledger?page=1&limit=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "suppliers",
+                "{{supplier_id}}",
+                "ledger"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "Audit log of GRN receipts, payments, and outstanding balances."
+          }
+        },
+        {
+          "name": "6. Disburse Supplier Due Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 5000,\n  \"accountId\": \"{{account_id}}\",\n  \"notes\": \"Partial payment against invoice\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/suppliers/{{supplier_id}}/pay-due",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "suppliers",
+                "{{supplier_id}}",
+                "pay-due"
+              ]
+            },
+            "description": "Pay vendor from bank/cash account."
+          }
+        },
+        {
+          "name": "7. Delete Supplier",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/suppliers/{{supplier_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "suppliers",
+                "{{supplier_id}}"
+              ]
+            },
+            "description": "Delete or deactivate supplier."
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Procurement (PO & GRN)",
+      "description": "Purchase orders, status workflows, and Goods Received Note (GRN) processing.",
+      "item": [
+        {
+          "name": "1. List Purchase Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/purchase-orders?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchase-orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "List all purchase orders."
+          }
+        },
+        {
+          "name": "2. Create Purchase Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplierId\": \"{{supplier_id}}\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variant_id}}\",\n      \"productName\": \"Aarong Milk 1L\",\n      \"sku\": \"SKU-AARONG-MILK-1000ML\",\n      \"orderedQty\": 50,\n      \"unitCost\": 82\n    }\n  ],\n  \"shippingCost\": 150,\n  \"notes\": \"Weekly store replenishment\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchase-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchase-orders"
+              ]
+            },
+            "description": "Generate a new PO in DRAFT status."
+          }
+        },
+        {
+          "name": "3. Get Purchase Order By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/purchase-orders/{{purchase_order_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchase-orders",
+                "{{purchase_order_id}}"
+              ]
+            },
+            "description": "Fetch PO details."
+          }
+        },
+        {
+          "name": "4. Update PO Status (Approve / Order / Cancel)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchase-orders/{{purchase_order_id}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchase-orders",
+                "{{purchase_order_id}}",
+                "status"
+              ]
+            },
+            "description": "Change PO workflow status."
+          }
+        },
+        {
+          "name": "5. Receive Goods (GRN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vendorInvoiceNo\": \"INV-AARONG-8821\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variant_id}}\",\n      \"receivedQty\": 50,\n      \"unitCost\": 82,\n      \"batchNo\": \"BAT-202609-GRN01\",\n      \"expiryDate\": \"2026-10-30T00:00:00.000Z\"\n    }\n  ],\n  \"paidNow\": 2000,\n  \"notes\": \"Received in good condition, rest on 15 days credit\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchase-orders/{{purchase_order_id}}/grn",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchase-orders",
+                "{{purchase_order_id}}",
+                "grn"
+              ]
+            },
+            "description": "Record physical inventory arrival, update stocks, batches, and supplier balance."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Cashier Shifts & Till",
+      "description": "Cash drawer shifts, float tracking, petty cash, and daily Z-Reports.",
+      "item": [
+        {
+          "name": "1. Get Active Shift",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shifts/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "active"
+              ]
+            },
+            "description": "Check if current cashier has an open till session."
+          }
+        },
+        {
+          "name": "2. Open Shift (Start Till)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"openingFloat\": 1000,\n  \"terminalId\": \"COUNTER-01\",\n  \"notes\": \"Morning shift opening float\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shifts/open",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "open"
+              ]
+            },
+            "description": "Open a new till with initial opening cash."
+          }
+        },
+        {
+          "name": "3. List Shifts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shifts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts"
+              ]
+            },
+            "description": "List shift sessions history."
+          }
+        },
+        {
+          "name": "4. Record Petty Cash (In / Out)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"OUT\",\n  \"amount\": 120,\n  \"reason\": \"Purchased emergency cleaning supplies\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shifts/{{shift_id}}/petty-cash",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "{{shift_id}}",
+                "petty-cash"
+              ]
+            },
+            "description": "Record petty cash withdrawal or injection from the drawer."
+          }
+        },
+        {
+          "name": "5. Close Shift (Reconciliation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actualCash\": 3500,\n  \"notes\": \"Drawer counted and reconciled\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shifts/{{shift_id}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "{{shift_id}}",
+                "close"
+              ]
+            },
+            "description": "End shift, record physical cash count and calculate discrepancy."
+          }
+        },
+        {
+          "name": "6. Get Shift Z-Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shifts/{{shift_id}}/z-report",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shifts",
+                "{{shift_id}}",
+                "z-report"
+              ]
+            },
+            "description": "Get comprehensive financial Z-Report for audit and print."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Point of Sale (POS) & Billing",
+      "description": "Checkout, multi-payment tenders, split bills, cart hold/resume, and thermal printing.",
+      "item": [
+        {
+          "name": "1. Checkout Sale (Complete Bill)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\",\n  \"pricingTier\": \"RETAIL\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variant_id}}\",\n      \"quantity\": 2,\n      \"unitSellingPrice\": 95,\n      \"taxRate\": 5,\n      \"discount\": 0\n    }\n  ],\n  \"discountAmount\": 0,\n  \"payments\": [\n    {\n      \"method\": \"CASH\",\n      \"amount\": 200\n    }\n  ],\n  \"changeReturned\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "checkout"
+              ]
+            },
+            "description": "Complete sale invoice, deduct inventory stock via FEFO/FIFO, and record payment."
+          }
+        },
+        {
+          "name": "2. List Hold Carts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/hold-carts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "hold-carts"
+              ]
+            },
+            "description": "List parked or held customer carts."
+          }
+        },
+        {
+          "name": "3. Hold Current Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cartLabel\": \"Customer Hasan (Shopping)\",\n  \"pricingTier\": \"RETAIL\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variant_id}}\",\n      \"quantity\": 1,\n      \"unitSellingPrice\": 95\n    }\n  ],\n  \"notes\": \"Customer left to pick up another item\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/hold-cart",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "hold-cart"
+              ]
+            },
+            "description": "Temporarily park a cart without completing sale."
+          }
+        },
+        {
+          "name": "4. Resume Held Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/hold-cart/{{hold_cart_id}}/resume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "hold-cart",
+                "{{hold_cart_id}}",
+                "resume"
+              ]
+            },
+            "description": "Load parked cart back to terminal."
+          }
+        },
+        {
+          "name": "5. Discard Held Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/hold-cart/{{hold_cart_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "hold-cart",
+                "{{hold_cart_id}}"
+              ]
+            },
+            "description": "Delete an abandoned held cart."
+          }
+        },
+        {
+          "name": "6. Get Sale By Invoice Number",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/{{invoice_no}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "{{invoice_no}}"
+              ]
+            },
+            "description": "Fetch sale transaction details by invoice number."
+          }
+        },
+        {
+          "name": "7. Get Receipt (HTML / Thermal Print)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sales/{{invoice_no}}/receipt?format=html&paperWidth=80mm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "{{invoice_no}}",
+                "receipt"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "html"
+                },
+                {
+                  "key": "paperWidth",
+                  "value": "80mm"
+                }
+              ]
+            },
+            "description": "Formatted receipt output for 80mm or 58mm thermal printers."
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Sales Returns & Vouchers",
+      "description": "Item return handling, restocking conditions, and store credit voucher issuance.",
+      "item": [
+        {
+          "name": "1. List Sales Returns",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/returns?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returns"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "List all processed return transactions."
+          }
+        },
+        {
+          "name": "2. Process Return (Store Credit / Cash Refund)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"saleId\": \"{{sale_id}}\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variant_id}}\",\n      \"quantity\": 1,\n      \"unitRefundPrice\": 95,\n      \"isResaleable\": true\n    }\n  ],\n  \"refundType\": \"STORE_CREDIT\",\n  \"reason\": \"Customer purchased incorrect pack size\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/returns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returns"
+              ]
+            },
+            "description": "Process return, optionally restock item, and generate credit voucher."
+          }
+        },
+        {
+          "name": "3. Get Return Details By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/returns/{{return_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returns",
+                "{{return_id}}"
+              ]
+            },
+            "description": "Fetch return record details."
+          }
+        },
+        {
+          "name": "4. Validate Store Credit Voucher",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/returns/voucher/{{voucher_code}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returns",
+                "voucher",
+                "{{voucher_code}}"
+              ]
+            },
+            "description": "Validate voucher code and remaining balance during checkout."
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Accounts & Banking",
+      "description": "Cash, Bank, and Mobile Money (bKash/Nagad) accounts & inter-account transfers.",
+      "item": [
+        {
+          "name": "1. List Accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "description": "List all financial cash, bank, and MFS accounts."
+          }
+        },
+        {
+          "name": "2. Create Financial Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"bKash Merchant Wallet\",\n  \"accountType\": \"MFS\",\n  \"accountNumber\": \"01700112233\",\n  \"initialBalance\": 15000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "description": "Add a new bank or wallet account."
+          }
+        },
+        {
+          "name": "3. Get Account By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{account_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{account_id}}"
+              ]
+            },
+            "description": "Get account balance and details."
+          }
+        },
+        {
+          "name": "4. Get Account Ledger",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{account_id}}/ledger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{account_id}}",
+                "ledger"
+              ]
+            },
+            "description": "View full debit/credit history of this account."
+          }
+        },
+        {
+          "name": "5. Transfer Funds Between Accounts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromAccountId\": \"{{account_id}}\",\n  \"toAccountId\": \"{{to_account_id}}\",\n  \"amount\": 2500,\n  \"description\": \"Transfer counter cash deposit to bank account\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/accounts/transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "transfer"
+              ]
+            },
+            "description": "Transfer money from one account to another."
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Expense Management",
+      "description": "Store operating expenses, utility bills, maintenance, and expense categories.",
+      "item": [
+        {
+          "name": "1. List Expense Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/expenses/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                "categories"
+              ]
+            },
+            "description": "List all expense heads/categories."
+          }
+        },
+        {
+          "name": "2. Create Expense Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Store Utilities & Power\",\n  \"code\": \"UTIL_POWER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses",
+                "categories"
+              ]
+            },
+            "description": "Create a new expense category."
+          }
+        },
+        {
+          "name": "3. List Expenses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/expenses?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Retrieve logged expenses."
+          }
+        },
+        {
+          "name": "4. Record New Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"{{expense_category_id}}\",\n  \"amount\": 1200,\n  \"accountId\": \"{{account_id}}\",\n  \"description\": \"Monthly store internet fiber bill\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "expenses"
+              ]
+            },
+            "description": "Log an operating expense paid from an account."
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Inventory Adjustments & Wastage",
+      "description": "Track spoiled, broken, or expired merchandise and record stock write-offs.",
+      "item": [
+        {
+          "name": "1. List Wastage Records",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/wastage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "wastage"
+              ]
+            },
+            "description": "List all recorded inventory loss and write-offs."
+          }
+        },
+        {
+          "name": "2. Record Wastage / Spoilage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantId\": \"{{variant_id}}\",\n  \"quantity\": 2,\n  \"reason\": \"Packaging damaged during shelf restocking\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inventory/wastage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "wastage"
+              ]
+            },
+            "description": "Write off damaged stock and record loss accounting entry."
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Reports & Analytics",
+      "description": "Executive KPIs, daily sales, P&L, stock valuation, and export utilities.",
+      "item": [
+        {
+          "name": "1. Executive Dashboard KPIs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "dashboard"
+              ]
+            },
+            "description": "High-level store performance, today revenue, orders count, low stock warnings."
+          }
+        },
+        {
+          "name": "2. Sales Summary Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/sales?startDate=2026-09-01&endDate=2026-09-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "sales"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-09-30"
+                }
+              ]
+            },
+            "description": "Sales breakdown by date and channel."
+          }
+        },
+        {
+          "name": "3. Product Sales Performance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "products"
+              ]
+            },
+            "description": "Best-selling products, quantities sold, and gross margins."
+          }
+        },
+        {
+          "name": "4. Inventory Stock Valuation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/inventory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "inventory"
+              ]
+            },
+            "description": "Total stock asset valuation at cost vs retail price, reorder alerts."
+          }
+        },
+        {
+          "name": "5. Profit & Loss (P&L) Statement",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/pnl",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "pnl"
+              ]
+            },
+            "description": "Revenue, COGS, Gross Profit, Expenses, and Net Profit."
+          }
+        },
+        {
+          "name": "6. Customer Receivables Aging",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/dues",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "dues"
+              ]
+            },
+            "description": "List of customers with overdue credit balances."
+          }
+        },
+        {
+          "name": "7. Supplier Payables Aging",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/payables",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "payables"
+              ]
+            },
+            "description": "Upcoming supplier liabilities and procurement dues."
+          }
+        },
+        {
+          "name": "8. Export Sales CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/export/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "export",
+                "sales"
+              ]
+            },
+            "description": "Download CSV file of sales records."
+          }
+        },
+        {
+          "name": "9. Export Sales PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/export-pdf/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "export-pdf",
+                "sales"
+              ]
+            },
+            "description": "Generate PDF sales report."
+          }
+        },
+        {
+          "name": "10. Export Sales Excel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/export-excel/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "export-excel",
+                "sales"
+              ]
+            },
+            "description": "Generate formatted XLSX sales workbook."
+          }
+        }
+      ]
+    },
+    {
+      "name": "17. Audit Logs",
+      "description": "System audit trails, activity logging, and security inspection.",
+      "item": [
+        {
+          "name": "1. Query Audit Trails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/audit-logs?page=1&limit=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "View chronological audit log of user actions and sensitive events."
+          }
+        }
+      ]
+    },
+    {
+      "name": "18. Store Settings",
+      "description": "Store business identity, tax rates, receipt headers, and localization.",
+      "item": [
+        {
+          "name": "1. Get Store Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings"
+              ]
+            },
+            "description": "Retrieve current store profile and config."
+          }
+        },
+        {
+          "name": "2. Update Store Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storeName\": \"Smart Cloud POS Mart\",\n  \"address\": \"House #12, Road #4, Dhanmondi, Dhaka\",\n  \"phone\": \"+8801700000000\",\n  \"currency\": \"BDT\",\n  \"currencySymbol\": \"৳\",\n  \"taxRate\": 5,\n  \"receiptFooter\": \"Thank you for shopping with us! Please visit again.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "settings"
+              ]
+            },
+            "description": "Update business information and receipt layout."
+          }
+        }
+      ]
+    }
+  ]
+}

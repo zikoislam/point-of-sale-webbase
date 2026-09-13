@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, cn } from '../../../lib/utils';
 import { BarcodeRenderer } from '../../../components/BarcodeRenderer';
+import { useBranding } from '../../../hooks/useBranding';
 import {
   Barcode,
   Printer,
@@ -31,6 +32,12 @@ export default function BarcodeLabelsPage() {
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [copies, setCopies] = useState<number>(24);
   const [shopName, setShopName] = useState('SMART RETAIL POS');
+  const branding = useBranding();
+
+  // Use the configured company name on labels once branding loads
+  React.useEffect(() => {
+    if (branding.shopName) setShopName(branding.shopName);
+  }, [branding.shopName]);
   const [labelFormat, setLabelFormat] = useState<'ROLL_38x25' | 'ROLL_50x30' | 'A4_GRID'>('A4_GRID');
 
   // Toggle visible elements on label
@@ -45,8 +52,28 @@ export default function BarcodeLabelsPage() {
     queryKey: ['barcode-catalog'],
     queryFn: async () => {
       const res = await api.get('/products', { params: { limit: 100 } });
-      const prods = Array.isArray(res.data?.products) ? res.data.products : (Array.isArray(res.data) ? res.data : []);
-      return prods;
+      const prods = Array.isArray(res.data?.products)
+        ? res.data.products
+        : Array.isArray(res.data)
+        ? res.data
+        : [];
+
+      // The list endpoint returns summaries without variants — fetch each product's
+      // detail so the real per-variant barcode (not a fallback) is rendered.
+      const withVariants: any[] = [];
+      for (const p of prods) {
+        if (Array.isArray(p.variants) && p.variants.length > 0) {
+          withVariants.push(p);
+          continue;
+        }
+        try {
+          const det = await api.get(`/products/${p.id || p._id}`);
+          if (det?.data) withVariants.push(det.data);
+        } catch {
+          // skip products that fail to load
+        }
+      }
+      return withVariants;
     },
   });
 
@@ -192,6 +219,7 @@ export default function BarcodeLabelsPage() {
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         {v.attributeName} · <span className="font-mono">{v.sku}</span>
                       </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono">{v.barcode}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <span className="text-xs font-bold text-emerald-400">

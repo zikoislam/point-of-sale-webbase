@@ -1,0 +1,13 @@
+# Taste
+- Prefers to communicate in Bengali, often written in romanized/Banglish script, and expects replies in Bengali. Confidence: 0.8
+- Packs several feature requests into a single run-on, unpunctuated Banglish message (e.g., logo customization, user creation, profile pictures, barcode search all in one sentence) and expects the agent to parse them and implement every listed item rather than asking which to do first. Confidence: 0.55
+- Prefers the agent to act on all issues it finds (fix everything, prioritized critical-first) rather than only reporting them or asking which one to start with. Confidence: 0.6
+- Expects the agent to actually run the project, not just typecheck/build: start backend and frontend dev servers in the background, then smoke-test the live app over HTTP (health endpoint, login, key page loads) before reporting. Confidence: 0.7
+- Wants dev servers left running after a "run the project" request so he can use the app in the browser, with the shell task IDs noted for later shutdown. Confidence: 0.6
+- Expects the agent to verify that existing features are actually usable end-to-end (e.g., that every report — accounts, inventory, sales — can really be opened/viewed) and to implement whatever is missing, rather than only flagging gaps. Confidence: 0.55
+- Uses "save" (e.g., "save koro") to mean committing all working changes to git, not just writing files to disk. Confidence: 0.75
+- Treats pushing to the remote as a separate, confirmation-required action: commit and keep everything local by default, and only push when explicitly asked (e.g., "GitHub a load koro"). Confidence: 0.6
+- Gives terse follow-ups like "continue koro" to mean "keep going and finish whatever work is in flight", expecting the agent to infer and complete the pending step (e.g., restart a dev server, commit the latest feature batch) without asking for clarification. Confidence: 0.5
+- Periodically asks whether all the work he handed over is finished, expecting an explicit per-task status summary (e.g., one line or one row per requested item) plus a short list of anything still outstanding or needing his own action. Confidence: 0.5
+- When told a feature works, wants the concrete usable artifacts/data surfaced (e.g., the actual barcode numbers, sample values) rather than only a confirmation that it functions. Confidence: 0.45
+- When something is missing or appears broken, asks "why?" and expects a root-cause diagnosis (is it a code bug, a validation gap, or just missing data entry?) backed by evidence, rather than only a fix or a restatement of the symptom. Confidence: 0.45

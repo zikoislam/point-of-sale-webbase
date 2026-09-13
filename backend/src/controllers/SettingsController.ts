@@ -3,6 +3,13 @@ import { settingsService } from '../services/SettingsService';
 import { sendSuccess } from '../utils/api-response';
 
 export class SettingsController {
+  async getPublicSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const branding = await settingsService.getPublicBranding();
+      sendSuccess(res, 200, 'Branding retrieved', branding);
+    } catch (error) { next(error); }
+  }
+
   async getSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const settings = await settingsService.getSettings();

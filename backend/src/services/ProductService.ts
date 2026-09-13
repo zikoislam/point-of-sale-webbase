@@ -2,6 +2,7 @@ import mongoose, { Types } from 'mongoose';
 import { Product } from '../models/Product';
 import { Category } from '../models/Category';
 import { AppError } from '../utils/app-error';
+import { escapeRegex } from '../utils/helpers';
 
 export interface ProductVariantInput {
   attributeName: string;
@@ -77,7 +78,10 @@ export class ProductService {
     else if (options.isActive === false) filter.isActive = false;
     // else: no filter = show all
 
-    if (options.search) filter.$text = { $search: options.search };
+    if (options.search) {
+      const rx = new RegExp(escapeRegex(options.search.trim()), 'i');
+      filter.$or = [{ name: rx }, { 'variants.sku': rx }, { 'variants.barcode': rx }];
+    }
     if (options.categoryId) filter.categoryId = new Types.ObjectId(options.categoryId);
     if (options.brandId) filter.brandId = new Types.ObjectId(options.brandId);
     if (options.lowStock) {

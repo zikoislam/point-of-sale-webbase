@@ -104,3 +104,7 @@ dist
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Uploaded images (logos, avatars)
+backend/uploads/*
+!backend/uploads/.gitkeep

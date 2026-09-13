@@ -120,6 +120,9 @@ export default function POSTerminalPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchingProducts, setSearchingProducts] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -274,33 +277,108 @@ export default function POSTerminalPage() {
     });
   };
 
+  // Manual product search (server-backed) for barcode / SKU / name
+  useEffect(() => {
+    const term = searchQuery.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+    let active = true;
+    setSearchingProducts(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API}/products?search=${encodeURIComponent(term)}&limit=8`, fetchOpts());
+        const j = await res.json();
+        if (active && j.success) {
+          setSearchResults(j.data || []);
+          setShowSearchResults(true);
+        }
+      } catch {
+        // ignore — user can still use the grid
+      } finally {
+        if (active) setSearchingProducts(false);
+      }
+    }, 300);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  // Fetch a product's detail and add its first in-stock variant to the cart
+  const addProductById = async (productId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API}/products/${productId}`, fetchOpts());
+      const j = await res.json();
+      if (!j.success || !j.data) return false;
+      const product: Product = j.data;
+      const variant =
+        product.variants.find((v) => (v as any).isAvailable !== false && v.currentStock > 0) ||
+        product.variants[0];
+      if (!variant) return false;
+      addToCart(product, variant);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   // Barcode enter lookup
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const term = searchQuery.trim();
+    if (!term) return;
+    const lower = term.toLowerCase();
 
-    const term = searchQuery.trim().toLowerCase();
-    let found = false;
-
+    // 1. Exact match in the already-loaded catalog
     for (const p of products) {
       for (const v of p.variants) {
         if (
-          v.barcode?.toLowerCase() === term ||
-          v.sku?.toLowerCase() === term ||
-          p.name.toLowerCase() === term
+          v.barcode?.toLowerCase() === lower ||
+          v.sku?.toLowerCase() === lower ||
+          p.name.toLowerCase() === lower
         ) {
           addToCart(p, v);
-          found = true;
-          break;
+          setSearchQuery('');
+          setShowSearchResults(false);
+          return;
         }
       }
-      if (found) break;
     }
 
-    if (!found) {
-      alert(`No product found with barcode/SKU "${searchQuery}"`);
+    // 2. Server-side barcode / SKU lookup (covers items not in the loaded page)
+    try {
+      const res = await fetch(`${API}/products/barcode/${encodeURIComponent(term)}`, fetchOpts());
+      const j = await res.json();
+      if (j.success && j.data) {
+        const product: Product = j.data;
+        const variant =
+          product.variants.find((v) => (v as any).isAvailable !== false && v.currentStock > 0) ||
+          product.variants[0];
+        if (variant) {
+          addToCart(product, variant);
+          setSearchQuery('');
+          setShowSearchResults(false);
+          return;
+        }
+      }
+    } catch {
+      // fall through to search results
     }
-    setSearchQuery('');
+
+    // 3. If the manual search narrowed to a single product, add it
+    if (searchResults.length === 1) {
+      const ok = await addProductById(searchResults[0].id);
+      if (ok) {
+        setSearchQuery('');
+        setShowSearchResults(false);
+        return;
+      }
+    }
+
+    alert(`No exact product found for "${term}". Pick one from the search results list.`);
   };
 
   const updateCartQty = (variantId: string, delta: number) => {
@@ -612,8 +690,52 @@ export default function POSTerminalPage() {
               placeholder="Scan barcode or type name (F2)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
+              onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
               className="w-full pl-9 pr-4 py-1.5 bg-slate-850 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition"
             />
+
+            {/* Manual search results dropdown */}
+            {showSearchResults && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto">
+                {searchingProducts ? (
+                  <div className="px-3 py-3 text-xs text-slate-400">Searching...</div>
+                ) : searchResults.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-slate-500">
+                    No products match &quot;{searchQuery}&quot;
+                  </div>
+                ) : (
+                  searchResults.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={async () => {
+                        const ok = await addProductById(p.id);
+                        if (ok) {
+                          setSearchQuery('');
+                          setShowSearchResults(false);
+                        }
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-800 border-b border-slate-800 last:border-0 transition"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white truncate">{p.name}</span>
+                        <span className="text-[10px] text-slate-400 shrink-0">{p.categoryName || ''}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <span className="text-[10px] text-slate-500">
+                          Stock: {p.totalStock ?? 0} {p.unit || ''}
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-400">
+                          ৳{Number(p.lowestRetailPrice || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </form>
         </div>
 

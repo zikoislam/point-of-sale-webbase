@@ -17,6 +17,12 @@ export const updateUserSchema = z.object({
   roleId: z.string().optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(6).optional(),
+  avatarUrl: z.string().trim().optional(),
+});
+
+export const updateProfileSchema = z.object({
+  fullName: z.string().trim().min(2, 'Full name must be at least 2 characters').optional(),
+  avatarUrl: z.string().trim().min(1).optional(),
 });
 
 export const updatePinSchema = z.object({
@@ -25,4 +31,5 @@ export const updatePinSchema = z.object({
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UpdatePinInput = z.infer<typeof updatePinSchema>;

@@ -12,6 +12,7 @@ export interface IUser extends Document {
   roleId: Types.ObjectId; // Ref: roles
   isActive: boolean;
   terminalLocked: boolean; // Quick screen lock state
+  avatarUrl?: string; // Profile picture URL
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -64,6 +65,10 @@ const UserSchema = new Schema<IUser>(
     terminalLocked: {
       type: Boolean,
       default: false,
+    },
+    avatarUrl: {
+      type: String,
+      trim: true,
     },
     lastLoginAt: {
       type: Date,

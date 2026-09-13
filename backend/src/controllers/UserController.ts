@@ -34,6 +34,25 @@ export class UserController {
     }
   }
 
+  async getMyProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const user = await userService.getUserById(req.user!.userId);
+      sendSuccess(res, 200, 'Profile retrieved successfully', user);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMyProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { fullName, avatarUrl } = req.body;
+      const user = await userService.updateOwnProfile(req.user!.userId, { fullName, avatarUrl });
+      sendSuccess(res, 200, 'Profile updated successfully', user);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const user = await userService.getUserById(req.params.id);

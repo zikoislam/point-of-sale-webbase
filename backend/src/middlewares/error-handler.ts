@@ -27,6 +27,13 @@ export const errorHandler = (
     return;
   }
 
+  // Multer upload errors (file too large, etc.)
+  if (err.name === 'MulterError') {
+    const message = (err as any).code === 'LIMIT_FILE_SIZE' ? 'Image must be 2 MB or smaller' : err.message;
+    sendError(res, 400, 'UPLOAD_ERROR', message);
+    return;
+  }
+
   // Handle Mongoose CastError (e.g. invalid ObjectId)
   if (err.name === 'CastError') {
     sendError(res, 400, 'INVALID_ID_FORMAT', 'Provided ID format is invalid');

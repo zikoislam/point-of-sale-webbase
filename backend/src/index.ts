@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -29,6 +31,7 @@ import expenseRoutes from './routes/expense.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import stockMovementRoutes from './routes/stock-movement.routes';
 import voucherRoutes from './routes/voucher.routes';
+import uploadRoutes from './routes/upload.routes';
 import reportRoutes from './routes/report.routes';
 import auditRoutes from './routes/audit.routes';
 import './models';
@@ -43,7 +46,9 @@ initSocket(server);
 app.set('trust proxy', 1);
 
 // Security & Utility Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors({
   origin: env.CLIENT_URL,
   credentials: true,
@@ -52,6 +57,13 @@ app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Uploaded images (company logo, profile pictures)
+const uploadsDir = path.resolve(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 
 // Health Check Endpoint
 app.get('/api/v1/health', (req: Request, res: Response) => {
@@ -77,6 +89,7 @@ app.use('/api/v1/expenses', expenseRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
 app.use('/api/v1/stock-movements', stockMovementRoutes);
 app.use('/api/v1/vouchers', voucherRoutes);
+app.use('/api/v1/uploads', uploadRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 

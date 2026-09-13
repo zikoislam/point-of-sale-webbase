@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../hooks/useAuth';
+import { useBranding } from '../hooks/useBranding';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -170,6 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const pathname = usePathname();
   const { user } = useAuth();
+  const branding = useBranding();
   const [expandedSubmenus, setExpandedSubmenus] = useState<Record<string, boolean>>({
     Products: true,
     Reports: false,
@@ -222,12 +224,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         >
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/20 ring-2 ring-blue-500/20">
-              <Store className="w-4 h-4 text-white" />
-            </div>
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={branding.logoUrl}
+                alt={branding.shopName}
+                className="w-8 h-8 rounded-xl object-cover shrink-0 shadow-lg ring-2 ring-blue-500/20 bg-white"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/20 ring-2 ring-blue-500/20">
+                <Store className="w-4 h-4 text-white" />
+              </div>
+            )}
             {!isCollapsed && (
               <div className="overflow-hidden leading-tight">
-                <p className="font-bold text-white text-sm truncate">Smart Retail POS</p>
+                <p className="font-bold text-white text-sm truncate">{branding.shopName || 'Smart Retail POS'}</p>
                 <p className="text-[10px] text-slate-400 uppercase tracking-wider truncate">
                   {user?.role ? user.role.replace('_', ' ') : 'Enterprise'}
                 </p>

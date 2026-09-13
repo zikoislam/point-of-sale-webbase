@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Settings, Save, Store, Printer, Tag, RefreshCw, Check } from 'lucide-react';
+import { Settings, Save, Store, Printer, Tag, RefreshCw, Check, Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
+import { uploadImage } from '../../../lib/upload';
+import { invalidateBranding } from '../../../hooks/useBranding';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -59,6 +61,22 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState('');
+
+  const handleLogoSelect = async (file: File | undefined) => {
+    if (!file) return;
+    setLogoUploading(true);
+    setLogoError('');
+    try {
+      const url = await uploadImage(file, 'image');
+      setForm((f) => ({ ...f, logoUrl: url }));
+    } catch (err: any) {
+      setLogoError(err?.message || 'Logo upload failed');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
 
   useEffect(() => {
     fetch(`${API}/settings`, fetchOpts())
@@ -74,7 +92,11 @@ export default function SettingsPage() {
         method: 'PUT', body: JSON.stringify(form),
       }));
       const j = await res.json();
-      if (j.success) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+      if (j.success) {
+        invalidateBranding();
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      }
     } finally { setSaving(false); }
   };
 
@@ -110,6 +132,53 @@ export default function SettingsPage() {
           {saved ? <Check className="w-4 h-4" /> : saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Changes'}
         </button>
+      </div>
+
+      {/* Company Logo (Super Admin) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h2 className="font-semibold text-white flex items-center gap-2 text-sm">
+          <ImageIcon className="w-4 h-4 text-indigo-400" /> Company Logo
+        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+          <div className="w-24 h-24 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+            {form.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.logoUrl} alt="Company logo" className="w-full h-full object-contain p-2" />
+            ) : (
+              <Store className="w-9 h-9 text-slate-600" />
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">
+                <Upload className="w-4 h-4" />
+                <span>{logoUploading ? 'Uploading...' : 'Upload Logo'}</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  disabled={logoUploading}
+                  onChange={(e) => handleLogoSelect(e.target.files?.[0])}
+                />
+              </label>
+              {form.logoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, logoUrl: '' }))}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-300 text-xs font-semibold transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Remove</span>
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500">
+              PNG, JPG, WEBP or GIF — max 2 MB. Appears on the sidebar, login screen and receipts.
+              Remember to click &quot;Save Changes&quot;.
+            </p>
+            {logoError && <p className="text-[11px] text-rose-400 font-medium">{logoError}</p>}
+          </div>
+        </div>
       </div>
 
       {/* Shop Info */}

@@ -49,6 +49,17 @@ export class SettingsService {
     if (!settings) throw new AppError(500, 'SETTINGS_ERROR', 'Failed to update settings');
     return settings as unknown as ShopSettings;
   }
+
+  async getPublicBranding() {
+    const settings = await this.getSettings();
+    return {
+      shopName: settings.shopName,
+      logoUrl: settings.logoUrl || '',
+      currencySymbol: settings.currencySymbol,
+      shopAddress: settings.shopAddress,
+      shopPhone: settings.shopPhone,
+    };
+  }
 }
 
 export const settingsService = new SettingsService();

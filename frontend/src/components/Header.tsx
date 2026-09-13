@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../hooks/useAuth';
 import { NotificationBell } from './NotificationBell';
+import { uploadImage } from '../lib/upload';
 import {
   Menu,
   Lock,
@@ -15,6 +16,8 @@ import {
   ChevronDown,
   Shield,
   Circle,
+  Camera,
+  X,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -28,10 +31,44 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout, lockTerminal } = useAuth();
+  const { user, logout, lockTerminal, refreshUser } = useAuth();
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Profile picture modal
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+
+  const openProfile = () => {
+    setUserDropdownOpen(false);
+    setAvatarPreview(user?.avatarUrl || '');
+    setAvatarFile(null);
+    setAvatarError('');
+    setProfileOpen(true);
+  };
+
+  const handleAvatarSave = async () => {
+    if (!avatarFile) {
+      setProfileOpen(false);
+      return;
+    }
+    setAvatarSaving(true);
+    setAvatarError('');
+    try {
+      const url = await uploadImage(avatarFile, 'avatar');
+      await api.patch('/users/me/profile', { avatarUrl: url });
+      await refreshUser();
+      setProfileOpen(false);
+    } catch (err: any) {
+      setAvatarError(err?.message || 'Failed to update profile picture');
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
 
   // Live date & time display (updating every second/minute)
   useEffect(() => {
@@ -204,9 +241,18 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-800 hover:opacity-90 transition-opacity focus:outline-none"
           >
             {/* User Avatar */}
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold text-xs shadow-md ring-2 ring-blue-500/20">
-              {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
-            </div>
+            {user?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatarUrl}
+                alt={user.fullName}
+                className="w-8 h-8 rounded-xl object-cover shadow-md ring-2 ring-blue-500/20"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold text-xs shadow-md ring-2 ring-blue-500/20">
+                {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+              </div>
+            )}
 
             <div className="hidden md:flex flex-col text-left leading-tight">
               <span className="text-xs font-semibold text-white max-w-[110px] truncate">
@@ -244,6 +290,15 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </div>
 
               <div className="p-1 space-y-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={openProfile}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left"
+                >
+                  <Camera className="w-4 h-4 text-slate-400" />
+                  <span>My Profile Picture</span>
+                </button>
+
                 <Link
                   href="/settings"
                   onClick={() => setUserDropdownOpen(false)}
@@ -288,6 +343,83 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           )}
         </div>
       </div>
+      {/* Profile Picture Modal */}
+      {profileOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-white">My Profile Picture</h3>
+              <button
+                type="button"
+                onClick={() => setProfileOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {avatarError && (
+                <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-xs">
+                  {avatarError}
+                </div>
+              )}
+
+              <div className="flex flex-col items-center gap-3">
+                {avatarPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarPreview}
+                    alt="Preview"
+                    className="w-24 h-24 rounded-2xl object-cover ring-2 ring-blue-500/30 bg-white"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-black text-3xl">
+                    {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                )}
+
+                <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">
+                  <Camera className="w-4 h-4" />
+                  <span>Choose image</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setAvatarFile(file);
+                      setAvatarPreview(URL.createObjectURL(file));
+                      setAvatarError('');
+                    }}
+                  />
+                </label>
+                <p className="text-[11px] text-slate-500">PNG, JPG, WEBP or GIF — max 2 MB</p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(false)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAvatarSave}
+                  disabled={avatarSaving || !avatarFile}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900/50 disabled:cursor-not-allowed text-white transition"
+                >
+                  {avatarSaving ? 'Uploading...' : 'Save Picture'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

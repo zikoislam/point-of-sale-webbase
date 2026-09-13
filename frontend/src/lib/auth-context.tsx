@@ -13,6 +13,7 @@ export interface UserProfile {
   role: string;
   permissions: string[];
   terminalLocked: boolean;
+  avatarUrl?: string;
   lastLoginAt?: string;
 }
 

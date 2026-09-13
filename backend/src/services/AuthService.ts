@@ -15,6 +15,7 @@ export interface UserProfileResponse {
   role: string;
   permissions: string[];
   terminalLocked: boolean;
+  avatarUrl?: string;
   lastLoginAt?: Date;
 }
 
@@ -65,6 +66,7 @@ export class AuthService {
         role: roleName,
         permissions,
         terminalLocked: user.terminalLocked,
+        avatarUrl: (user as any).avatarUrl,
         lastLoginAt: user.lastLoginAt,
       },
     };
@@ -106,6 +108,7 @@ export class AuthService {
       role: role?.name || 'CASHIER',
       permissions: role?.permissions || [],
       terminalLocked: user.terminalLocked,
+      avatarUrl: (user as any).avatarUrl,
       lastLoginAt: user.lastLoginAt,
     };
   }

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
+import { useBranding } from '../../hooks/useBranding';
 import {
   Store,
   Lock,
@@ -18,6 +19,7 @@ import { Spinner } from '../../components/ui/Spinner';
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
+  const branding = useBranding();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -106,10 +108,19 @@ export default function LoginPage() {
       <div className="w-full max-w-md relative z-10">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white shadow-xl shadow-blue-600/25 mb-4 ring-4 ring-blue-500/20">
-            <Store className="w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">Smart Retail POS</h1>
+          {branding.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={branding.logoUrl}
+              alt={branding.shopName}
+              className="inline-block w-16 h-16 rounded-2xl object-contain bg-white p-1.5 shadow-xl mb-4 ring-4 ring-blue-500/20"
+            />
+          ) : (
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white shadow-xl shadow-blue-600/25 mb-4 ring-4 ring-blue-500/20">
+              <Store className="w-8 h-8" />
+            </div>
+          )}
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">{branding.shopName || 'Smart Retail POS'}</h1>
           <p className="text-sm text-slate-400 mt-1">Enterprise Cloud Shop &amp; Inventory Management</p>
         </div>
 

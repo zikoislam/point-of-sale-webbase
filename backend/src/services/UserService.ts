@@ -14,6 +14,7 @@ export interface UserListItem {
   role: { id: string; name: string; displayName: string };
   isActive: boolean;
   terminalLocked: boolean;
+  avatarUrl?: string;
   lastLoginAt?: Date;
   createdAt: Date;
 }
@@ -69,6 +70,7 @@ export class UserService {
       },
       isActive: u.isActive,
       terminalLocked: u.terminalLocked,
+      avatarUrl: (u as any).avatarUrl,
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
     }));
@@ -123,6 +125,7 @@ export class UserService {
       role: { id: role._id.toString(), name: role.name, displayName: role.displayName },
       isActive: user.isActive,
       terminalLocked: user.terminalLocked,
+      avatarUrl: (user as any).avatarUrl,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
     };
@@ -147,9 +150,26 @@ export class UserService {
       },
       isActive: user.isActive,
       terminalLocked: user.terminalLocked,
+      avatarUrl: (user as any).avatarUrl,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
     };
+  }
+
+  async updateOwnProfile(
+    id: string,
+    data: { fullName?: string; avatarUrl?: string }
+  ): Promise<UserListItem> {
+    if (!Types.ObjectId.isValid(id)) throw new AppError(400, 'INVALID_ID', 'Invalid user ID');
+
+    const user = await User.findById(id);
+    if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+
+    if (data.fullName !== undefined) user.fullName = data.fullName;
+    if (data.avatarUrl !== undefined) (user as any).avatarUrl = data.avatarUrl;
+
+    await user.save();
+    return this.getUserById(id);
   }
 
   async updateUser(id: string, data: UpdateUserInput, requestingUserId: string): Promise<UserListItem> {
@@ -169,6 +189,7 @@ export class UserService {
     if (data.phone) user.phone = data.phone;
     if (data.isActive !== undefined) user.isActive = data.isActive;
     if (data.password) user.passwordHash = data.password; // Pre-save hook re-hashes
+    if (data.avatarUrl !== undefined) (user as any).avatarUrl = data.avatarUrl;
 
     await user.save();
     return this.getUserById(id);

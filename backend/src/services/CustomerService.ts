@@ -1,8 +1,11 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { Customer, ICustomer } from '../models/Customer';
 import { CustomerLedger } from '../models/CustomerLedger';
 import { Shift } from '../models/Shift';
+import { Account } from '../models/Account';
+import { AccountTransaction } from '../models/AccountTransaction';
 import { AppError } from '../utils/app-error';
+import { escapeRegex, roundMoney } from '../utils/helpers';
 
 export interface CreateCustomerDto {
   name: string;
@@ -23,7 +26,9 @@ export interface UpdateCustomerDto {
 
 export interface DuePaymentDto {
   amount: number;
-  paymentMethod: 'CASH' | 'CARD' | 'MFS_BKASH' | 'MFS_NAGAD';
+  paymentMethod: 'CASH' | 'CARD' | 'MFS_BKASH' | 'MFS_NAGAD' | 'STORE_CREDIT';
+  paymentAccountId?: string;
+  narration?: string;
   notes?: string;
 }
 
@@ -31,9 +36,10 @@ class CustomerService {
   async list(page = 1, limit = 50, search?: string) {
     const query: any = {};
     if (search) {
+      const safe = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
+        { name: { $regex: safe, $options: 'i' } },
+        { phone: { $regex: safe, $options: 'i' } },
       ];
     }
 
@@ -64,7 +70,7 @@ class CustomerService {
   async create(dto: CreateCustomerDto): Promise<ICustomer> {
     const existing = await Customer.findOne({ phone: dto.phone }).lean();
     if (existing) {
-      throw new AppError(409, 'DUPLICATE_PHONE', 'A customer with this phone number already exists');
+      throw new AppError(409, 'CUSTOMER_PHONE_DUPLICATE', 'A customer with this phone number already exists');
     }
 
     const customer = await Customer.create({
@@ -85,12 +91,20 @@ class CustomerService {
 
     if (dto.phone) {
       const dup = await Customer.findOne({ phone: dto.phone, _id: { $ne: id } }).lean();
-      if (dup) throw new AppError(409, 'DUPLICATE_PHONE', 'Phone number is already used by another customer');
+      if (dup) throw new AppError(409, 'CUSTOMER_PHONE_DUPLICATE', 'Phone number is already used by another customer');
     }
+
+    const updates: Record<string, any> = {};
+    if (dto.name !== undefined) updates.name = dto.name;
+    if (dto.phone !== undefined) updates.phone = dto.phone;
+    if (dto.email !== undefined) updates.email = dto.email;
+    if (dto.address !== undefined) updates.address = dto.address;
+    if (dto.creditLimit !== undefined) updates.creditLimit = dto.creditLimit;
+    if (dto.isActive !== undefined) updates.isActive = dto.isActive;
 
     const customer = await Customer.findByIdAndUpdate(
       id,
-      { $set: dto },
+      { $set: updates },
       { new: true, runValidators: true }
     ).lean();
 
@@ -125,46 +139,91 @@ class CustomerService {
 
   async collectDuePayment(customerId: string, dto: DuePaymentDto, recordedById: string) {
     if (!Types.ObjectId.isValid(customerId)) throw new AppError(400, 'INVALID_ID', 'Invalid customer ID');
-    const customer = await Customer.findById(customerId);
-    if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
 
-    const amount = Number(dto.amount);
-    if (amount <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Payment amount must be greater than 0');
-    if (amount > customer.currentDueBalance) {
-      throw new AppError(400, 'OVERPAYMENT', `Amount exceeds current due balance of ৳${customer.currentDueBalance}`);
-    }
+    const amount = roundMoney(Number(dto.amount));
+    if (!Number.isFinite(amount) || amount <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Payment amount must be greater than 0');
 
-    const balanceBefore = customer.currentDueBalance;
-    const balanceAfter = balanceBefore - amount;
-    customer.currentDueBalance = balanceAfter;
-    await customer.save();
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const ledger = await CustomerLedger.create({
-      customerId: customer._id,
-      transactionType: 'PAYMENT_COLLECTION',
-      amount,
-      balanceBefore,
-      balanceAfter,
-      referenceType: 'RECEIPT',
-      referenceId: new Types.ObjectId(recordedById),
-      narration: `Due payment collection via ${dto.paymentMethod}. ${dto.notes || ''}`.trim(),
-      recordedById: new Types.ObjectId(recordedById),
-    });
-
-    // If payment is CASH, accumulate into the cashier's active shift
-    if (dto.paymentMethod === 'CASH') {
-      const activeShift = await Shift.findOne({
-        userId: new Types.ObjectId(recordedById),
-        status: 'OPEN',
-      });
-      if (activeShift) {
-        activeShift.cashSalesTotal += amount;
-        activeShift.expectedCash += amount;
-        await activeShift.save();
+    try {
+      const customer = await Customer.findById(customerId).session(session);
+      if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+      if (amount > customer.currentDueBalance) {
+        throw new AppError(400, 'OVERPAYMENT', `Amount exceeds current due balance of ৳${customer.currentDueBalance}`);
       }
-    }
 
-    return { customer, ledger };
+      const balanceBefore = customer.currentDueBalance;
+      const balanceAfter = roundMoney(balanceBefore - amount);
+      customer.currentDueBalance = balanceAfter;
+      await customer.save({ session });
+
+      const ledger = await CustomerLedger.create(
+        [
+          {
+            customerId: customer._id,
+            transactionType: 'PAYMENT_COLLECTION',
+            amount,
+            balanceBefore,
+            balanceAfter,
+            referenceType: 'RECEIPT',
+            referenceId: new Types.ObjectId(recordedById),
+            narration: `Due payment collection via ${dto.paymentMethod}. ${dto.narration || dto.notes || ''}`.trim(),
+            recordedById: new Types.ObjectId(recordedById),
+          },
+        ],
+        { session }
+      );
+
+      // Credit the receiving financial account (Rule: due collection credits account)
+      if (dto.paymentAccountId && Types.ObjectId.isValid(dto.paymentAccountId)) {
+        const account = await Account.findById(dto.paymentAccountId).session(session);
+        if (!account) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Payment account not found');
+        if (!account.isActive) throw new AppError(422, 'ACCOUNT_NOT_ACTIVE', `Account ${account.name} is inactive`);
+
+        const acctBefore = account.currentBalance;
+        const acctAfter = roundMoney(acctBefore + amount);
+        account.currentBalance = acctAfter;
+        await account.save({ session });
+
+        await AccountTransaction.create(
+          [
+            {
+              accountId: account._id,
+              type: 'CREDIT',
+              amount,
+              balanceBefore: acctBefore,
+              balanceAfter: acctAfter,
+              referenceType: 'DUE_COLLECTION',
+              referenceId: customer._id,
+              description: `Customer due collection from ${customer.name}`,
+            },
+          ],
+          { session }
+        );
+      }
+
+      // If payment is CASH, accumulate into the cashier's active shift
+      if (dto.paymentMethod === 'CASH') {
+        const activeShift = await Shift.findOne({
+          userId: new Types.ObjectId(recordedById),
+          status: 'OPEN',
+        }).session(session);
+        if (activeShift) {
+          activeShift.cashSalesTotal = roundMoney(activeShift.cashSalesTotal + amount);
+          activeShift.expectedCash = roundMoney(activeShift.expectedCash + amount);
+          await activeShift.save({ session });
+        }
+      }
+
+      await session.commitTransaction();
+      return { customer, ledger: ledger[0] };
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
   }
 }
 

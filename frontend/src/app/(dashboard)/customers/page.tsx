@@ -24,8 +24,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface Customer {
@@ -92,7 +96,7 @@ export default function CustomersPage() {
         limit: '100',
         ...(search ? { search } : {}),
       });
-      const res = await fetch(`${API}/customers?${params.toString()}`, { headers: authHeader() });
+      const res = await fetch(`${API}/customers?${params.toString()}`, fetchOpts());
       const j = await res.json();
       if (j.success) {
         let list: Customer[] = j.data.data || [];
@@ -155,14 +159,13 @@ export default function CustomersPage() {
       const url = editTarget ? `${API}/customers/${editTarget._id}` : `${API}/customers`;
       const method = editTarget ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetch(url, fetchOpts({
         method,
-        headers: authHeader(),
         body: JSON.stringify(payload),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to save customer');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Failed to save customer');
 
       setShowCreateModal(false);
       fetchCustomers();
@@ -197,18 +200,17 @@ export default function CustomersPage() {
     setPayError('');
 
     try {
-      const res = await fetch(`${API}/customers/${paymentCustomer._id}/pay-due`, {
+      const res = await fetch(`${API}/customers/${paymentCustomer._id}/pay-due`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
         body: JSON.stringify({
           amount: Number(payAmount),
           paymentMethod: payMethod,
           notes: payNotes.trim() || undefined,
         }),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Payment collection failed');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Payment collection failed');
 
       setShowPaymentModal(false);
       fetchCustomers();
@@ -225,7 +227,7 @@ export default function CustomersPage() {
     setLoadingLedger(true);
 
     try {
-      const res = await fetch(`${API}/customers/${c._id}/ledger`, { headers: authHeader() });
+      const res = await fetch(`${API}/customers/${c._id}/ledger`, fetchOpts());
       const j = await res.json();
       if (j.success) {
         setLedgerEntries(j.data.data || []);
@@ -242,7 +244,7 @@ export default function CustomersPage() {
     }
     if (!confirm(`Delete customer "${c.name}"?`)) return;
     try {
-      const res = await fetch(`${API}/customers/${c._id}`, { method: 'DELETE', headers: authHeader() });
+      const res = await fetch(`${API}/customers/${c._id}`, fetchOpts({ method: 'DELETE' }));
       const j = await res.json();
       if (j.success) fetchCustomers();
       else alert(j.message);
@@ -300,11 +302,10 @@ export default function CustomersPage() {
 
         <button
           onClick={() => setFilterDueOnly(!filterDueOnly)}
-          className={`px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center space-x-2 ${
-            filterDueOnly
-              ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
-              : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
-          }`}
+          className={`px-4 py-2 rounded-lg text-xs font-bold border transition flex items-center space-x-2 ${filterDueOnly
+            ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+            : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+            }`}
         >
           <DollarSign className="w-3.5 h-3.5" />
           <span>Show Customers with Due Balance Only</span>
@@ -666,9 +667,8 @@ export default function CustomersPage() {
                       </div>
                       <div className="text-right">
                         <div
-                          className={`font-bold text-sm ${
-                            e.transactionType === 'SALE_DUE' ? 'text-rose-400' : 'text-emerald-400'
-                          }`}
+                          className={`font-bold text-sm ${e.transactionType === 'SALE_DUE' ? 'text-rose-400' : 'text-emerald-400'
+                            }`}
                         >
                           {e.transactionType === 'SALE_DUE' ? `+৳${e.amount.toFixed(2)}` : `-৳${e.amount.toFixed(2)}`}
                         </div>

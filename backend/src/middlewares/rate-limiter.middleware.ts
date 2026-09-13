@@ -15,3 +15,19 @@ export const authRateLimiter = rateLimit({
     );
   },
 });
+
+// Throttle PIN verification to prevent 4-digit PIN brute forcing
+export const pinRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    sendError(
+      res,
+      429,
+      'RATE_LIMIT_EXCEEDED',
+      'Too many PIN attempts. Please try again after 1 minute.'
+    );
+  },
+});

@@ -7,7 +7,7 @@ import { updateSettingsSchema } from '../validators/settings.validators';
 
 const router = Router();
 router.use(authenticate);
-router.get('/', (req, res, next) => settingsController.getSettings(req, res, next));
+router.get('/', requirePermissions('settings:manage'), (req, res, next) => settingsController.getSettings(req, res, next));
 router.put('/', requirePermissions('settings:manage'), validate(updateSettingsSchema), (req, res, next) => settingsController.updateSettings(req, res, next));
 export default router;
 

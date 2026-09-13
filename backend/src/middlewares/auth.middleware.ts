@@ -46,14 +46,14 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const blacklisted = await TokenBlacklist.findOne({ tokenHash });
     if (blacklisted) {
-      sendError(res, 401, 'TOKEN_REVOKED', 'Session has been invalidated. Please login again.');
+      sendError(res, 401, 'TOKEN_INVALID_OR_BLACKLISTED', 'Session has been invalidated. Please login again.');
       return;
     }
 
     // Verify JWT
     const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
     if (!decoded || !decoded.userId) {
-      sendError(res, 401, 'INVALID_TOKEN', 'Invalid authentication token.');
+      sendError(res, 401, 'TOKEN_INVALID_OR_BLACKLISTED', 'Invalid authentication token.');
       return;
     }
 
@@ -67,6 +67,15 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     const role = user.roleId;
     const permissions: string[] = role && role.permissions ? role.permissions : [];
     const roleName: string = role && role.name ? role.name : 'CASHIER';
+
+    // Terminal quick-lock enforcement (server-side). Only the unlock / session
+    // management endpoints remain reachable while the terminal is locked.
+    const unlockedPaths = ['/auth/me', '/auth/logout', '/auth/unlock-terminal', '/auth/lock-terminal'];
+    const isExempt = unlockedPaths.some((p) => req.originalUrl.includes(p));
+    if (user.terminalLocked && !isExempt) {
+      sendError(res, 403, 'TERMINAL_LOCKED', 'Terminal is locked. Enter your PIN to unlock.');
+      return;
+    }
 
     req.user = {
       _id: user._id,
@@ -86,7 +95,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       return;
     }
     if (error.name === 'JsonWebTokenError') {
-      sendError(res, 401, 'INVALID_TOKEN', 'Malformed or invalid authentication token.');
+      sendError(res, 401, 'TOKEN_INVALID_OR_BLACKLISTED', 'Malformed or invalid authentication token.');
       return;
     }
     next(error);

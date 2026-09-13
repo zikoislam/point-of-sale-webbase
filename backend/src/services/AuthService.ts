@@ -28,7 +28,7 @@ export class AuthService {
     }).populate<{ roleId: any }>('roleId');
 
     if (!user) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid username/email or password');
+      throw new AppError(401, 'AUTH_CREDENTIALS_INVALID', 'Invalid username/email or password');
     }
 
     if (!user.isActive) {
@@ -37,7 +37,7 @@ export class AuthService {
 
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid username/email or password');
+      throw new AppError(401, 'AUTH_CREDENTIALS_INVALID', 'Invalid username/email or password');
     }
 
     // Update lastLoginAt
@@ -128,7 +128,7 @@ export class AuthService {
 
     const isPinValid = await user.comparePin(pin);
     if (!isPinValid) {
-      throw new AppError(400, 'INVALID_PIN', 'Incorrect 4-digit PIN');
+      throw new AppError(401, 'PIN_INVALID', 'Incorrect 4-digit PIN');
     }
 
     user.terminalLocked = false;

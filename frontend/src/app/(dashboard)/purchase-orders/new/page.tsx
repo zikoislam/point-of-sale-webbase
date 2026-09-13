@@ -99,23 +99,33 @@ export default function CreatePurchaseOrderPage() {
           : [];
 
         const variantsList: ProductVariantItem[] = [];
-        prodList.forEach((prod: any) => {
-          if (Array.isArray(prod.variants)) {
-            prod.variants.forEach((v: any) => {
+        for (const prod of prodList) {
+          // The list endpoint returns summaries only — fetch the detail for variants
+          let full = prod;
+          if (!Array.isArray(prod.variants)) {
+            try {
+              const det = await api.get(`/products/${prod.id || prod._id}`);
+              full = det.data || prod;
+            } catch {
+              full = prod;
+            }
+          }
+          if (Array.isArray(full.variants)) {
+            full.variants.forEach((v: any) => {
               const attrStr = Array.isArray(v.attributes)
                 ? v.attributes.map((a: any) => `${a.name}: ${a.value}`).join(', ')
                 : '';
               variantsList.push({
                 variantId: v.id || v._id,
-                productId: prod.id || prod._id,
-                productName: prod.name,
+                productId: full.id || full._id,
+                productName: full.name,
                 sku: v.sku,
                 attributeSummary: attrStr,
                 costPrice: v.costPrice || 0,
               });
             });
           }
-        });
+        }
         setAvailableVariants(variantsList);
       } catch (err: any) {
         toast.error('Load Error', 'Failed to load suppliers or products');

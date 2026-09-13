@@ -67,13 +67,13 @@ class WastageService {
         { session }
       );
 
-      // 2. Ensure "WASTAGE_LOSS" ExpenseCategory exists
+      // 2. Ensure "Inventory Shrinkage & Loss" ExpenseCategory exists
       let wastageCat = await ExpenseCategory.findOne({ code: 'WASTAGE_LOSS' }).session(session);
       if (!wastageCat) {
         const createdCat = await ExpenseCategory.create(
           [
             {
-              name: 'Inventory Wastage & Spoilage',
+              name: 'Inventory Shrinkage & Loss',
               code: 'WASTAGE_LOSS',
             },
           ],
@@ -82,22 +82,50 @@ class WastageService {
         wastageCat = createdCat[0];
       }
 
-      // 3. Find primary account or create default for booking the loss
-      let account = await Account.findOne().session(session);
-      if (account) {
-        await Expense.create(
-          [
-            {
-              categoryId: wastageCat._id,
-              amount: lossValuation,
-              accountId: account._id,
-              description: `Damaged/Wastage loss: ${qty}x ${product.name} (${variant.attributeName}). Reason: ${dto.reason}`,
-              createdById: new Types.ObjectId(userId),
-            },
-          ],
-          { session }
-        );
+      // 3. Resolve the account to debit for the loss
+      const account =
+        (await Account.findOne({ accountType: 'CASH', isActive: true }).session(session)) ||
+        (await Account.findOne({ isActive: true }).session(session));
+      if (!account) {
+        throw new AppError(422, 'ACCOUNT_NOT_FOUND', 'No active financial account available to book the wastage loss');
       }
+
+      // 4. Book the expense
+      await Expense.create(
+        [
+          {
+            categoryId: wastageCat._id,
+            amount: lossValuation,
+            accountId: account._id,
+            description: `Damaged/Wastage loss: ${qty}x ${product.name} (${variant.attributeName}). Reason: ${dto.reason}`,
+            createdById: new Types.ObjectId(userId),
+          },
+        ],
+        { session }
+      );
+
+      // 5. Debit the account balance
+      const balanceBefore = account.currentBalance;
+      const balanceAfter = Math.round((balanceBefore - lossValuation + Number.EPSILON) * 100) / 100;
+      account.currentBalance = balanceAfter;
+      await account.save({ session });
+
+      // 6. Record the account ledger entry
+      await AccountTransaction.create(
+        [
+          {
+            accountId: account._id,
+            type: 'DEBIT',
+            amount: lossValuation,
+            balanceBefore,
+            balanceAfter,
+            referenceType: 'WASTAGE_LOSS',
+            referenceId: movement[0]._id,
+            description: `Wastage loss: ${qty}x ${product.name} (${variant.attributeName})`,
+          },
+        ],
+        { session }
+      );
 
       await session.commitTransaction();
       return movement[0].toObject() as unknown as IStockMovement;

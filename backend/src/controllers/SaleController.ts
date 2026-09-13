@@ -29,15 +29,35 @@ class SaleController {
 
   async resumeCart(req: Request, res: Response, next: NextFunction) {
     try {
-      const cart = await saleService.resumeCart(req.params.id);
+      const cashierId = (req as any).user._id.toString();
+      const cart = await saleService.resumeCart(req.params.id, cashierId);
       sendSuccess(res, 200, 'Cart resumed', cart);
     } catch (err) { next(err); }
   }
 
   async deleteHoldCart(req: Request, res: Response, next: NextFunction) {
     try {
-      await saleService.deleteHoldCart(req.params.id);
+      const cashierId = (req as any).user._id.toString();
+      await saleService.deleteHoldCart(req.params.id, cashierId);
       sendSuccess(res, 200, 'Hold cart discarded');
+    } catch (err) { next(err); }
+  }
+
+  async list(req: Request, res: Response, next: NextFunction) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const result = await saleService.listSales(page, limit, {
+        shiftId: req.query.shiftId as string | undefined,
+        customerId: req.query.customerId as string | undefined,
+        search: req.query.search as string | undefined,
+      });
+      sendSuccess(res, 200, 'Sales fetched', result.data, {
+        page: result.page,
+        limit,
+        totalItems: result.total,
+        totalPages: result.totalPages,
+      });
     } catch (err) { next(err); }
   }
 

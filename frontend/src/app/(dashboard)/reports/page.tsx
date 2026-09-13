@@ -22,8 +22,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 type ReportTab = 'SALES' | 'PRODUCTS' | 'INVENTORY' | 'PNL' | 'DUES' | 'PAYABLES';
@@ -53,27 +57,27 @@ export default function ReportsPage() {
 
     try {
       if (activeTab === 'SALES') {
-        const res = await fetch(`${API}/reports/sales?${query}`, { headers: authHeader() });
+        const res = await fetch(`${API}/reports/sales?${query}`, fetchOpts());
         const j = await res.json();
         if (j.success) setSalesReport(j.data);
       } else if (activeTab === 'PRODUCTS') {
-        const res = await fetch(`${API}/reports/products?${query}`, { headers: authHeader() });
+        const res = await fetch(`${API}/reports/products?${query}`, fetchOpts());
         const j = await res.json();
         if (j.success) setProductsReport(j.data || []);
       } else if (activeTab === 'INVENTORY') {
-        const res = await fetch(`${API}/reports/inventory`, { headers: authHeader() });
+        const res = await fetch(`${API}/reports/inventory`, fetchOpts());
         const j = await res.json();
         if (j.success) setInventoryReport(j.data);
       } else if (activeTab === 'PNL') {
-        const res = await fetch(`${API}/reports/pnl?${query}`, { headers: authHeader() });
+        const res = await fetch(`${API}/reports/pnl?${query}`, fetchOpts());
         const j = await res.json();
         if (j.success) setPnlReport(j.data);
       } else if (activeTab === 'DUES') {
-        const res = await fetch(`${API}/reports/dues`, { headers: authHeader() });
+        const res = await fetch(`${API}/reports/dues`, fetchOpts());
         const j = await res.json();
         if (j.success) setDuesReport(j.data);
       } else if (activeTab === 'PAYABLES') {
-        const res = await fetch(`${API}/reports/payables`, { headers: authHeader() });
+        const res = await fetch(`${API}/reports/payables`, fetchOpts());
         const j = await res.json();
         if (j.success) setPayablesReport(j.data);
       }

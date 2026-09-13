@@ -81,14 +81,16 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     queryKey: ['active-shift'],
     queryFn: async () => {
       try {
-        const res = await api.get('/shifts/current');
+        const res = await api.get('/shifts/active');
         return res?.data;
       } catch {
         return null;
       }
     },
+    enabled: !!user, // only run when user is authenticated
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
+    retry: false, // don't retry on 404/403
   });
 
   const hasActiveShift = Boolean(shiftData && shiftData.status === 'OPEN');

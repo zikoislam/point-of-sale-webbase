@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../hooks/useAuth';
 import { Lock, KeyRound, ShieldAlert, Loader2 } from 'lucide-react';
@@ -27,6 +27,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const [pinError, setPinError] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
 
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user)) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, user, router]);
+
   // If loading session
   if (isLoading) {
     return (
@@ -39,7 +45,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // If not logged in
   if (!isAuthenticated || !user) {
-    router.replace('/login');
     return null;
   }
 

@@ -5,8 +5,12 @@ import { Settings, Save, Store, Printer, Tag, RefreshCw, Check } from 'lucide-re
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface ShopSettings {
@@ -57,7 +61,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/settings`, { headers: authHeader() })
+    fetch(`${API}/settings`, fetchOpts())
       .then((r) => r.json())
       .then((j) => { if (j.success) setForm({ ...defaultSettings, ...j.data }); })
       .finally(() => setLoading(false));
@@ -66,9 +70,9 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`${API}/settings`, {
-        method: 'PUT', headers: authHeader(), body: JSON.stringify(form),
-      });
+      const res = await fetch(`${API}/settings`, fetchOpts({
+        method: 'PUT', body: JSON.stringify(form),
+      }));
       const j = await res.json();
       if (j.success) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
     } finally { setSaving(false); }

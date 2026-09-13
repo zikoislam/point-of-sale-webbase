@@ -78,6 +78,7 @@ const UserSchema = new Schema<IUser>(
 
 // Indexes
 UserSchema.index({ roleId: 1 });
+UserSchema.index({ phone: 1 }, { unique: true });
 
 // Pre-save hook to hash password and PIN if modified
 UserSchema.pre<IUser>('save', async function (next) {

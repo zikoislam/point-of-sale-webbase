@@ -6,7 +6,7 @@ import { Spinner } from './Spinner';
 export interface SearchInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   value?: string;
-  onChange?: (value: any) => void;
+  onChange?: (value: string) => void;
   onClear?: () => void;
   debounceMs?: number;
   loading?: boolean;
@@ -30,6 +30,11 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
   ) => {
     const [localValue, setLocalValue] = useState(controlledValue || '');
     const isFirstRender = useRef(true);
+    const onChangeRef = useRef(onChange);
+
+    useEffect(() => {
+      onChangeRef.current = onChange;
+    }, [onChange]);
 
     useEffect(() => {
       if (controlledValue !== undefined) {
@@ -44,21 +49,15 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       }
 
       const timer = setTimeout(() => {
-        if (onChange) {
-          (onChange as any)(localValue);
-          (onChange as any)({ target: { value: localValue } });
-        }
+        onChangeRef.current?.(localValue);
       }, debounceMs);
 
       return () => clearTimeout(timer);
-    }, [localValue, debounceMs, onChange]);
+    }, [localValue, debounceMs]);
 
     const handleClear = () => {
       setLocalValue('');
-      if (onChange) {
-        (onChange as any)('');
-        (onChange as any)({ target: { value: '' } });
-      }
+      onChangeRef.current?.('');
       onClear?.();
     };
 

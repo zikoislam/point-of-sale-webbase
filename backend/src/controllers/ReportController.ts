@@ -56,6 +56,22 @@ class ReportController {
     } catch (err) { next(err); }
   }
 
+  async getPurchases(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { startDate, endDate } = req.query;
+      const data = await reportService.getPurchaseReport(startDate as string, endDate as string);
+      sendSuccess(res, 200, 'Purchase report generated', data);
+    } catch (err) { next(err); }
+  }
+
+  async getInventoryWastage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { startDate, endDate } = req.query;
+      const data = await reportService.getInventoryWastageReport(startDate as string, endDate as string);
+      sendSuccess(res, 200, 'Inventory wastage report generated', data);
+    } catch (err) { next(err); }
+  }
+
   async exportCsv(req: Request, res: Response, next: NextFunction) {
     try {
       const { type } = req.params;

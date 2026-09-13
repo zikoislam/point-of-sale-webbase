@@ -34,10 +34,14 @@ const getRoleBadge = (role: string) => {
   }
 };
 
-const authHeader = () => {
-  const token = localStorage.getItem('pos_access_token');
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-};
+const authHeader = () => ({
+  'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
+});
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -58,7 +62,7 @@ export default function UsersPage() {
       if (search) params.set('search', search);
       if (roleFilter) params.set('roleId', roleFilter);
       if (activeFilter) params.set('isActive', activeFilter);
-      const res = await fetch(`${API}/users?${params}`, { headers: authHeader() });
+      const res = await fetch(`${API}/users?${params}`, fetchOpts());
       const json = await res.json();
       if (json.success) {
         setUsers(json.data);
@@ -71,7 +75,7 @@ export default function UsersPage() {
   }, [search, roleFilter, activeFilter, page]);
 
   const fetchRoles = async () => {
-    const res = await fetch(`${API}/roles`, { headers: authHeader() });
+    const res = await fetch(`${API}/roles`, fetchOpts());
     const json = await res.json();
     if (json.success) setRoles(json.data);
   };
@@ -83,23 +87,21 @@ export default function UsersPage() {
     const method = currentActive ? 'DELETE' : 'PUT';
     const url = currentActive ? `${API}/users/${id}` : `${API}/users/${id}`;
     if (currentActive) {
-      await fetch(`${API}/users/${id}`, { method: 'DELETE', headers: authHeader() });
+      await fetch(`${API}/users/${id}`, fetchOpts({ method: 'DELETE' }));
     } else {
-      await fetch(`${API}/users/${id}`, {
+      await fetch(`${API}/users/${id}`, fetchOpts({
         method: 'PUT',
-        headers: authHeader(),
         body: JSON.stringify({ isActive: true }),
-      });
+      }));
     }
     fetchUsers();
   };
 
   const handleCreateUser = async (data: any) => {
-    const res = await fetch(`${API}/users`, {
+    const res = await fetch(`${API}/users`, fetchOpts({
       method: 'POST',
-      headers: authHeader(),
       body: JSON.stringify(data),
-    });
+    }));
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'Failed to create user');
     fetchUsers();

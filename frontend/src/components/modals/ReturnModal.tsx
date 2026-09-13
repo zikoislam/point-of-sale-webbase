@@ -80,6 +80,10 @@ export function ReturnModal({ sale, onClose, onSuccess }: ReturnModalProps) {
       setError('Please provide a reason for return');
       return;
     }
+    if (!/^\d{4,}$/.test(managerPin.trim())) {
+      setError('Manager PIN (min 4 digits) is required to authorise a return');
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -90,11 +94,12 @@ export function ReturnModal({ sale, onClose, onSuccess }: ReturnModalProps) {
         items: activeReturns.map((i) => ({
           variantId: i.variantId,
           quantity: i.returnQty,
-          condition: i.isResaleable ? 'RESTOCK' : 'DAMAGED',
+          unitRefundPrice: i.unitRefundPrice,
+          isResaleable: i.isResaleable,
         })),
         refundType,
         reason: returnReason.trim(),
-        managerPin: managerPin.trim() || undefined,
+        managerPin: managerPin.trim(),
       };
 
       const res = await api.post('/returns', payload);
@@ -227,7 +232,7 @@ export function ReturnModal({ sale, onClose, onSuccess }: ReturnModalProps) {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
                 Refund Disbursement
@@ -240,6 +245,21 @@ export function ReturnModal({ sale, onClose, onSuccess }: ReturnModalProps) {
                 <option value="CASH">Cash Refund (Deduct from Register)</option>
                 <option value="STORE_CREDIT">Store Credit Voucher</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Manager PIN *
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={8}
+                value={managerPin}
+                onChange={(e) => setManagerPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-mono tracking-widest"
+              />
             </div>
 
             <div>

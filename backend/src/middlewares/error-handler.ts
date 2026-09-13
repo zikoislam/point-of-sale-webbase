@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
 import { AppError } from '../utils/app-error';
 import { sendError } from '../utils/api-response';
 
@@ -10,6 +11,19 @@ export const errorHandler = (
 ): void => {
   if (err instanceof AppError) {
     sendError(res, err.statusCode, err.errorCode, err.message, err.details);
+    return;
+  }
+
+  // Zod validation performed inside services (not via the validate() middleware)
+  if (err instanceof ZodError) {
+    const details = err.errors.map((e) => ({ field: e.path.join('.'), message: e.message }));
+    sendError(res, 400, 'INVALID_PAYLOAD', 'Validation failed', details);
+    return;
+  }
+
+  // Duplicate key (unique index violation)
+  if ((err as any).code === 11000) {
+    sendError(res, 409, 'DUPLICATE_RESOURCE', 'A record with these unique values already exists');
     return;
   }
 

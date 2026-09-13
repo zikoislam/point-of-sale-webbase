@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '../../../hooks/useAuth';
 import {
   Boxes,
   AlertTriangle,
@@ -18,8 +19,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface Variant {
@@ -52,6 +57,9 @@ interface WastageRecord {
 }
 
 export default function InventoryPage() {
+  const { user } = useAuth();
+  const canViewCost = user?.role === 'SUPER_ADMIN' || user?.role === 'BRANCH_MANAGER';
+  const canAdjust = user?.role === 'SUPER_ADMIN' || (user?.permissions || []).includes('inv:adjust');
   const [activeTab, setActiveTab] = useState<'STOCK' | 'WASTAGE'>('STOCK');
   const [products, setProducts] = useState<Product[]>([]);
   const [wastages, setWastages] = useState<WastageRecord[]>([]);
@@ -68,12 +76,12 @@ export default function InventoryPage() {
 
   const fetchCatalog = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/products?limit=100`, { headers: authHeader() });
+      const res = await fetch(`${API}/products?limit=100`, fetchOpts());
       const j = await res.json();
       if (j.success) {
         const fullProds: Product[] = [];
-        for (const p of j.data.products || []) {
-          const det = await fetch(`${API}/products/${p.id}`, { headers: authHeader() });
+        for (const p of j.data || []) {
+          const det = await fetch(`${API}/products/${p.id}`, fetchOpts());
           const dj = await det.json();
           if (dj.success && dj.data) fullProds.push(dj.data);
         }
@@ -86,7 +94,7 @@ export default function InventoryPage() {
 
   const fetchWastages = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/inventory/wastage?limit=50`, { headers: authHeader() });
+      const res = await fetch(`${API}/inventory/wastage?limit=50`, fetchOpts());
       const j = await res.json();
       if (j.success) setWastages(j.data.data || []);
     } catch (e) {
@@ -163,18 +171,17 @@ export default function InventoryPage() {
     setWastageError('');
 
     try {
-      const res = await fetch(`${API}/inventory/wastage`, {
+      const res = await fetch(`${API}/inventory/wastage`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
         body: JSON.stringify({
           variantId: selectedVariantId,
           quantity: Number(wastageQty),
           reason: wastageReason.trim(),
         }),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to record wastage');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Failed to record wastage');
 
       setShowWastageModal(false);
       refreshAll();
@@ -233,7 +240,7 @@ export default function InventoryPage() {
         <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-1">
           <div className="text-xs text-slate-400 uppercase font-semibold">Total Inventory Valuation</div>
           <div className="text-2xl font-black text-emerald-400">
-            ৳{totalValuation.toFixed(2)}
+            {canViewCost ? `৳${totalValuation.toFixed(2)}` : '—'}
           </div>
           <p className="text-[11px] text-slate-500">Based on Weighted Average Cost (WAC)</p>
         </div>
@@ -327,7 +334,7 @@ export default function InventoryPage() {
                         </td>
                         <td className="py-3.5 px-4 font-mono text-xs text-slate-300">{v.sku}</td>
                         <td className="py-3.5 px-4 text-right font-medium text-slate-300">
-                          ৳{v.costPrice.toFixed(2)}
+                          {canViewCost ? `৳${(v.costPrice || 0).toFixed(2)}` : '—'}
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <span
@@ -341,16 +348,20 @@ export default function InventoryPage() {
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right font-bold text-emerald-400">
-                          ৳{(v.currentStock * v.costPrice).toFixed(2)}
+                          {canViewCost ? `৳${(v.currentStock * (v.costPrice || 0)).toFixed(2)}` : '—'}
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => openWastageModal(v.variantId)}
-                            className="px-2.5 py-1 rounded-lg bg-rose-600/20 border border-rose-500/30 text-rose-300 text-xs font-semibold hover:bg-rose-600/30 transition flex items-center space-x-1 ml-auto"
-                          >
-                            <Flame className="w-3 h-3" />
-                            <span>Write-off</span>
-                          </button>
+                          {canAdjust ? (
+                            <button
+                              onClick={() => openWastageModal(v.variantId)}
+                              className="px-2.5 py-1 rounded-lg bg-rose-600/20 border border-rose-500/30 text-rose-300 text-xs font-semibold hover:bg-rose-600/30 transition flex items-center space-x-1 ml-auto"
+                            >
+                              <Flame className="w-3 h-3" />
+                              <span>Write-off</span>
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-500">—</span>
+                          )}
                         </td>
                       </tr>
                     ))

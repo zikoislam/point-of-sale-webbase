@@ -26,6 +26,10 @@ export const requireIdempotencyKey = async (
       return;
     }
 
+    // Pass the key through to the service so it is persisted with the sale
+    req.body = req.body || {};
+    req.body.idempotencyKey = idempotencyKey.trim();
+
     next();
   } catch (error) {
     next(error);

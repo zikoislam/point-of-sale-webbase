@@ -1,17 +1,57 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import '../print.css';
 
+/** Path-prefix → required permission (longest prefix wins). */
+const ROUTE_PERMISSIONS: Array<[string, string]> = [
+  ['/dashboard', 'reports:dashboard'],
+  ['/categories', 'inv:view'],
+  ['/brands', 'inv:view'],
+  ['/products', 'inv:view'],
+  ['/inventory', 'inv:view'],
+  ['/barcode-labels', 'inv:labels'],
+  ['/purchase-orders', 'procurement:view'],
+  ['/suppliers', 'procurement:view'],
+  ['/sales', 'sales:view'],
+  ['/customers', 'customers:view'],
+  ['/shifts', 'shifts:operate'],
+  ['/expenses', 'expenses:view'],
+  ['/accounts', 'accounts:view'],
+  ['/reports', 'reports:dashboard'],
+  ['/users', 'users:manage'],
+  ['/roles', 'roles:view'],
+  ['/audit-logs', 'audit:view'],
+  ['/settings', 'settings:manage'],
+];
+
+function resolvePermission(pathname: string | null): string | undefined {
+  if (!pathname) return undefined;
+  let best: string | undefined;
+  let bestLen = -1;
+  for (const [prefix, permission] of ROUTE_PERMISSIONS) {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      if (prefix.length > bestLen) {
+        best = permission;
+        bestLen = prefix.length;
+      }
+    }
+  }
+  return best;
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const pathname = usePathname();
+  const requiredPermission = resolvePermission(pathname);
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredPermission={requiredPermission}>
       <div className="flex h-screen bg-slate-950 overflow-hidden">
         {/* Sidebar */}
         <Sidebar

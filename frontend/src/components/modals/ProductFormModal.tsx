@@ -96,39 +96,42 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         const [catRes, brandRes, supRes] = await Promise.all([
           api.get('/categories'),
           api.get('/brands'),
-          api.get('/suppliers'),
+          api.get('/suppliers', { params: { limit: 200 } }),
         ]);
 
-        if (catRes.data) {
-          const catList = Array.isArray(catRes.data) ? catRes.data : [];
-          setCategories(
-            catList.map((c: any) => ({
-              value: c.id || c._id,
-              label: c.name,
-              taxRate: c.defaultTaxRate ?? 0,
-            }))
-          );
-        }
+        // Backend returns paginated: { data: { data: [...], total, page } }
+        // or flat array — handle both shapes
+        const extractList = (res: any): any[] => {
+          const d = res?.data;
+          if (Array.isArray(d)) return d;
+          if (d && Array.isArray(d.data)) return d.data;
+          return [];
+        };
 
-        if (brandRes.data) {
-          const bList = Array.isArray(brandRes.data) ? brandRes.data : [];
-          setBrands(
-            bList.map((b: any) => ({
-              value: b.id || b._id,
-              label: b.name,
-            }))
-          );
-        }
+        const catList = extractList(catRes);
+        setCategories(
+          catList.map((c: any) => ({
+            value: c.id || c._id,
+            label: c.name,
+            taxRate: c.defaultTaxRate ?? 0,
+          }))
+        );
 
-        if (supRes.data) {
-          const sList = Array.isArray(supRes.data) ? supRes.data : [];
-          setSuppliers(
-            sList.map((s: any) => ({
-              value: s.id || s._id,
-              label: s.companyName || s.name,
-            }))
-          );
-        }
+        const bList = extractList(brandRes);
+        setBrands(
+          bList.map((b: any) => ({
+            value: b.id || b._id,
+            label: b.name,
+          }))
+        );
+
+        const sList = extractList(supRes);
+        setSuppliers(
+          sList.map((s: any) => ({
+            value: s.id || s._id,
+            label: s.companyName || s.name,
+          }))
+        );
       } catch (err: any) {
         console.error('Failed to load dropdown data:', err);
       }

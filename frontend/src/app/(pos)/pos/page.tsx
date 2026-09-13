@@ -32,14 +32,19 @@ import {
 } from 'lucide-react';
 import { usePOSHotkeys } from '../../../hooks/usePOSHotkeys';
 import { useOfflineSync } from '../../../hooks/useOfflineSync';
+import { useAuth } from '../../../hooks/useAuth';
 import { queueOfflineSale } from '../../../lib/offline-queue';
 import { EscposBuilder } from '../../../lib/escpos-builder';
 import { openCashDrawer } from '../../../lib/cash-drawer';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pos_access_token') : ''}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface Variant {
@@ -74,6 +79,7 @@ interface CartItem {
   quantity: number;
   unitSellingPrice: number;
   taxRate: number;
+  taxType: string;
   discount: number;
   stockAvailable: number;
 }
@@ -105,6 +111,7 @@ interface HoldCartItem {
 }
 
 export default function POSTerminalPage() {
+  const { lockTerminal, unlockTerminal } = useAuth();
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
   const [loadingShift, setLoadingShift] = useState(true);
 
@@ -156,7 +163,7 @@ export default function POSTerminalPage() {
   // 1. Fetch Shift
   const fetchActiveShift = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/shifts/active`, { headers: authHeader() });
+      const res = await fetch(`${API}/shifts/active`, fetchOpts());
       const j = await res.json();
       if (j.success && j.data) {
         setActiveShift(j.data);
@@ -174,16 +181,16 @@ export default function POSTerminalPage() {
   const fetchCatalog = useCallback(async () => {
     try {
       const [cRes, pRes] = await Promise.all([
-        fetch(`${API}/categories`, { headers: authHeader() }),
-        fetch(`${API}/products?limit=100`, { headers: authHeader() }),
+        fetch(`${API}/categories`, fetchOpts()),
+        fetch(`${API}/products?limit=100`, fetchOpts()),
       ]);
       const [cJson, pJson] = await Promise.all([cRes.json(), pRes.json()]);
       if (cJson.success) setCategories(cJson.data);
 
       if (pJson.success) {
         const fullProducts: Product[] = [];
-        for (const p of pJson.data.products || []) {
-          const det = await fetch(`${API}/products/${p.id}`, { headers: authHeader() });
+        for (const p of pJson.data || []) {
+          const det = await fetch(`${API}/products/${p.id}`, fetchOpts());
           const dj = await det.json();
           if (dj.success && dj.data) {
             fullProducts.push(dj.data);
@@ -200,11 +207,11 @@ export default function POSTerminalPage() {
   const fetchAux = useCallback(async () => {
     try {
       const [custRes, holdRes] = await Promise.all([
-        fetch(`${API}/customers`, { headers: authHeader() }),
-        fetch(`${API}/sales/hold-carts`, { headers: authHeader() }),
+        fetch(`${API}/customers`, fetchOpts()),
+        fetch(`${API}/sales/hold-carts`, fetchOpts()),
       ]);
       const [custJson, holdJson] = await Promise.all([custRes.json(), holdRes.json()]);
-      if (custJson.success) setCustomers(custJson.data || []);
+      if (custJson.success) setCustomers(custJson.data?.data || custJson.data || []);
       if (holdJson.success) setHoldCarts(holdJson.data || []);
     } catch (e) {
       console.error(e);
@@ -258,6 +265,7 @@ export default function POSTerminalPage() {
             quantity: 1,
             unitSellingPrice: price,
             taxRate: product.taxRate || 0,
+            taxType: product.taxType || 'INCLUSIVE',
             discount: 0,
             stockAvailable: variant.currentStock,
           },
@@ -318,22 +326,32 @@ export default function POSTerminalPage() {
     setCart((prev) => prev.filter((i) => i.variantId !== variantId));
   };
 
-  // Cart Calculations
-  const subtotal = cart.reduce((acc, item) => acc + item.quantity * item.unitSellingPrice, 0);
-  const totalTax = cart.reduce(
-    (acc, item) => acc + (item.quantity * item.unitSellingPrice * item.taxRate) / 100,
-    0
+  // Cart Calculations — mirrors server Rule 1 (INCLUSIVE tax is inside the price)
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const lineGross = (item: CartItem) => item.quantity * item.unitSellingPrice;
+  const lineNet = (item: CartItem) => Math.max(0, lineGross(item) - (item.discount || 0));
+  const lineTax = (item: CartItem) => {
+    if (item.taxType === 'EXCLUSIVE') return (lineNet(item) * item.taxRate) / 100;
+    if (item.taxType === 'INCLUSIVE') return lineNet(item) - lineNet(item) / (1 + item.taxRate / 100);
+    return 0;
+  };
+  const lineTotal = (item: CartItem) =>
+    item.taxType === 'EXCLUSIVE' ? lineNet(item) + lineTax(item) : lineNet(item);
+
+  const subtotal = round2(cart.reduce((acc, item) => acc + lineNet(item), 0));
+  const totalTax = round2(cart.reduce((acc, item) => acc + lineTax(item), 0));
+  const grandTotal = Math.max(
+    0,
+    round2(cart.reduce((acc, item) => acc + lineTotal(item), 0) - overallDiscount)
   );
-  const grandTotal = Math.max(0, subtotal + totalTax - overallDiscount);
 
   // Hold Cart
   const handleHoldCart = async () => {
     if (cart.length === 0) return;
     const label = prompt('Enter a label for this held cart (e.g. Customer Name):') || 'Parked Cart';
     try {
-      const res = await fetch(`${API}/sales/hold-cart`, {
+      const res = await fetch(`${API}/sales/hold-cart`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
         body: JSON.stringify({
           cartLabel: label,
           customerId: selectedCustomer?._id,
@@ -345,7 +363,7 @@ export default function POSTerminalPage() {
           })),
           discountAmount: overallDiscount,
         }),
-      });
+      }));
       const j = await res.json();
       if (j.success) {
         setCart([]);
@@ -363,10 +381,9 @@ export default function POSTerminalPage() {
   // Resume Cart
   const handleResumeCart = async (cartId: string) => {
     try {
-      const res = await fetch(`${API}/sales/hold-cart/${cartId}/resume`, {
+      const res = await fetch(`${API}/sales/hold-cart/${cartId}/resume`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
-      });
+      }));
       const j = await res.json();
       if (j.success) {
         const hc = j.data;
@@ -380,6 +397,7 @@ export default function POSTerminalPage() {
             quantity: i.quantity,
             unitSellingPrice: i.unitSellingPrice,
             taxRate: i.taxRate || 0,
+            taxType: i.taxType || 'INCLUSIVE',
             discount: i.discount || 0,
             stockAvailable: 999, // default
           }))
@@ -429,7 +447,7 @@ export default function POSTerminalPage() {
       payments: [
         {
           method: paymentMethod,
-          amount: paymentMethod === 'CASH' ? Math.min(cashTendered, grandTotal) : grandTotal,
+          amount: paymentMethod === 'CASH' ? cashTendered : grandTotal,
         },
       ],
       changeReturned,
@@ -473,14 +491,14 @@ export default function POSTerminalPage() {
 
     // If Online: Normal API checkout
     try {
-      const res = await fetch(`${API}/sales/checkout`, {
+      const res = await fetch(`${API}/sales/checkout`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
+        headers: { 'Idempotency-Key': payload.idempotencyKey },
         body: JSON.stringify(payload),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Checkout failed');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Checkout failed');
 
       setCompletedSale(j.data);
       setShowCheckoutModal(false);
@@ -506,6 +524,12 @@ export default function POSTerminalPage() {
     }
   };
 
+  // Lock terminal on both client and server so the API is actually protected
+  const handleLockTerminal = () => {
+    setIsLocked(true);
+    lockTerminal().catch(() => {});
+  };
+
   // Bind Keyboard Hotkeys Hook (F2, F4, F8, F9, Ctrl+L, Escape, Enter)
   usePOSHotkeys({
     onFocusBarcode: () => barcodeInputRef.current?.focus(),
@@ -516,7 +540,7 @@ export default function POSTerminalPage() {
       el?.focus();
     },
     onOpenPaymentModal: openCheckout,
-    onLockTerminal: () => setIsLocked(true),
+    onLockTerminal: handleLockTerminal,
     onCloseModals: () => {
       setShowCheckoutModal(false);
       setShowReceiptModal(false);
@@ -636,7 +660,7 @@ export default function POSTerminalPage() {
 
           {/* Lock Terminal Button */}
           <button
-            onClick={() => setIsLocked(true)}
+            onClick={handleLockTerminal}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white transition"
             title="Lock POS Terminal (Ctrl+L)"
           >
@@ -1135,7 +1159,7 @@ export default function POSTerminalPage() {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Terminal Locked</h2>
-              <p className="text-xs text-slate-400 mt-1">Enter PIN (default: 1234) to unlock register</p>
+              <p className="text-xs text-slate-400 mt-1">Enter your 4-digit PIN to unlock register</p>
             </div>
 
             {/* PIN Dots */}
@@ -1161,23 +1185,23 @@ export default function POSTerminalPage() {
                     if (digit === 'C') {
                       setPinInput('');
                     } else if (digit === 'OK') {
-                      if (pinInput === '1234' || pinInput.length >= 4) {
-                        setIsLocked(false);
-                        setPinInput('');
+                      if (pinInput.length === 4) {
+                        (async () => {
+                          try {
+                            await unlockTerminal(pinInput);
+                            setIsLocked(false);
+                            setPinInput('');
+                          } catch (err: any) {
+                            alert(err.message || 'Incorrect PIN');
+                            setPinInput('');
+                          }
+                        })();
                       } else {
-                        alert('Incorrect PIN');
-                        setPinInput('');
+                        alert('Enter your 4-digit PIN');
                       }
                     } else {
                       if (pinInput.length < 4) {
-                        const next = pinInput + digit;
-                        setPinInput(next);
-                        if (next === '1234' || next === '0000') {
-                          setTimeout(() => {
-                            setIsLocked(false);
-                            setPinInput('');
-                          }, 200);
-                        }
+                        setPinInput(pinInput + digit);
                       }
                     }
                   }}

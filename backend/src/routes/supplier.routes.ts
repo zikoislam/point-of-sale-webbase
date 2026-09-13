@@ -19,7 +19,8 @@ router.put('/:id', requirePermissions('procurement:manage'), validate(updateSupp
 router.delete('/:id', requirePermissions('procurement:manage'), (req, res, next) => supplierController.delete(req, res, next));
 
 // Supplier Due Payment / Disbursal (Phase 18)
-router.post('/:id/pay-due', requirePermissions('procurement:manage'), validate(supplierDuePaymentSchema), (req, res, next) => supplierController.payDue(req, res, next));
+router.post('/:id/payments', requirePermissions('procurement:pay'), validate(supplierDuePaymentSchema), (req, res, next) => supplierController.payDue(req, res, next));
+router.post('/:id/pay-due', requirePermissions('procurement:pay'), validate(supplierDuePaymentSchema), (req, res, next) => supplierController.payDue(req, res, next));
 
 export default router;
 

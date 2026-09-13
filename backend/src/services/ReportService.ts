@@ -7,6 +7,7 @@ import { Account } from '../models/Account';
 import { Expense } from '../models/Expense';
 import { Shift } from '../models/Shift';
 import { PurchaseOrder } from '../models/PurchaseOrder';
+import { StockMovement } from '../models/StockMovement';
 
 class ReportService {
   async getDashboardMetrics() {
@@ -350,6 +351,90 @@ class ReportService {
         phone: s.phone,
         currentPayableBalance: s.currentPayableBalance,
       })),
+    };
+  }
+
+  async getPurchaseReport(startDate?: string, endDate?: string) {
+    const query: any = {};
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    const pos = await PurchaseOrder.find(query)
+      .populate('supplierId', 'companyName phone')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    let totalOrderedValue = 0;
+    let totalPaid = 0;
+    let totalDue = 0;
+    for (const po of pos) {
+      totalOrderedValue += po.totalAmount || 0;
+      totalPaid += po.paidAmount || 0;
+      totalDue += po.dueAmount || 0;
+    }
+
+    return {
+      summary: {
+        totalPurchaseOrders: pos.length,
+        totalOrderedValue,
+        totalPaid,
+        totalDue,
+      },
+      data: pos,
+    };
+  }
+
+  async getInventoryWastageReport(startDate?: string, endDate?: string) {
+    const query: any = { type: 'WASTAGE' };
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    const movements = await StockMovement.find(query)
+      .populate('productId', 'name unit')
+      .populate('userId', 'fullName name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    let totalQty = 0;
+    let totalLossValue = 0;
+    const data = movements.map((m) => {
+      const lossValue = (m.quantity || 0) * (m.unitCost || 0);
+      totalQty += m.quantity || 0;
+      totalLossValue += lossValue;
+      return {
+        id: m._id,
+        productName: (m.productId as any)?.name || 'Unknown',
+        unit: (m.productId as any)?.unit || '',
+        quantity: m.quantity,
+        unitCost: m.unitCost,
+        lossValue,
+        reason: m.reason,
+        recordedBy: (m.userId as any)?.fullName || (m.userId as any)?.name || '',
+        createdAt: m.createdAt,
+      };
+    });
+
+    return {
+      summary: {
+        totalWastageEvents: movements.length,
+        totalQty,
+        totalLossValue,
+      },
+      data,
     };
   }
 }

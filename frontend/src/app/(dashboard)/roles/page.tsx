@@ -14,10 +14,14 @@ interface Role {
   createdAt: string;
 }
 
-const authHeader = () => {
-  const token = localStorage.getItem('pos_access_token');
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-};
+const authHeader = () => ({
+  'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
+});
 
 const PERM_GROUPS: Record<string, string[]> = {
   'POS & Sales': ['pos:checkout', 'pos:void', 'sales:view', 'sales:refund'],
@@ -38,7 +42,7 @@ export default function RolesPage() {
   const fetchRoles = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/roles`, { headers: authHeader() });
+      const res = await fetch(`${API}/roles`, fetchOpts());
       const json = await res.json();
       if (json.success) {
         setRoles(json.data);

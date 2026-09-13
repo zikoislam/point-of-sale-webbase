@@ -288,7 +288,7 @@ async function runPhasesVerification() {
     const heldList = await saleService.listHoldCarts(adminUserId);
     assert(heldList.some((c) => c._id.toString() === heldCart._id.toString()), 24, 'Parked cart appears in cashier active held list');
 
-    const resumedCart = await saleService.resumeCart(heldCart._id.toString());
+    const resumedCart = await saleService.resumeCart(heldCart._id.toString(), adminUserId);
     assert(resumedCart.cartLabel === 'Customer Walk-in Basket #4', 24, 'Resumed cart returns original items');
 
     const postResume = await HoldCart.findById(heldCart._id).lean();

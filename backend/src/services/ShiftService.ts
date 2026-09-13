@@ -1,7 +1,10 @@
 import mongoose, { Types } from 'mongoose';
 import { Shift, IShift } from '../models/Shift';
 import { Sale } from '../models/Sale';
+import { User } from '../models/User';
+import { Role } from '../models/Role';
 import { AppError } from '../utils/app-error';
+import { roundMoney } from '../utils/helpers';
 
 export interface OpenShiftDto {
   openingFloat: number;
@@ -19,6 +22,23 @@ export interface CloseShiftDto {
   actualCash: number;
   notes?: string;
   managerApprovalId?: string;
+  managerPin?: string;
+}
+
+const MANAGER_ROLES = ['BRANCH_MANAGER', 'SUPER_ADMIN'];
+
+async function verifyManagerPin(pin: string): Promise<Types.ObjectId> {
+  const roles = await Role.find({ name: { $in: MANAGER_ROLES } });
+  const managers = await User.find({ roleId: { $in: roles.map((r) => r._id) }, isActive: true });
+  for (const manager of managers) {
+    if (await manager.comparePin(pin)) return manager._id;
+  }
+  throw new AppError(403, 'DISCREPANCY_REQUIRES_APPROVAL', 'Invalid manager PIN for shift discrepancy approval');
+}
+
+async function isManager(userId: string): Promise<boolean> {
+  const user = await User.findById(userId).populate<{ roleId: any }>('roleId');
+  return !!user && MANAGER_ROLES.includes(user.roleId?.name);
 }
 
 class ShiftService {
@@ -38,7 +58,7 @@ class ShiftService {
       status: 'OPEN',
     });
     if (existing) {
-      throw new AppError(400, 'SHIFT_ALREADY_OPEN', 'User already has an open shift on terminal ' + existing.terminalId);
+      throw new AppError(409, 'SHIFT_ALREADY_OPEN', 'User already has an open shift on terminal ' + existing.terminalId);
     }
 
     const openingFloat = Number(dto.openingFloat) || 0;
@@ -59,63 +79,68 @@ class ShiftService {
     return shift.toObject() as unknown as IShift;
   }
 
-  async addPettyCash(shiftId: string, dto: PettyCashDto): Promise<IShift> {
+  async addPettyCash(shiftId: string, dto: PettyCashDto, userId: string): Promise<IShift> {
     if (!Types.ObjectId.isValid(shiftId)) throw new AppError(400, 'INVALID_ID', 'Invalid shift ID');
     const shift = await Shift.findById(shiftId);
     if (!shift) throw new AppError(404, 'SHIFT_NOT_FOUND', 'Shift not found');
-    if (shift.status !== 'OPEN') throw new AppError(400, 'SHIFT_CLOSED', 'Cannot adjust petty cash for a closed shift');
+    if (shift.userId.toString() !== userId && !(await isManager(userId))) {
+      throw new AppError(403, 'PERMISSION_DENIED', 'You can only adjust your own shift');
+    }
+    if (shift.status !== 'OPEN') throw new AppError(422, 'SHIFT_CLOSED_CANNOT_CHECKOUT', 'Cannot adjust petty cash for a closed shift');
 
     const amount = Number(dto.amount);
     if (amount <= 0) throw new AppError(400, 'INVALID_AMOUNT', 'Petty cash amount must be greater than 0');
 
     if (dto.type === 'IN') {
-      shift.pettyCashIn += amount;
+      shift.pettyCashIn = roundMoney(shift.pettyCashIn + amount);
     } else {
-      shift.pettyCashOut += amount;
+      shift.pettyCashOut = roundMoney(shift.pettyCashOut + amount);
     }
 
-    shift.expectedCash =
+    shift.expectedCash = roundMoney(
       shift.openingFloat +
-      shift.cashSalesTotal +
-      shift.pettyCashIn -
-      shift.cashExpensesTotal -
-      shift.pettyCashOut;
+        shift.cashSalesTotal +
+        shift.pettyCashIn -
+        shift.cashExpensesTotal -
+        shift.pettyCashOut
+    );
 
     await shift.save();
     return shift.toObject() as unknown as IShift;
   }
 
-  async closeShift(shiftId: string, dto: CloseShiftDto): Promise<IShift> {
+  async closeShift(shiftId: string, dto: CloseShiftDto, userId: string): Promise<IShift> {
     if (!Types.ObjectId.isValid(shiftId)) throw new AppError(400, 'INVALID_ID', 'Invalid shift ID');
     const shift = await Shift.findById(shiftId);
     if (!shift) throw new AppError(404, 'SHIFT_NOT_FOUND', 'Shift not found');
     if (shift.status !== 'OPEN') throw new AppError(400, 'SHIFT_ALREADY_CLOSED', 'Shift is already closed');
-
-    // Re-verify cash sales from Sale records
-    const sales = await Sale.find({ shiftId: shift._id }).lean();
-    let cashSalesTotal = 0;
-    for (const s of sales) {
-      for (const p of s.payments) {
-        if (p.method === 'CASH') {
-          cashSalesTotal += p.amount;
-        }
-      }
-      // Deduct change returned from cash drawer
-      if (s.changeReturned > 0) {
-        cashSalesTotal -= s.changeReturned;
-      }
+    if (shift.userId.toString() !== userId && !(await isManager(userId))) {
+      throw new AppError(403, 'PERMISSION_DENIED', 'You can only close your own shift');
     }
 
-    shift.cashSalesTotal = Math.max(0, cashSalesTotal);
-    const expectedCash =
+    // cashSalesTotal is maintained incrementally by checkout / due collection / refunds.
+    const expectedCash = roundMoney(
       shift.openingFloat +
-      shift.cashSalesTotal +
-      shift.pettyCashIn -
-      shift.cashExpensesTotal -
-      shift.pettyCashOut;
+        shift.cashSalesTotal +
+        shift.pettyCashIn -
+        shift.cashExpensesTotal -
+        shift.pettyCashOut
+    );
 
     const actualCash = Number(dto.actualCash) || 0;
-    const discrepancy = actualCash - expectedCash;
+    const discrepancy = roundMoney(actualCash - expectedCash);
+
+    // Rule 7: discrepancies beyond ৳10 require a verified Manager PIN
+    if (Math.abs(discrepancy) > 10) {
+      if (!dto.managerPin) {
+        throw new AppError(
+          403,
+          'DISCREPANCY_REQUIRES_APPROVAL',
+          `Cash discrepancy of ৳${discrepancy} exceeds ৳10. Manager PIN is required to close this shift.`
+        );
+      }
+      shift.managerApprovalId = await verifyManagerPin(dto.managerPin);
+    }
 
     shift.expectedCash = expectedCash;
     shift.actualCash = actualCash;
@@ -123,17 +148,14 @@ class ShiftService {
     shift.status = 'CLOSED';
     shift.closedAt = new Date();
     if (dto.notes) shift.notes = (shift.notes ? shift.notes + ' | ' : '') + dto.notes;
-    if (dto.managerApprovalId && Types.ObjectId.isValid(dto.managerApprovalId)) {
-      shift.managerApprovalId = new Types.ObjectId(dto.managerApprovalId);
-    }
 
     await shift.save();
 
     // Broadcast discrepancy alert & log to audit if |discrepancy| > 10
     if (Math.abs(discrepancy) > 10) {
       try {
-        const { emitEvent } = await import('../sockets');
-        emitEvent('SHIFT_DISCREPANCY_ALERT', {
+        const { emitToRoles } = await import('../sockets');
+        emitToRoles('SHIFT_DISCREPANCY_ALERT', {
           shiftId: shift._id.toString(),
           terminalId: shift.terminalId,
           cashierId: shift.userId.toString(),

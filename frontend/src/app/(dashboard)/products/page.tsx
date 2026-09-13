@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../hooks/useAuth';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, cn } from '../../../lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Package,
   Plus,
@@ -52,6 +52,7 @@ export default function ProductsPage() {
   const router = useRouter();
   const { user } = useAuth();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const isCashier = user?.role === 'CASHIER';
 
   // Filters State
@@ -71,12 +72,20 @@ export default function ProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState<ProductItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Helper: extract list from paginated or flat API response
+  const extractList = (res: any): any[] => {
+    const d = res?.data;
+    if (Array.isArray(d)) return d;
+    if (d && Array.isArray(d.data)) return d.data;
+    return [];
+  };
+
   // Fetch Categories & Brands for filters
   const { data: categories = [] } = useQuery({
     queryKey: ['filter-categories'],
     queryFn: async () => {
       const res = await api.get('/categories');
-      return Array.isArray(res.data) ? res.data : [];
+      return extractList(res);
     },
   });
 
@@ -84,7 +93,7 @@ export default function ProductsPage() {
     queryKey: ['filter-brands'],
     queryFn: async () => {
       const res = await api.get('/brands');
-      return Array.isArray(res.data) ? res.data : [];
+      return extractList(res);
     },
   });
 
@@ -104,17 +113,27 @@ export default function ProductsPage() {
       if (search.trim()) params.search = search.trim();
       if (categoryId) params.categoryId = categoryId;
       if (brandId) params.brandId = brandId;
-      if (isLowStock) params.isLowStock = true;
+      if (isLowStock) params.lowStock = true;
       if (statusFilter === 'active') params.isActive = true;
       if (statusFilter === 'inactive') params.isActive = false;
 
       const res = await api.get('/products', { params });
+      // Backend returns the product array in `data` and pagination in `meta`
+      const payload: any = res.data;
+      const products = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.products)
+        ? payload.products
+        : [];
       return {
-        products: (res.data?.products || res.data || []) as ProductItem[],
-        totalItems: res.meta?.totalItems ?? res.data?.total ?? 0,
-        totalPages: res.meta?.totalPages ?? res.data?.totalPages ?? 1,
+        products: products as ProductItem[],
+        totalItems: res.meta?.totalItems ?? payload?.total ?? 0,
+        totalPages: res.meta?.totalPages ?? payload?.totalPages ?? 1,
       };
     },
+    enabled: !!user,
+    retry: false,
+    staleTime: 30 * 1000,
   });
 
   const products = productsResponse?.products || [];
@@ -131,6 +150,11 @@ export default function ProductsPage() {
     setIsModalOpen(true);
   };
 
+  // Invalidate products cache → force fresh fetch from server
+  const invalidateProducts = () => {
+    queryClient.invalidateQueries({ queryKey: ['products-list'] });
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -138,7 +162,7 @@ export default function ProductsPage() {
       await api.delete(`/products/${deleteTarget.id}`);
       toast.success(`Product "${deleteTarget.name}" deleted successfully.`);
       setDeleteTarget(null);
-      refetch();
+      invalidateProducts();
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete product.');
     } finally {
@@ -493,7 +517,7 @@ export default function ProductsPage() {
           setSelectedProductId(null);
         }}
         onSuccess={() => {
-          refetch();
+          invalidateProducts();
         }}
       />
 

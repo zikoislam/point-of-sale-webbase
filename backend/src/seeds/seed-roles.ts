@@ -57,9 +57,6 @@ export const MANAGER_PERMISSIONS = [
   'customers:create',
   'customers:manage',
   'customers:pay_due',
-  'accounts:view',
-  'accounts:manage',
-  'accounts:transfer',
   'expenses:view',
   'expenses:create',
   'expenses:manage',
@@ -69,7 +66,6 @@ export const MANAGER_PERMISSIONS = [
   'reports:purchases',
   'reports:dues',
   'reports:payables',
-  'reports:pnl',
   'reports:export',
   'roles:view',
 ];
@@ -81,6 +77,7 @@ export const CASHIER_PERMISSIONS = [
   'customers:view',
   'customers:create',
   'customers:pay_due',
+  'expenses:create',
   'inv:view',
 ];
 

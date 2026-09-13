@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiClient, ApiError } from './api-client';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { apiClient } from './api-client';
 
 export interface UserProfile {
   id: string;
@@ -30,27 +30,42 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SESSION_CHECK_TIMEOUT_MS = 8000; // 8 seconds max wait
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const mountedRef = useRef(true);
 
   const refreshUser = useCallback(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SESSION_CHECK_TIMEOUT_MS);
+
     try {
-      const res = await apiClient<UserProfile>('/auth/me');
+      const res = await apiClient<UserProfile>('/auth/me', { signal: controller.signal });
+      if (!mountedRef.current) return;
       if (res.success && res.data) {
         setUser(res.data);
       } else {
         setUser(null);
       }
     } catch {
+      if (!mountedRef.current) return;
       setUser(null);
     } finally {
-      setIsLoading(false);
+      clearTimeout(timeoutId);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     refreshUser();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [refreshUser]);
 
   const login = async (username: string, password: string, rememberMe: boolean = false): Promise<UserProfile> => {

@@ -5,14 +5,15 @@ import { sendSuccess } from '../utils/api-response';
 export class ProductController {
   async listProducts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { page, limit, search, categoryId, brandId, lowStock } = req.query;
+      const { page, limit, search, categoryId, brandId, lowStock, isLowStock, isActive } = req.query;
       const result = await productService.listProducts({
         page: page ? parseInt(page as string) : 1,
         limit: limit ? parseInt(limit as string) : 20,
         search: search as string | undefined,
         categoryId: categoryId as string | undefined,
         brandId: brandId as string | undefined,
-        lowStock: lowStock === 'true',
+        lowStock: lowStock === 'true' || isLowStock === 'true',
+        isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
         userRole: req.user?.role,
       });
       sendSuccess(res, 200, 'Products retrieved', result.products, {

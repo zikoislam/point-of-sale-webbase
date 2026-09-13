@@ -46,14 +46,14 @@ function buildUrl(endpoint: string, params?: Record<string, any>): string {
 
   if (!params) return base;
 
-  const url = new URL(base, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+  const url = new URL(base);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.append(key, String(value));
     }
   });
 
-  return url.pathname + url.search;
+  return url.href;
 }
 
 export async function apiClient<T = any>(
@@ -83,14 +83,22 @@ export async function apiClient<T = any>(
       credentials: 'include', // HTTP-only cookies
     });
   } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new ApiError(0, 'TIMEOUT', 'Request timed out. Please check your connection.');
+    }
     throw new ApiError(0, 'NETWORK_ERROR', err?.message || 'Network connection failed');
   }
 
-  // Handle 401 Unauthorized globally
+  // Handle 401 Unauthorized globally — but never redirect from login page itself
   if (response.status === 401) {
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    const isOnLoginPage =
+      typeof window !== 'undefined' && window.location.pathname.startsWith('/login');
+    if (typeof window !== 'undefined' && !isOnLoginPage) {
       window.location.href = '/login';
     }
+    // Always throw immediately on 401 so React Query transitions to error state
+    // instead of leaving isLoading stuck as true forever.
+    throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication required. Please login.');
   }
 
   let data: any;

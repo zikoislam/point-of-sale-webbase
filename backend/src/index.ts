@@ -27,6 +27,8 @@ import salesReturnRoutes from './routes/sales-return.routes';
 import accountRoutes from './routes/account.routes';
 import expenseRoutes from './routes/expense.routes';
 import inventoryRoutes from './routes/inventory.routes';
+import stockMovementRoutes from './routes/stock-movement.routes';
+import voucherRoutes from './routes/voucher.routes';
 import reportRoutes from './routes/report.routes';
 import auditRoutes from './routes/audit.routes';
 import './models';
@@ -36,6 +38,9 @@ const server = http.createServer(app);
 
 // Initialize Socket.IO
 initSocket(server);
+
+// Behind Nginx / reverse proxy — needed so rate limiting sees the real client IP
+app.set('trust proxy', 1);
 
 // Security & Utility Middleware
 app.use(helmet());
@@ -70,6 +75,8 @@ app.use('/api/v1/returns', salesReturnRoutes);
 app.use('/api/v1/accounts', accountRoutes);
 app.use('/api/v1/expenses', expenseRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
+app.use('/api/v1/stock-movements', stockMovementRoutes);
+app.use('/api/v1/vouchers', voucherRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 

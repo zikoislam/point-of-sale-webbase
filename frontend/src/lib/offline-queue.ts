@@ -113,7 +113,10 @@ export async function syncOfflineQueue(
     try {
       const res = await fetch(`${apiBaseUrl}/sales/checkout`, {
         method: 'POST',
-        headers: authHeaderFn(),
+        headers: {
+          ...authHeaderFn(),
+          'Idempotency-Key': item.payload?.idempotencyKey || item.id,
+        },
         body: JSON.stringify(item.payload),
       });
 

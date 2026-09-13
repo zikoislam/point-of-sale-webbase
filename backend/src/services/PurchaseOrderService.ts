@@ -5,6 +5,8 @@ import { Supplier } from '../models/Supplier';
 import { SupplierLedger } from '../models/SupplierLedger';
 import { StockMovement } from '../models/StockMovement';
 import { AppError } from '../utils/app-error';
+import { generatePONumber } from './SequenceService';
+import { roundMoney } from '../utils/helpers';
 
 export interface POItemDto {
   variantId: string;
@@ -36,21 +38,6 @@ export interface GRNDto {
   items: GRNItemDto[];
   paidNow?: number;
   notes?: string;
-}
-
-async function generatePONumber(): Promise<string> {
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-  const prefix = `PO-${dateStr}-`;
-  const lastPO = await PurchaseOrder.findOne({ poNumber: new RegExp(`^${prefix}`) })
-    .sort({ poNumber: -1 })
-    .lean();
-  let seq = 1;
-  if (lastPO) {
-    const parts = lastPO.poNumber.split('-');
-    seq = parseInt(parts[parts.length - 1], 10) + 1;
-  }
-  return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
 class PurchaseOrderService {
@@ -162,9 +149,21 @@ class PurchaseOrderService {
         if (!poItem) throw new AppError(400, 'ITEM_NOT_FOUND', `Variant ${grnItem.variantId} not in PO`);
 
         const receivingCost = grnItem.unitCost ?? poItem.unitCost;
+
+        // Rule: cannot receive more than ordered
+        if (poItem.receivedQty + grnItem.receivedQty > poItem.orderedQty) {
+          throw new AppError(
+            422,
+            'PARTIAL_RECEIVING_OVERFLOW',
+            `Received quantity (${poItem.receivedQty + grnItem.receivedQty}) exceeds ordered quantity (${poItem.orderedQty}) for ${poItem.productName}`
+          );
+        }
+
         poItem.receivedQty += grnItem.receivedQty;
-        const lineValue = grnItem.receivedQty * receivingCost;
-        totalReceivedValue += lineValue;
+        poItem.unitCost = receivingCost;
+        poItem.lineTotal = roundMoney(poItem.orderedQty * receivingCost);
+        const lineValue = roundMoney(grnItem.receivedQty * receivingCost);
+        totalReceivedValue = roundMoney(totalReceivedValue + lineValue);
 
         const product = await Product.findOne({ 'variants._id': new Types.ObjectId(grnItem.variantId) }).session(session);
         if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', `Product not found for variant ${grnItem.variantId}`);
@@ -181,13 +180,13 @@ class PurchaseOrderService {
         const incomingValue = grnItem.receivedQty * receivingCost;
         const newWAC = newStock > 0 ? (existingValue + incomingValue) / newStock : receivingCost;
 
-        variant.currentStock = newStock;
+        variant.currentStock = roundMoney(newStock);
         variant.costPrice = parseFloat(newWAC.toFixed(4));
 
-        if (grnItem.batchNo) {
+        if (grnItem.batchNo || grnItem.expiryDate) {
           if (!variant.batches) variant.batches = [];
           variant.batches.push({
-            batchNo: grnItem.batchNo,
+            batchNo: grnItem.batchNo || `BATCH-${Date.now()}`,
             costPrice: receivingCost,
             expiryDate: grnItem.expiryDate ? new Date(grnItem.expiryDate) : undefined,
             quantity: grnItem.receivedQty,
@@ -218,9 +217,10 @@ class PurchaseOrderService {
       po.receivedById = new Types.ObjectId(userId);
       if (dto.vendorInvoiceNo) po.vendorInvoiceNo = dto.vendorInvoiceNo;
 
-      const paidNow = dto.paidNow ?? 0;
-      po.paidAmount += paidNow;
-      po.dueAmount = po.totalAmount - po.paidAmount;
+      const paidNow = roundMoney(dto.paidNow ?? 0);
+      po.paidAmount = roundMoney(po.paidAmount + paidNow);
+      if (po.paidAmount > po.totalAmount) po.paidAmount = po.totalAmount;
+      po.dueAmount = roundMoney(Math.max(0, po.totalAmount - po.paidAmount));
 
       await po.save({ session });
 

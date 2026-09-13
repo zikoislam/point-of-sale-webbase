@@ -16,8 +16,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface AuditLog {
@@ -47,7 +51,7 @@ export default function AuditLogsPage() {
         ...(selectedEntity ? { entity: selectedEntity } : {}),
       }).toString();
 
-      const res = await fetch(`${API}/audit-logs?${query}`, { headers: authHeader() });
+      const res = await fetch(`${API}/audit-logs?${query}`, fetchOpts());
       const j = await res.json();
       if (j.success) setLogs(j.data.data || []);
     } catch (e) {

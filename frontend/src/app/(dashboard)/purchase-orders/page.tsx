@@ -214,7 +214,7 @@ export default function PurchaseOrdersPage() {
               <SearchInput
                 placeholder="Search PO # or supplier..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(val) => { setSearchQuery(val); setPage(1); }}
               />
             </div>
           </div>

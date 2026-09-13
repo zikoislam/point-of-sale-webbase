@@ -7,7 +7,7 @@ export interface IAccountTransaction extends Document {
   amount: number;
   balanceBefore: number;
   balanceAfter: number;
-  referenceType: 'SALE' | 'EXPENSE' | 'TRANSFER' | 'DUE_COLLECTION' | 'SUPPLIER_PAYMENT' | 'WASTAGE_LOSS';
+  referenceType: 'SALE' | 'EXPENSE' | 'TRANSFER' | 'DUE_COLLECTION' | 'SUPPLIER_PAYMENT' | 'WASTAGE_LOSS' | 'RETURN';
   referenceId: Types.ObjectId;
   description: string;
   createdAt: Date;
@@ -40,7 +40,7 @@ const AccountTransactionSchema = new Schema<IAccountTransaction>(
     },
     referenceType: {
       type: String,
-      enum: ['SALE', 'EXPENSE', 'TRANSFER', 'DUE_COLLECTION', 'SUPPLIER_PAYMENT', 'WASTAGE_LOSS'],
+      enum: ['SALE', 'EXPENSE', 'TRANSFER', 'DUE_COLLECTION', 'SUPPLIER_PAYMENT', 'WASTAGE_LOSS', 'RETURN'],
       required: true,
     },
     referenceId: {

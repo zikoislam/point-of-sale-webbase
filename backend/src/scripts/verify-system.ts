@@ -202,10 +202,15 @@ async function runVerificationSuite() {
     // TEST 8: Shift Close & Discrepancy Escalation
     // ----------------------------------------------------
     console.log('\n🔹 Test 8: Shift Closing & Cash Discrepancy Reconciliation');
-    const closedShift = await shiftService.closeShift(openShift._id.toString(), {
-      actualCash: 2100, // Expected was 2000 + 190 (2 * 95) = 2190. Discrepancy = -90
-      notes: 'Missing ৳90 discrepancy test',
-    });
+    const closedShift = await shiftService.closeShift(
+      openShift._id.toString(),
+      {
+        actualCash: 2100, // Expected was 2000 + 190 (2 * 95) = 2190. Discrepancy = -90
+        notes: 'Missing ৳90 discrepancy test',
+        managerPin: '1234',
+      },
+      cashier!._id.toString()
+    );
 
     assert(closedShift.status === 'CLOSED', 'Shift status updated to CLOSED');
     assert(closedShift.discrepancy !== 0, `Discrepancy calculated: ৳${closedShift.discrepancy}`);

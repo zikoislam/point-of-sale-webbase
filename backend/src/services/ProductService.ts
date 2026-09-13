@@ -47,6 +47,15 @@ export interface ProductListItem {
 
 const CASHIER_ROLE = 'CASHIER';
 
+function stripCostFields(product: any): any {
+  if (!product || !product.variants) return product;
+  product.variants = product.variants.map((v: any) => {
+    const { costPrice, batches, ...rest } = v;
+    return rest;
+  });
+  return product;
+}
+
 export class ProductService {
   async listProducts(options: {
     page?: number;
@@ -55,17 +64,33 @@ export class ProductService {
     categoryId?: string;
     brandId?: string;
     lowStock?: boolean;
+    isActive?: boolean; // undefined = all, true = active only, false = inactive only
     userRole?: string;
   }): Promise<{ products: ProductListItem[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, any> = { isActive: true };
+    // isActive filter: default to all products (active + inactive) when undefined
+    const filter: Record<string, any> = {};
+    if (options.isActive === true) filter.isActive = true;
+    else if (options.isActive === false) filter.isActive = false;
+    // else: no filter = show all
+
     if (options.search) filter.$text = { $search: options.search };
     if (options.categoryId) filter.categoryId = new Types.ObjectId(options.categoryId);
     if (options.brandId) filter.brandId = new Types.ObjectId(options.brandId);
-    if (options.lowStock) filter['variants.currentStock'] = { $lte: filter['variants.alertQty'] || 10 };
+    if (options.lowStock) {
+      filter.$expr = {
+        $anyElementTrue: {
+          $map: {
+            input: '$variants',
+            as: 'v',
+            in: { $lte: ['$$v.currentStock', '$$v.alertQty'] },
+          },
+        },
+      };
+    }
 
     const [products, total] = await Promise.all([
       Product.find(filter)
@@ -82,10 +107,14 @@ export class ProductService {
 
     const formatted: ProductListItem[] = products.map((p) => {
       const totalStock = (p.variants || []).reduce((sum: number, v: any) => sum + (v.currentStock || 0), 0);
-      const lowestRetail = Math.min(...(p.variants || []).map((v: any) => v.retailSellingPrice || 0));
-      const lowestCost = Math.min(...(p.variants || []).map((v: any) => v.costPrice || 0));
+      const retailPrices = (p.variants || []).map((v: any) => v.retailSellingPrice || 0);
+      const costPrices = (p.variants || []).map((v: any) => v.costPrice || 0);
+      const wholesalePrices = (p.variants || []).map((v: any) => v.wholesaleSellingPrice || 0);
+      const lowestRetail = retailPrices.length ? Math.min(...retailPrices) : 0;
+      const lowestCost = costPrices.length ? Math.min(...costPrices) : 0;
+      const lowestWholesale = wholesalePrices.length ? Math.min(...wholesalePrices) : 0;
 
-      const item: ProductListItem = {
+      const item: any = {
         id: p._id.toString(),
         name: p.name,
         categoryId: p.categoryId?._id?.toString() || '',
@@ -102,7 +131,10 @@ export class ProductService {
         createdAt: p.createdAt,
       };
 
-      if (!isCashier) item.lowestCostPrice = lowestCost;
+      if (!isCashier) {
+        item.lowestCostPrice = lowestCost;
+        item.lowestWholesalePrice = lowestWholesale;
+      }
       return item;
     });
 
@@ -120,15 +152,7 @@ export class ProductService {
 
     if (!product || !product.isActive) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
-    const isCashier = userRole === CASHIER_ROLE;
-    if (isCashier && product.variants) {
-      product.variants = product.variants.map((v: any) => {
-        const { costPrice, ...rest } = v;
-        return rest;
-      });
-    }
-
-    return product;
+    return userRole === CASHIER_ROLE ? stripCostFields(product) : product;
   }
 
   async getProductByBarcode(barcode: string, userRole?: string): Promise<any> {
@@ -142,15 +166,7 @@ export class ProductService {
 
     if (!product) throw new AppError(404, 'PRODUCT_NOT_FOUND', `No product with barcode: ${barcode}`);
 
-    const isCashier = userRole === CASHIER_ROLE;
-    if (isCashier && product.variants) {
-      product.variants = product.variants.map((v: any) => {
-        const { costPrice, ...rest } = v;
-        return rest;
-      });
-    }
-
-    return product;
+    return userRole === CASHIER_ROLE ? stripCostFields(product) : product;
   }
 
   async createProduct(data: ProductInput): Promise<any> {
@@ -162,7 +178,11 @@ export class ProductService {
     // Check SKU uniqueness
     for (const variant of data.variants) {
       const existing = await Product.findOne({ 'variants.sku': variant.sku, isActive: true });
-      if (existing) throw new AppError(409, 'SKU_DUPLICATE', `SKU "${variant.sku}" already exists`);
+      if (existing) throw new AppError(409, 'DUPLICATE_SKU', `SKU "${variant.sku}" already exists`);
+      if (variant.barcode) {
+        const dupBarcode = await Product.findOne({ 'variants.barcode': variant.barcode, isActive: true });
+        if (dupBarcode) throw new AppError(409, 'DUPLICATE_BARCODE', `Barcode "${variant.barcode}" already exists`);
+      }
     }
 
     // Inherit tax rate from category if not specified

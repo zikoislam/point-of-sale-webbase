@@ -2,6 +2,7 @@ import mongoose, { Types } from 'mongoose';
 import { User } from '../models/User';
 import { Role } from '../models/Role';
 import { AppError } from '../utils/app-error';
+import { escapeRegex } from '../utils/helpers';
 import { CreateUserInput, UpdateUserInput } from '../validators/user.validators';
 
 export interface UserListItem {
@@ -39,7 +40,7 @@ export class UserService {
 
     const filter: Record<string, any> = {};
     if (options.search) {
-      const regex = new RegExp(options.search, 'i');
+      const regex = new RegExp(escapeRegex(options.search), 'i');
       filter.$or = [{ username: regex }, { fullName: regex }, { email: regex }, { phone: regex }];
     }
     if (options.roleId) filter.roleId = options.roleId;

@@ -22,8 +22,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface SaleItem {
@@ -93,6 +97,7 @@ export default function SalesHistoryPage() {
   >([]);
   const [refundType, setRefundType] = useState<'CASH' | 'STORE_CREDIT'>('CASH');
   const [returnReason, setReturnReason] = useState('');
+  const [returnManagerPin, setReturnManagerPin] = useState('');
   const [returnSaving, setReturnSaving] = useState(false);
   const [returnError, setReturnError] = useState('');
   const [completedReturn, setCompletedReturn] = useState<any>(null);
@@ -100,10 +105,10 @@ export default function SalesHistoryPage() {
   const fetchSales = useCallback(async () => {
     try {
       // Fetch recent sales via invoices or reports
-      const res = await fetch(`${API}/sales?limit=50`, { headers: authHeader() }).catch(() => null);
+      const res = await fetch(`${API}/sales?limit=50`, fetchOpts()).catch(() => null);
       if (res && res.ok) {
         const j = await res.json();
-        if (j.success) setSales(j.data.data || []);
+        if (j.success) setSales(j.data || []);
       }
     } catch (e) {
       console.error(e);
@@ -112,7 +117,7 @@ export default function SalesHistoryPage() {
 
   const fetchReturns = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/returns?limit=50`, { headers: authHeader() });
+      const res = await fetch(`${API}/returns?limit=50`, fetchOpts());
       const j = await res.json();
       if (j.success) setReturns(j.data.data || []);
     } catch (e) {
@@ -136,7 +141,7 @@ export default function SalesHistoryPage() {
     if (!search.trim()) return;
     try {
       setLoading(true);
-      const res = await fetch(`${API}/sales/${search.trim()}`, { headers: authHeader() });
+      const res = await fetch(`${API}/sales/${search.trim()}`, fetchOpts());
       const j = await res.json();
       if (j.success && j.data) {
         setSales([j.data]);
@@ -182,6 +187,10 @@ export default function SalesHistoryPage() {
       setReturnError('Please enter a reason for the return');
       return;
     }
+    if (!/^\d{4,}$/.test(returnManagerPin.trim())) {
+      setReturnError('Manager PIN (min 4 digits) is required to authorise a return');
+      return;
+    }
 
     setReturnSaving(true);
     setReturnError('');
@@ -197,16 +206,16 @@ export default function SalesHistoryPage() {
           unitRefundPrice: Number(i.unitRefundPrice),
           isResaleable: i.isResaleable,
         })),
+        managerPin: returnManagerPin.trim(),
       };
 
-      const res = await fetch(`${API}/returns`, {
+      const res = await fetch(`${API}/returns`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
         body: JSON.stringify(payload),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to process return');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Failed to process return');
 
       setCompletedReturn(j.data);
       refreshAll();
@@ -573,7 +582,7 @@ export default function SalesHistoryPage() {
                 </div>
 
                 {/* Refund Method & Reason */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
                       Refund Disbursement
@@ -586,6 +595,21 @@ export default function SalesHistoryPage() {
                       <option value="CASH">Cash Refund (Deduct Drawer)</option>
                       <option value="STORE_CREDIT">Store Credit Voucher</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Manager PIN *
+                    </label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={8}
+                      value={returnManagerPin}
+                      onChange={(e) => setReturnManagerPin(e.target.value.replace(/\D/g, ''))}
+                      placeholder="••••"
+                      className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono tracking-widest focus:outline-none"
+                    />
                   </div>
 
                   <div>

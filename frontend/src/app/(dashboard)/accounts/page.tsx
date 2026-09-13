@@ -21,8 +21,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface Account {
@@ -78,7 +82,7 @@ export default function AccountsPage() {
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/accounts`, { headers: authHeader() });
+      const res = await fetch(`${API}/accounts`, fetchOpts());
       const j = await res.json();
       if (j.success) setAccounts(j.data || []);
     } finally {
@@ -131,14 +135,13 @@ export default function AccountsPage() {
       const url = editTarget ? `${API}/accounts/${editTarget._id}` : `${API}/accounts`;
       const method = editTarget ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await fetch(url, fetchOpts({
         method,
-        headers: authHeader(),
         body: JSON.stringify(payload),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to save account');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Failed to save account');
 
       setShowCreateModal(false);
       fetchAccounts();
@@ -176,19 +179,18 @@ export default function AccountsPage() {
     setTransferError('');
 
     try {
-      const res = await fetch(`${API}/accounts/transfer`, {
+      const res = await fetch(`${API}/accounts/transfer`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
         body: JSON.stringify({
           fromAccountId: fromAccount,
           toAccountId: toAccount,
           amount: Number(transferAmount),
           description: transferDesc.trim() || 'Internal Transfer',
         }),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Transfer failed');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Transfer failed');
 
       setShowTransferModal(false);
       fetchAccounts();
@@ -205,7 +207,7 @@ export default function AccountsPage() {
     setLoadingLedger(true);
 
     try {
-      const res = await fetch(`${API}/accounts/${a._id}/ledger`, { headers: authHeader() });
+      const res = await fetch(`${API}/accounts/${a._id}/ledger`, fetchOpts());
       const j = await res.json();
       if (j.success) {
         setLedgerEntries(j.data.data || []);

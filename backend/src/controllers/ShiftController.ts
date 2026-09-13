@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { shiftService } from '../services/ShiftService';
 import { sendSuccess } from '../utils/api-response';
+import { AppError } from '../utils/app-error';
 
 class ShiftController {
   async getActive(req: Request, res: Response, next: NextFunction) {
@@ -21,14 +22,22 @@ class ShiftController {
 
   async addPettyCash(req: Request, res: Response, next: NextFunction) {
     try {
-      const shift = await shiftService.addPettyCash(req.params.id, req.body);
+      const userId = (req as any).user._id.toString();
+      let shiftId = req.params.id;
+      if (!shiftId) {
+        const active = await shiftService.getActiveShift(userId);
+        if (!active) throw new AppError(404, 'SHIFT_NOT_FOUND', 'No active shift found');
+        shiftId = active._id.toString();
+      }
+      const shift = await shiftService.addPettyCash(shiftId, req.body, userId);
       sendSuccess(res, 200, 'Petty cash updated', shift);
     } catch (err) { next(err); }
   }
 
   async close(req: Request, res: Response, next: NextFunction) {
     try {
-      const shift = await shiftService.closeShift(req.params.id, req.body);
+      const userId = (req as any).user._id.toString();
+      const shift = await shiftService.closeShift(req.params.id, req.body, userId);
       sendSuccess(res, 200, 'Shift closed successfully', shift);
     } catch (err) { next(err); }
   }

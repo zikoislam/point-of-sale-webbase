@@ -18,8 +18,12 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
-  Authorization: `Bearer ${localStorage.getItem('pos_access_token')}`,
   'Content-Type': 'application/json',
+});
+const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
+  ...opts,
+  credentials: 'include' as RequestCredentials,
+  headers: { ...authHeader(), ...(opts.headers as Record<string, string> || {}) },
 });
 
 interface Expense {
@@ -71,8 +75,8 @@ export default function ExpensesPage() {
   const fetchDropdowns = async () => {
     try {
       const [cRes, aRes] = await Promise.all([
-        fetch(`${API}/expenses/categories`, { headers: authHeader() }),
-        fetch(`${API}/accounts`, { headers: authHeader() }),
+        fetch(`${API}/expenses/categories`, fetchOpts()),
+        fetch(`${API}/accounts`, fetchOpts()),
       ]);
       const [cJson, aJson] = await Promise.all([cRes.json(), aRes.json()]);
       if (cJson.success) setCategories(cJson.data || []);
@@ -85,7 +89,7 @@ export default function ExpensesPage() {
   const fetchExpenses = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/expenses?limit=50`, { headers: authHeader() });
+      const res = await fetch(`${API}/expenses?limit=50`, fetchOpts());
       const j = await res.json();
       if (j.success) setExpenses(j.data.data || []);
     } finally {
@@ -131,19 +135,18 @@ export default function ExpensesPage() {
     setExpError('');
 
     try {
-      const res = await fetch(`${API}/expenses`, {
+      const res = await fetch(`${API}/expenses`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
         body: JSON.stringify({
           amount: Number(expAmount),
           categoryId: expCategory,
           accountId: expAccount,
           description: expDesc.trim(),
         }),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to record expense');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Failed to record expense');
 
       setShowAddModal(false);
       fetchExpenses();
@@ -163,17 +166,16 @@ export default function ExpensesPage() {
     setCatError('');
 
     try {
-      const res = await fetch(`${API}/expenses/categories`, {
+      const res = await fetch(`${API}/expenses/categories`, fetchOpts({
         method: 'POST',
-        headers: authHeader(),
         body: JSON.stringify({
           name: catName.trim(),
           code: catCode.trim().toUpperCase(),
         }),
-      });
+      }));
 
       const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to create category');
+      if (!j.success) throw new Error(j.error?.message || j.message || 'Failed to create category');
 
       setCatName('');
       setCatCode('');

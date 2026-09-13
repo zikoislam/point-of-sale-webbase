@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, cn } from '../../../lib/utils';
 import {
@@ -40,6 +40,7 @@ interface Supplier {
 
 export default function SuppliersPage() {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -55,6 +56,8 @@ export default function SuppliersPage() {
     data: suppliers = [],
     isLoading,
     isRefetching,
+    isError,
+    error,
     refetch,
   } = useQuery<Supplier[]>({
     queryKey: ['suppliers-list', search],
@@ -62,9 +65,18 @@ export default function SuppliersPage() {
       const params: Record<string, any> = { limit: 100 };
       if (search.trim()) params.search = search.trim();
       const res = await api.get('/suppliers', { params });
-      return Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      // Backend returns: { success, data: { data: [...], total, page, totalPages } }
+      if (Array.isArray(res.data?.data)) return res.data.data;
+      if (Array.isArray(res.data)) return res.data;
+      return [];
     },
+    retry: 1,
   });
+
+  // Invalidate cache and force fresh fetch from server
+  const invalidateSuppliers = () => {
+    queryClient.invalidateQueries({ queryKey: ['suppliers-list'] });
+  };
 
   const handleOpenCreate = () => {
     setSelectedSupplier(null);
@@ -99,7 +111,7 @@ export default function SuppliersPage() {
       await api.delete(`/suppliers/${deleteTarget.id || deleteTarget._id}`);
       toast.success(`Supplier "${deleteTarget.companyName}" deleted successfully.`);
       setDeleteTarget(null);
-      refetch();
+      invalidateSuppliers();
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete supplier.');
     } finally {
@@ -174,6 +186,29 @@ export default function SuppliersPage() {
                   <td colSpan={6} className="py-16 text-center text-slate-400">
                     <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-500" />
                     <p className="text-xs">Loading suppliers directory...</p>
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center">
+                    <div className="inline-flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                        <RefreshCw className="w-6 h-6 text-rose-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-300">Failed to load suppliers</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {(error as any)?.message || 'Could not connect to server.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => refetch()}
+                        className="px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-200 transition-colors"
+                      >
+                        Try Again
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : suppliers.length === 0 ? (
@@ -293,7 +328,7 @@ export default function SuppliersPage() {
           setSelectedSupplier(null);
         }}
         onSuccess={() => {
-          refetch();
+          invalidateSuppliers();
         }}
         supplier={selectedSupplier}
       />
@@ -306,7 +341,7 @@ export default function SuppliersPage() {
           setPayTarget(null);
         }}
         onSuccess={() => {
-          refetch();
+          invalidateSuppliers();
         }}
         supplier={payTarget}
       />

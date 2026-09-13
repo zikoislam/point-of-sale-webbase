@@ -88,17 +88,19 @@ class AccountService {
 
     try {
       const source = await Account.findById(dto.fromAccountId).session(session);
-      if (!source) throw new AppError(404, 'SOURCE_NOT_FOUND', 'Source account not found');
+      if (!source) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Source account not found');
+      if (!source.isActive) throw new AppError(422, 'ACCOUNT_NOT_ACTIVE', `Source account ${source.name} is inactive`);
       if (source.currentBalance < amount) {
         throw new AppError(
-          400,
-          'INSUFFICIENT_FUNDS',
+          422,
+          'ACCOUNT_INSUFFICIENT_FUNDS',
           `Insufficient balance in ${source.name}. Available: ৳${source.currentBalance.toFixed(2)}`
         );
       }
 
       const dest = await Account.findById(dto.toAccountId).session(session);
-      if (!dest) throw new AppError(404, 'DEST_NOT_FOUND', 'Destination account not found');
+      if (!dest) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Destination account not found');
+      if (!dest.isActive) throw new AppError(422, 'ACCOUNT_NOT_ACTIVE', `Destination account ${dest.name} is inactive`);
 
       // 1. Debit Source
       const srcBefore = source.currentBalance;

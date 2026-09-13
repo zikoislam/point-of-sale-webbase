@@ -17,7 +17,7 @@ import { Spinner } from '../../components/ui/Spinner';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,16 +26,33 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // If already authenticated, redirect based on role
+  // Redirect once auth check is done and user is already logged in
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (!isAuthLoading && isAuthenticated && user) {
       if (user.role === 'CASHIER') {
         router.replace('/pos');
       } else {
         router.replace('/dashboard');
       }
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthLoading, isAuthenticated, user, router]);
+
+  // While session is being verified, show a clean loading screen
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex flex-col justify-center items-center">
+        <div className="flex flex-col items-center gap-4">
+          <Spinner size="lg" color="primary" />
+          <p className="text-slate-400 text-sm font-medium animate-pulse">Checking session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Already authenticated — show nothing while redirecting
+  if (isAuthenticated) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,8 +74,14 @@ export default function LoginPage() {
     } catch (err: any) {
       if (err.statusCode === 429 || err.code === 'RATE_LIMIT_EXCEEDED') {
         setErrorMsg('Too many attempts. Please try again later.');
-      } else if (err.statusCode === 401 || err.code === 'UNAUTHORIZED' || err.code === 'INVALID_CREDENTIALS') {
+      } else if (
+        err.statusCode === 401 ||
+        err.code === 'UNAUTHORIZED' ||
+        err.code === 'INVALID_CREDENTIALS'
+      ) {
         setErrorMsg('Invalid username or password.');
+      } else if (err.code === 'TIMEOUT' || err.code === 'NETWORK_ERROR') {
+        setErrorMsg('Cannot connect to server. Please check your connection.');
       } else {
         setErrorMsg(err.message || 'Authentication failed. Please check your credentials.');
       }
@@ -87,7 +110,7 @@ export default function LoginPage() {
             <Store className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Smart Retail POS</h1>
-          <p className="text-sm text-slate-400 mt-1">Enterprise Cloud Shop & Inventory Management</p>
+          <p className="text-sm text-slate-400 mt-1">Enterprise Cloud Shop &amp; Inventory Management</p>
         </div>
 
         {/* Card Container */}
@@ -99,7 +122,7 @@ export default function LoginPage() {
 
           {/* Error Banner */}
           {errorMsg && (
-            <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-3 text-rose-300 text-xs sm:text-sm animate-scale-in">
+            <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-3 text-rose-300 text-xs sm:text-sm">
               <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{errorMsg}</span>
             </div>

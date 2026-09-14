@@ -126,6 +126,55 @@ interface SearchRow {
   price: number;
 }
 
+/**
+ * Quantity box you can type into, not just tap +/-.
+ * Keeps its own draft so the field can be cleared while typing, commits on every
+ * valid keystroke (so F9 checkout sees the value without needing a blur first)
+ * and snaps back to the stored quantity if the draft is not usable.
+ */
+function QtyInput({
+  value,
+  max,
+  onCommit,
+  className,
+}: {
+  value: number;
+  max: number;
+  onCommit: (qty: number) => void;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  // Mirror changes made elsewhere (+/- buttons, scanning, resuming a cart)
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={max}
+      value={draft}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setDraft(raw);
+        const n = Number(raw);
+        if (raw.trim() !== '' && Number.isFinite(n) && n >= 1) onCommit(n);
+      }}
+      onBlur={() => setDraft(String(value))}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className={className}
+    />
+  );
+}
+
 export default function POSTerminalPage() {
   const { user, logout, lockTerminal, unlockTerminal } = useAuth();
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
@@ -255,8 +304,14 @@ export default function POSTerminalPage() {
     fetchAux();
   }, [fetchActiveShift, fetchCatalog, fetchAux]);
 
-  // Focus barcode input
+  // Keep the scanner ready, but never steal focus while the cashier is typing
   useEffect(() => {
+    const active = document.activeElement as HTMLElement | null;
+    const isEditing =
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active?.isContentEditable;
+    if (isEditing) return;
     barcodeInputRef.current?.focus();
   }, [cart, isLocked]);
 
@@ -515,6 +570,18 @@ export default function POSTerminalPage() {
           return item;
         })
         .filter(Boolean) as CartItem[]
+    );
+  };
+
+  // Type an exact quantity, clamped to 1..available stock
+  const setCartQty = (variantId: string, qty: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.variantId !== variantId) return item;
+        if (!Number.isFinite(qty)) return item;
+        const clamped = Math.min(Math.max(Math.trunc(qty), 1), item.stockAvailable);
+        return { ...item, quantity: clamped };
+      })
     );
   };
 
@@ -1165,7 +1232,16 @@ export default function POSTerminalPage() {
                 >
                   <Minus className="w-3 h-3" />
                 </button>
-                <input readOnly value={currentItem?.quantity ?? ''} className={`${fieldCls} w-14 text-center font-bold`} />
+                {currentItem ? (
+                  <QtyInput
+                    value={currentItem.quantity}
+                    max={currentItem.stockAvailable}
+                    onCommit={(qty) => setCartQty(currentItem.variantId, qty)}
+                    className={`${fieldCls} w-14 text-center font-bold`}
+                  />
+                ) : (
+                  <input readOnly value="" className={`${fieldCls} w-14 text-center font-bold`} />
+                )}
                 <button
                   type="button"
                   onClick={() => currentItem && updateCartQty(currentItem.variantId, 1)}
@@ -1254,9 +1330,12 @@ export default function POSTerminalPage() {
                               >
                                 <Minus className="w-2.5 h-2.5" />
                               </button>
-                              <span className="w-9 text-center font-bold text-slate-900">
-                                {item.quantity}
-                              </span>
+                              <QtyInput
+                                value={item.quantity}
+                                max={item.stockAvailable}
+                                onCommit={(qty) => setCartQty(item.variantId, qty)}
+                                className="w-12 px-1 py-0.5 text-center font-bold text-slate-900 bg-white border border-slate-400 rounded-sm focus:outline-none focus:border-[#0f9aa8]"
+                              />
                               <button
                                 type="button"
                                 onClick={(e) => {

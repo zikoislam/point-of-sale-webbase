@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '../../../hooks/useAuth';
+import { useBranding } from '../../../hooks/useBranding';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, cn } from '../../../lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -67,7 +67,7 @@ interface DashboardResponse {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const branding = useBranding();
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
 
   // Fetch Dashboard Metrics
@@ -287,17 +287,20 @@ export default function DashboardPage() {
     <div className="space-y-6 pb-10">
       {/* Top Banner & Refresh */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-600/30 ring-4 ring-blue-500/10">
-            {user?.fullName?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
-              Welcome back, {user?.fullName?.split(' ')[0] || user?.username}! 👋
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Live shop operations & financial performance overview
-            </p>
+        {/* Live scrolling headline (news-ticker style).
+            Six copies keep the track wider than any viewport, so shifting it by
+            one copy (100%/6) loops without ever showing an empty gap. */}
+        <div className="w-full min-w-0 overflow-hidden sm:flex-1">
+          <div className="flex w-max whitespace-nowrap animate-marquee motion-reduce:animate-none">
+            {[0, 1, 2, 3, 4, 5].map((copy) => (
+              <span
+                key={copy}
+                aria-hidden={copy > 0}
+                className="pr-16 text-lg font-bold tracking-tight text-white sm:text-xl"
+              >
+                Welcome to {branding.shopName || 'Unique Textile'} POS &amp; Inventory System
+              </span>
+            ))}
           </div>
         </div>
 

@@ -30,12 +30,18 @@ const config: Config = {
         'fade-in': 'fadeIn 0.2s ease-out',
         'scale-in': 'scaleIn 0.2s ease-out',
         'pulse-soft': 'pulseSoft 2s infinite',
+        marquee: 'marquee 26s linear infinite',
       },
       keyframes: {
         slideIn: { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(0)' } },
         fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
         scaleIn: { from: { transform: 'scale(0.95)', opacity: '0' }, to: { transform: 'scale(1)', opacity: '1' } },
         pulseSoft: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.7' } },
+        // The headline is rendered 6 times into one track, so the track is always
+        // far wider than the viewport. Shifting it by exactly one copy (100%/6)
+        // means the copy that scrolls in is identical to the one that scrolled
+        // out — a gap-free loop, like a broadcast news ticker.
+        marquee: { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-16.6667%)' } },
       },
     },
   },

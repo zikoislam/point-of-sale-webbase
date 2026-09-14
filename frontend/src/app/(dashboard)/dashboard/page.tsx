@@ -331,7 +331,7 @@ export default function DashboardPage() {
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Quick Links (Enlaces Rápidos)
+            Quick Links
           </h2>
           <span className="text-[11px] text-slate-500">12 Shortcut Modules</span>
         </div>
@@ -504,7 +504,7 @@ export default function DashboardPage() {
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <span>Sales Trend (Gráfico de las ventas)</span>
+                <span>Sales Trend</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 Revenue, tax collections, and discounts breakdown
@@ -579,18 +579,18 @@ export default function DashboardPage() {
                         <div className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-2xl text-xs space-y-1">
                           <p className="font-bold text-slate-200 mb-1.5">{label}</p>
                           <div className="flex items-center justify-between gap-4 text-emerald-400 font-semibold">
-                            <span>Ventas (Revenue):</span>
+                            <span>Revenue:</span>
                             <span>{formatCurrency(payload[0]?.value as number)}</span>
                           </div>
                           {payload[1] && (
                             <div className="flex items-center justify-between gap-4 text-blue-400 font-medium">
-                              <span>Impuesto (Tax):</span>
+                              <span>VAT / Tax:</span>
                               <span>{formatCurrency(payload[1]?.value as number)}</span>
                             </div>
                           )}
                           {payload[2] && (
                             <div className="flex items-center justify-between gap-4 text-amber-400 font-medium">
-                              <span>Descuento (Discount):</span>
+                              <span>Discount:</span>
                               <span>{formatCurrency(payload[2]?.value as number)}</span>
                             </div>
                           )}
@@ -607,7 +607,7 @@ export default function DashboardPage() {
                   strokeWidth={2.5}
                   fillOpacity={1}
                   fill="url(#revenueGradient)"
-                  name="Ventas"
+                  name="Revenue"
                 />
                 <Area
                   type="monotone"
@@ -616,7 +616,7 @@ export default function DashboardPage() {
                   strokeWidth={1.5}
                   fillOpacity={1}
                   fill="url(#taxGradient)"
-                  name="Impuesto"
+                  name="VAT"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -626,15 +626,15 @@ export default function DashboardPage() {
           <div className="flex items-center justify-center gap-6 pt-4 border-t border-slate-800/80 text-xs text-slate-400">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span>Ventas (Gross Sales)</span>
+              <span>Gross Sales</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-blue-500" />
-              <span>Impuesto (VAT/Tax)</span>
+              <span>VAT / Tax</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-amber-500" />
-              <span>Descuento (Discounts)</span>
+              <span>Discounts</span>
             </div>
           </div>
         </div>

@@ -4,3 +4,10 @@ export const DEFAULT_TAX_RATE = 5;
 export const ITEMS_PER_PAGE = 20;
 export const TOAST_DURATION = 4000;
 export const DEBOUNCE_DELAY = 300;
+
+/** Shown on the login page and in the sidebar footer. */
+export const SOFTWARE_CREDIT = {
+  company: 'Bdbbc.com',
+  developer: 'Zakirul Islam',
+  phone: '+8801534000350',
+};

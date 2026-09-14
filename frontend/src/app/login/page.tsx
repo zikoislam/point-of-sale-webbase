@@ -15,6 +15,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { Spinner } from '../../components/ui/Spinner';
+import { SOFTWARE_CREDIT } from '../../lib/constants';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -246,6 +247,24 @@ export default function LoginPage() {
         <p className="text-center text-xs text-slate-500 mt-6">
           🔒 Secure 256-bit TLS encrypted session · Multi-Document ACID compliant
         </p>
+
+        {/* Software credit */}
+        <div className="text-center mt-4 space-y-1">
+          <p className="text-xs text-slate-400">
+            Software by{' '}
+            <span className="font-semibold text-slate-300">{SOFTWARE_CREDIT.company}</span>
+          </p>
+          <p className="text-[11px] text-slate-500">
+            Developer: <span className="text-slate-400">{SOFTWARE_CREDIT.developer}</span>
+            {' · '}
+            <a
+              href={`tel:${SOFTWARE_CREDIT.phone}`}
+              className="text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              {SOFTWARE_CREDIT.phone}
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

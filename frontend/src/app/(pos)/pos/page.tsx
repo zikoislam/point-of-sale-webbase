@@ -11,6 +11,7 @@ import {
   PlayCircle,
   Lock,
   Unlock,
+  LogOut,
   CreditCard,
   Banknote,
   Smartphone,
@@ -126,7 +127,7 @@ interface SearchRow {
 }
 
 export default function POSTerminalPage() {
-  const { user, lockTerminal, unlockTerminal } = useAuth();
+  const { user, logout, lockTerminal, unlockTerminal } = useAuth();
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
   const [loadingShift, setLoadingShift] = useState(true);
 
@@ -542,6 +543,18 @@ export default function POSTerminalPage() {
   // "Close" — leave the POS terminal
   const handleCloseTerminal = () => {
     router.push('/dashboard');
+  };
+
+  // "Exit" — sign out completely and come back to a fresh login page
+  const handleExit = async () => {
+    if (cart.length > 0 && !confirm('There are items in the current cart. Sign out anyway?')) {
+      return;
+    }
+    try {
+      await logout();
+    } finally {
+      router.replace('/login');
+    }
   };
 
   // Cart Calculations — mirrors server Rule 1 (INCLUSIVE tax is inside the price)
@@ -986,6 +999,15 @@ export default function POSTerminalPage() {
           title="Lock POS Terminal (Ctrl+L)"
         >
           <Lock className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={handleExit}
+          className="flex items-center gap-1.5 px-3 py-1 rounded-sm bg-[#e2574c] hover:bg-[#cf4a40] border border-[#c33f36] text-white font-bold transition"
+          title="Sign out and return to the login page"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Exit
         </button>
       </div>
 
@@ -1923,6 +1945,22 @@ export default function POSTerminalPage() {
                 </button>
               ))}
             </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setIsLocked(false);
+                setPinInput('');
+                try {
+                  await logout();
+                } finally {
+                  router.replace('/login');
+                }
+              }}
+              className="text-xs text-slate-400 hover:text-slate-200 transition-colors pt-1"
+            >
+              Switch Account / Sign Out
+            </button>
           </div>
         </div>
       )}

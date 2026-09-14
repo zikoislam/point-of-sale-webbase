@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed": "ts-node src/seeds/index.ts",
+    "db": "node scripts/db-tool.js",
     "generate:postman": "ts-node src/scripts/generate-postman.ts"
   },
   "keywords": [

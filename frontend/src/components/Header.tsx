@@ -233,6 +233,17 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           <span className="sr-only">Lock Terminal</span>
         </button>
 
+        {/* Exit — sign out and return to a fresh login page */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-sm transition-colors"
+          title="Sign out and return to the login page"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Exit</span>
+        </button>
+
         {/* User Profile Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button

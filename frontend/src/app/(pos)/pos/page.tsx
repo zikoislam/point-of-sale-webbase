@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Scan,
   Search,
@@ -36,6 +37,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { queueOfflineSale } from '../../../lib/offline-queue';
 import { EscposBuilder } from '../../../lib/escpos-builder';
 import { openCashDrawer } from '../../../lib/cash-drawer';
+import { BarcodeRenderer } from '../../../components/BarcodeRenderer';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -110,8 +112,21 @@ interface HoldCartItem {
   createdAt: string;
 }
 
+/** One flat row of the barcode lookup panel (a single variant). */
+interface SearchRow {
+  productId: string;
+  productName: string;
+  variantId: string;
+  variantName: string;
+  sku: string;
+  barcode?: string;
+  unit: string;
+  stock: number;
+  price: number;
+}
+
 export default function POSTerminalPage() {
-  const { lockTerminal, unlockTerminal } = useAuth();
+  const { user, lockTerminal, unlockTerminal } = useAuth();
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
   const [loadingShift, setLoadingShift] = useState(true);
 
@@ -128,6 +143,16 @@ export default function POSTerminalPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pricingTier, setPricingTier] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [overallDiscount, setOverallDiscount] = useState<number>(0);
+  // Row highlighted in the cart grid / shown in the "Product Info." panel
+  const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
+  // Slide-over product catalog (touch-friendly alternative to scanning)
+  const [showCatalog, setShowCatalog] = useState(false);
+
+  // Barcode lookup panel opened by the banner's "Product Search" button
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchModalTerm, setSearchModalTerm] = useState('');
+  const [searchModalResults, setSearchModalResults] = useState<SearchRow[]>([]);
+  const [searchModalLoading, setSearchModalLoading] = useState(false);
 
   // Customers
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -156,6 +181,8 @@ export default function POSTerminalPage() {
   const [pinError, setPinError] = useState(false);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const receiveInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   // Offline Sync Management
   const { isOnline, pendingCount, isSyncing, triggerSync, refreshPendingCount } = useOfflineSync(
@@ -238,6 +265,9 @@ export default function POSTerminalPage() {
       alert(`"${product.name} (${variant.attributeName})" is OUT OF STOCK!`);
       return;
     }
+
+    // Highlight this line in the grid and mirror it in the Product Info panel
+    setCurrentVariantId(variant._id);
 
     const price =
       pricingTier === 'WHOLESALE'
@@ -325,6 +355,93 @@ export default function POSTerminalPage() {
     }
   };
 
+  // "Product Search" — expands a term into every matching variant with its barcode
+  const runProductSearch = useCallback(
+    async (term: string) => {
+      const q = term.trim();
+      setSearchModalTerm(q);
+      if (q.length < 2) {
+        setSearchModalResults([]);
+        return;
+      }
+
+      setSearchModalLoading(true);
+      try {
+        const res = await fetch(
+          `${API}/products?search=${encodeURIComponent(q)}&limit=10`,
+          fetchOpts()
+        );
+        const j = await res.json();
+        const list: any[] = j.success ? j.data || [] : [];
+
+        // The list endpoint returns summaries only, so pull details for the hits
+        const details = await Promise.all(
+          list.map(async (p) => {
+            try {
+              const dRes = await fetch(`${API}/products/${p.id}`, fetchOpts());
+              const dJson = await dRes.json();
+              return dJson.success ? dJson.data : null;
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        const rows: SearchRow[] = [];
+        for (const p of details) {
+          if (!p) continue;
+          for (const v of p.variants || []) {
+            rows.push({
+              productId: p.id,
+              productName: p.name,
+              variantId: v._id,
+              variantName: v.attributeName,
+              sku: v.sku,
+              barcode: v.barcode,
+              unit: p.unit,
+              stock: v.currentStock,
+              price:
+                pricingTier === 'WHOLESALE'
+                  ? v.wholesaleSellingPrice || v.retailSellingPrice
+                  : v.retailSellingPrice,
+            });
+          }
+        }
+        setSearchModalResults(rows);
+      } catch {
+        setSearchModalResults([]);
+      } finally {
+        setSearchModalLoading(false);
+      }
+    },
+    [pricingTier]
+  );
+
+  // Live-search inside the panel
+  useEffect(() => {
+    if (!showSearchModal) return;
+    const t = setTimeout(() => {
+      runProductSearch(searchModalTerm);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchModalTerm, showSearchModal, runProductSearch]);
+
+  // Add a search-panel row straight to the cart
+  const addSearchRowToCart = async (row: SearchRow) => {
+    const product = products.find((p) => p.id === row.productId);
+    let variant = product?.variants.find((v) => v._id === row.variantId);
+
+    if (!variant) {
+      const ok = await addProductById(row.productId);
+      if (ok) setShowSearchModal(false);
+      return;
+    }
+
+    const fullProduct = product as Product;
+    addToCart(fullProduct, variant);
+    setShowSearchModal(false);
+  };
+
   // Barcode enter lookup
   const handleBarcodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -402,6 +519,29 @@ export default function POSTerminalPage() {
 
   const removeCartItem = (variantId: string) => {
     setCart((prev) => prev.filter((i) => i.variantId !== variantId));
+  };
+
+  // "Cancel" — discard the whole ticket
+  const handleCancelTicket = () => {
+    if (cart.length === 0) return;
+    if (!confirm('Cancel this sale and clear the cart?')) return;
+    setCart([]);
+    setSelectedCustomer(null);
+    setOverallDiscount(0);
+    setCurrentVariantId(null);
+  };
+
+  // "Remove" — drop only the highlighted grid row
+  const handleRemoveCurrent = () => {
+    const row = cart.find((i) => i.variantId === currentVariantId);
+    if (!row) return;
+    removeCartItem(row.variantId);
+    setCurrentVariantId(null);
+  };
+
+  // "Close" — leave the POS terminal
+  const handleCloseTerminal = () => {
+    router.push('/dashboard');
   };
 
   // Cart Calculations — mirrors server Rule 1 (INCLUSIVE tax is inside the price)
@@ -623,9 +763,36 @@ export default function POSTerminalPage() {
       setShowCheckoutModal(false);
       setShowReceiptModal(false);
       setShowHoldModal(false);
+      setShowSearchModal(false);
+      setShowCatalog(false);
     },
     onConfirmPayment: handleCheckoutSubmit,
     isPaymentModalOpen: showCheckoutModal,
+  });
+
+  // Extra terminal keys that don't collide with usePOSHotkeys (F2/F4/F8/F9 stay as-is)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F3') {
+        e.preventDefault();
+        handleCloseTerminal();
+      }
+      if (e.key === 'F11') {
+        e.preventDefault();
+        receiveInputRef.current?.focus();
+        receiveInputRef.current?.select();
+      }
+      if (e.key === 'F12') {
+        e.preventDefault();
+        openCheckout();
+      }
+      if (e.key === 'Delete') {
+        e.preventDefault();
+        handleRemoveCurrent();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   });
 
   // Filtered Products
@@ -643,376 +810,799 @@ export default function POSTerminalPage() {
     return matchesCat && matchesSearch;
   });
 
+  // Classic desktop field styling shared by the read-only info panels
+  const fieldCls =
+    'w-full px-1.5 py-0.5 bg-white border border-slate-400 rounded-sm text-[11px] text-slate-900 focus:outline-none focus:border-[#0f9aa8]';
+  const idFieldCls =
+    'w-full px-1.5 py-0.5 bg-white border border-slate-400 rounded-sm text-[11px] font-bold text-red-600 focus:outline-none focus:border-[#0f9aa8]';
+  const labelCls = 'text-[11px] text-slate-700 whitespace-nowrap';
+  const legendCls = 'text-[11px] font-semibold text-slate-700 px-1';
+
+  // The line shown in the "Product Info." panel (last scanned, or grid selection)
+  const currentItem =
+    cart.find((i) => i.variantId === currentVariantId) || cart[cart.length - 1] || null;
+  const currentProduct = currentItem
+    ? products.find((p) =>
+        p.variants.some((v) => v._id === currentItem.variantId)
+      ) || null
+    : null;
+
+  const now = new Date();
+  const shiftRef = activeShift ? `SHIFT-${activeShift._id.slice(-6).toUpperCase()}` : '—';
+
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden select-none">
-      {/* Top Navbar */}
-      <header className="h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-xs font-bold text-white tracking-wide">
-              {activeShift ? activeShift.terminalId : 'NO SHIFT'}
-            </span>
-          </div>
+    <div className="h-screen w-screen flex flex-col bg-[#dfe3e6] text-slate-900 overflow-hidden select-none">
+      {/* Teal terminal banner */}
+      <header className="bg-[#0f9aa8] border-b-2 border-[#0b7d88] px-4 py-2.5 flex items-center justify-between gap-4 shrink-0 shadow-sm">
+        <h1 className="text-white text-lg font-bold tracking-tight whitespace-nowrap">
+          Point Of Sale (POS) System
+        </h1>
 
-          {/* Online/Offline Status Indicator */}
-          <div
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border ${
-              isOnline
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse'
-            }`}
+        <form onSubmit={handleBarcodeSubmit} className="relative flex items-center gap-2 ml-auto">
+          <label className="text-white text-sm whitespace-nowrap">Barcode Reader:</label>
+          <input
+            ref={barcodeInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
+            onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
+            placeholder="Scan or type (F2)"
+            className="w-56 md:w-72 px-2 py-1 bg-white border border-[#0b7d88] rounded-sm text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-white/70"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setSearchModalTerm(searchQuery);
+              setShowSearchModal(true);
+            }}
+            className="px-4 py-1 bg-[#0b7d88] hover:bg-[#0a6d77] text-white text-sm font-semibold rounded-sm transition"
+            title="Search products and see their barcodes"
           >
-            {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-            <span>{isOnline ? 'Online' : 'Offline Mode'}</span>
-          </div>
+            Product Search
+          </button>
 
-          {/* Pending Offline Sales Sync Badge */}
-          {pendingCount > 0 && (
-            <button
-              onClick={triggerSync}
-              disabled={isSyncing || !isOnline}
-              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 text-[11px] font-bold transition"
-            >
-              <CloudUpload className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
-              <span>
-                {isSyncing ? 'Syncing...' : `Sync ${pendingCount} Sale${pendingCount > 1 ? 's' : ''}`}
-              </span>
-            </button>
+          {/* Manual search results dropdown */}
+          {showSearchResults && (
+            <div className="absolute right-0 top-full mt-1 z-40 w-80 bg-white border border-slate-400 rounded-sm shadow-2xl overflow-hidden max-h-80 overflow-y-auto">
+              {searchingProducts ? (
+                <div className="px-3 py-3 text-xs text-slate-500">Searching...</div>
+              ) : searchResults.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-slate-500">
+                  No products match &quot;{searchQuery}&quot;
+                </div>
+              ) : (
+                searchResults.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={async () => {
+                      const ok = await addProductById(p.id);
+                      if (ok) {
+                        setSearchQuery('');
+                        setShowSearchResults(false);
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-[#d7eef1] border-b border-slate-200 last:border-0 transition"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-900 truncate">{p.name}</span>
+                      <span className="text-[10px] text-slate-500 shrink-0">{p.categoryName || ''}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                      <span className="text-[10px] text-slate-500">
+                        Stock: {p.totalStock ?? 0} {p.unit || ''}
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-700">
+                        ৳{Number(p.lowestRetailPrice || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           )}
-
-          {/* Barcode Search Box */}
-          <form onSubmit={handleBarcodeSubmit} className="relative w-64 md:w-80">
-            <Scan className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              ref={barcodeInputRef}
-              type="text"
-              placeholder="Scan barcode or type name (F2)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true); }}
-              onBlur={() => setTimeout(() => setShowSearchResults(false), 150)}
-              className="w-full pl-9 pr-4 py-1.5 bg-slate-850 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition"
-            />
-
-            {/* Manual search results dropdown */}
-            {showSearchResults && (
-              <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto">
-                {searchingProducts ? (
-                  <div className="px-3 py-3 text-xs text-slate-400">Searching...</div>
-                ) : searchResults.length === 0 ? (
-                  <div className="px-3 py-3 text-xs text-slate-500">
-                    No products match &quot;{searchQuery}&quot;
-                  </div>
-                ) : (
-                  searchResults.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={async () => {
-                        const ok = await addProductById(p.id);
-                        if (ok) {
-                          setSearchQuery('');
-                          setShowSearchResults(false);
-                        }
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-slate-800 border-b border-slate-800 last:border-0 transition"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-white truncate">{p.name}</span>
-                        <span className="text-[10px] text-slate-400 shrink-0">{p.categoryName || ''}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <span className="text-[10px] text-slate-500">
-                          Stock: {p.totalStock ?? 0} {p.unit || ''}
-                        </span>
-                        <span className="text-[11px] font-bold text-emerald-400">
-                          ৳{Number(p.lowestRetailPrice || 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </form>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center space-x-2">
-          {/* Pricing Tier Toggle */}
-          <div className="flex items-center bg-slate-800 p-0.5 rounded-xl border border-slate-700 text-xs font-semibold">
-            <button
-              onClick={() => setPricingTier('RETAIL')}
-              className={`px-3 py-1 rounded-lg transition ${
-                pricingTier === 'RETAIL'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Retail
-            </button>
-            <button
-              onClick={() => setPricingTier('WHOLESALE')}
-              className={`px-3 py-1 rounded-lg transition ${
-                pricingTier === 'WHOLESALE'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Wholesale
-            </button>
-          </div>
-
-          {/* Hold Carts List */}
-          <button
-            onClick={() => setShowHoldModal(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-300 transition"
-            title="Held Carts (Shift + F4)"
-          >
-            <PauseCircle className="w-4 h-4 text-amber-400" />
-            <span>Held Carts</span>
-            {holdCarts.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-amber-500 text-slate-950 font-bold text-[10px] flex items-center justify-center">
-                {holdCarts.length}
-              </span>
-            )}
-          </button>
-
-          {/* Lock Terminal Button */}
-          <button
-            onClick={handleLockTerminal}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white transition"
-            title="Lock POS Terminal (Ctrl+L)"
-          >
-            <Lock className="w-4 h-4" />
-          </button>
-        </div>
+        </form>
       </header>
 
-      {/* Main Split Interface */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Column: Product Catalog Grid */}
-        <div className="flex-1 flex flex-col overflow-hidden border-r border-slate-800 bg-slate-950">
-          {/* Category Horizontal Scroll */}
-          <div className="p-3 border-b border-slate-800/80 flex items-center space-x-2 overflow-x-auto shrink-0 scrollbar-none">
-            <button
-              onClick={() => setSelectedCategory('ALL')}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
-                selectedCategory === 'ALL'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
-              }`}
-            >
-              All Items
-            </button>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCategory(c.id)}
-                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
-                  selectedCategory === c.id
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
-                }`}
-              >
-                {c.name}
-              </button>
-            ))}
+      {/* Status strip */}
+      <div className="bg-[#eef1f2] border-b border-slate-300 px-3 py-1.5 flex items-center gap-2 flex-wrap shrink-0 text-[11px]">
+        <span className="flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-300 rounded-sm font-bold text-slate-700">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          {activeShift ? activeShift.terminalId : 'NO SHIFT'}
+        </span>
+
+        <span
+          className={`flex items-center gap-1.5 px-2 py-1 rounded-sm font-bold border ${
+            isOnline
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+              : 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse'
+          }`}
+        >
+          {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+          {isOnline ? 'Online' : 'Offline Mode'}
+        </span>
+
+        {pendingCount > 0 && (
+          <button
+            onClick={triggerSync}
+            disabled={isSyncing || !isOnline}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-sm bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 font-bold transition"
+          >
+            <CloudUpload className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
+            {isSyncing ? 'Syncing...' : `Sync ${pendingCount} Sale${pendingCount > 1 ? 's' : ''}`}
+          </button>
+        )}
+
+        <span className="ml-auto" />
+
+        {/* Pricing Tier Toggle */}
+        <div className="flex items-center bg-white border border-slate-300 rounded-sm font-semibold overflow-hidden">
+          <button
+            onClick={() => setPricingTier('RETAIL')}
+            className={`px-3 py-1 transition ${
+              pricingTier === 'RETAIL' ? 'bg-[#0f9aa8] text-white' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Retail
+          </button>
+          <button
+            onClick={() => setPricingTier('WHOLESALE')}
+            className={`px-3 py-1 transition ${
+              pricingTier === 'WHOLESALE' ? 'bg-[#0f9aa8] text-white' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Wholesale
+          </button>
+        </div>
+
+        <button
+          onClick={() => setShowCatalog(true)}
+          className="flex items-center gap-1.5 px-3 py-1 rounded-sm bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700 transition"
+          title="Browse the product catalog"
+        >
+          <Layers className="w-3.5 h-3.5 text-slate-600" />
+          Catalog
+        </button>
+
+        <button
+          onClick={() => setShowHoldModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1 rounded-sm bg-white hover:bg-slate-100 border border-slate-300 font-semibold text-slate-700 transition"
+          title="Held Carts (Shift + F4)"
+        >
+          <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
+          Held Carts
+          {holdCarts.length > 0 && (
+            <span className="w-4 h-4 rounded-full bg-amber-500 text-white font-bold text-[10px] flex items-center justify-center">
+              {holdCarts.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={handleLockTerminal}
+          className="p-1.5 rounded-sm bg-white hover:bg-slate-100 border border-slate-300 text-slate-600 transition"
+          title="Lock POS Terminal (Ctrl+L)"
+        >
+          <Lock className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Main terminal body */}
+      <div className="flex-1 flex gap-2 p-2 overflow-hidden">
+        {/* LEFT COLUMN: info panels on top, line items below */}
+        <div className="flex-1 flex flex-col gap-2 overflow-hidden min-w-0">
+          {/* Transaction. + Customer Info. */}
+          <div className="flex gap-2 items-stretch shrink-0">
+            <fieldset className="flex-1 min-w-0 bg-[#f7f8f9] border border-slate-400 rounded-sm px-3 pb-2.5 pt-1">
+              <legend className={legendCls}>Transaction.</legend>
+              <div className="grid grid-cols-[86px_1fr_86px_1fr] gap-x-3 gap-y-1.5 items-center">
+                <span className={labelCls}>Current Date :</span>
+                <input
+                  readOnly
+                  value={now.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                  className={fieldCls}
+                />
+
+                <span className={labelCls}>Employee ID :</span>
+                <input readOnly value={user?.username || '—'} className={fieldCls} />
+
+                <span className={labelCls}>Transaction ID :</span>
+                <input
+                  readOnly
+                  value={`INV-${now.toISOString().slice(0, 10).replace(/-/g, '')}-#####`}
+                  className={idFieldCls}
+                />
+
+                <span className={labelCls}>Employee :</span>
+                <input readOnly value={user?.fullName || '—'} className={fieldCls} />
+
+                <span className={labelCls}>Reference No. :</span>
+                <input readOnly value={shiftRef} className={idFieldCls} />
+
+                <span className={labelCls}>Position :</span>
+                <input
+                  readOnly
+                  value={(user?.role || '—').replace('_', ' ')}
+                  className={fieldCls}
+                />
+
+                <span className={labelCls}>Payment Method :</span>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as any)}
+                  className={`${fieldCls} font-semibold`}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="CARD">Card</option>
+                  <option value="MFS_BKASH">bKash</option>
+                  <option value="MFS_NAGAD">Nagad</option>
+                  <option value="CUSTOMER_DUE">Customer Due</option>
+                </select>
+
+                <span className={labelCls}>Time :</span>
+                <input readOnly value={now.toLocaleTimeString()} className={fieldCls} />
+              </div>
+            </fieldset>
+
+            <fieldset className="w-[270px] shrink-0 bg-[#f7f8f9] border border-slate-400 rounded-sm px-3 pb-2.5 pt-1">
+              <legend className={legendCls}>Customer Info.</legend>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-3">
+                  <span className={labelCls}>Type :</span>
+                  <label className="flex items-center gap-1 text-[11px] text-slate-700">
+                    <input
+                      type="radio"
+                      name="customerType"
+                      checked={!selectedCustomer}
+                      onChange={() => setSelectedCustomer(null)}
+                    />
+                    General
+                  </label>
+                  <label className="flex items-center gap-1 text-[11px] text-slate-700">
+                    <input
+                      type="radio"
+                      name="customerType"
+                      checked={!!selectedCustomer}
+                      onChange={() => {}}
+                    />
+                    Member
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-[70px_1fr] gap-x-2 items-center">
+                  <span className={labelCls}>Member ID :</span>
+                  <select
+                    id="customer-select"
+                    value={selectedCustomer?._id || ''}
+                    onChange={(e) => {
+                      const cust = customers.find((c) => c._id === e.target.value);
+                      setSelectedCustomer(cust || null);
+                    }}
+                    className={fieldCls}
+                  >
+                    <option value="">Walk-in (F8)</option>
+                    {customers.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name} ({c.phone})
+                      </option>
+                    ))}
+                  </select>
+
+                  <span className={labelCls}>Full Name :</span>
+                  <input readOnly value={selectedCustomer?.name || '—'} className={fieldCls} />
+                </div>
+
+                {selectedCustomer && (
+                  <div className="text-[11px] font-semibold text-red-600">
+                    Outstanding due: ৳{selectedCustomer.currentDueBalance.toFixed(2)} / limit ৳
+                    {selectedCustomer.creditLimit.toFixed(2)}
+                  </div>
+                )}
+              </div>
+            </fieldset>
           </div>
 
-          {/* Product Items Grid */}
-          <div className="flex-1 p-4 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {filteredProducts.map((p) =>
-              p.variants.map((v) => (
-                <div
-                  key={v._id}
-                  onClick={() => addToCart(p, v)}
-                  className={`group relative p-3 bg-slate-900 border rounded-2xl cursor-pointer transition flex flex-col justify-between hover:scale-[1.02] active:scale-[0.98] ${
-                    v.currentStock <= 0
-                      ? 'border-slate-800/40 opacity-40 grayscale cursor-not-allowed'
-                      : 'border-slate-800/80 hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/10'
-                  }`}
-                >
-                  <div>
-                    <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                      {p.categoryName || 'General'}
-                    </div>
-                    <div className="font-bold text-sm text-white mt-1 group-hover:text-indigo-400 transition line-clamp-2">
-                      {p.name}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      {v.attributeName} <span className="text-[10px] text-slate-500">[{v.sku}]</span>
-                    </div>
-                  </div>
+          {/* Product Info. */}
+          <fieldset className="shrink-0 bg-[#f7f8f9] border border-slate-400 rounded-sm px-3 pb-2.5 pt-1">
+            <legend className={legendCls}>Product Info.</legend>
+            <div className="grid grid-cols-[86px_1fr_86px_1fr_86px_auto] gap-x-3 gap-y-1.5 items-center">
+              <span className={labelCls}>Product ID :</span>
+              <input readOnly value={currentItem?.barcode || currentItem?.sku || ''} className={idFieldCls} />
 
-                  <div className="mt-4 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                    <div className="font-black text-sm text-emerald-400">
-                      ৳
-                      {pricingTier === 'WHOLESALE'
-                        ? (v.wholesaleSellingPrice || v.retailSellingPrice).toFixed(2)
-                        : v.retailSellingPrice.toFixed(2)}
-                    </div>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        v.currentStock <= 5
-                          ? 'bg-rose-500/20 text-rose-300'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {v.currentStock} {p.unit}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
+              <span className={labelCls}>Descriptions :</span>
+              <input readOnly value={currentItem?.variantName || ''} className={fieldCls} />
+
+              <span className={labelCls}>Stocked :</span>
+              <input readOnly value={currentItem ? currentItem.stockAvailable : ''} className={fieldCls} />
+
+              <span className={labelCls}>Product Name :</span>
+              <input readOnly value={currentItem?.productName || ''} className={fieldCls} />
+
+              <span className={labelCls}>Unit Price :</span>
+              <input
+                readOnly
+                value={currentItem ? `৳${currentItem.unitSellingPrice.toFixed(2)}` : ''}
+                className={idFieldCls}
+              />
+
+              <span className={labelCls}>Quantity :</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => currentItem && updateCartQty(currentItem.variantId, -1)}
+                  disabled={!currentItem}
+                  className="w-7 h-7 flex items-center justify-center bg-white border border-slate-400 rounded-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                  title="Decrease quantity"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <input readOnly value={currentItem?.quantity ?? ''} className={`${fieldCls} w-14 text-center font-bold`} />
+                <button
+                  type="button"
+                  onClick={() => currentItem && updateCartQty(currentItem.variantId, 1)}
+                  disabled={!currentItem}
+                  className="w-7 h-7 flex items-center justify-center bg-white border border-slate-400 rounded-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                  title="Increase quantity"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Line items grid */}
+          <div className="flex-1 bg-white border border-slate-400 rounded-sm overflow-hidden flex flex-col min-h-0">
+            <div className="flex-1 overflow-auto">
+              <table className="w-full border-collapse text-[11px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-[#1f5fa8] text-white">
+                    <th className="w-6 border border-[#17497f] py-1" />
+                    <th className="border border-[#17497f] py-1 px-2 text-left font-semibold">
+                      Product Barcode
+                    </th>
+                    <th className="border border-[#17497f] py-1 px-2 text-left font-semibold">
+                      Product Name
+                    </th>
+                    <th className="border border-[#17497f] py-1 px-2 text-left font-semibold">
+                      Descriptions
+                    </th>
+                    <th className="border border-[#17497f] py-1 px-2 text-right font-semibold">
+                      Unit Price
+                    </th>
+                    <th className="border border-[#17497f] py-1 px-2 text-center font-semibold">
+                      Quantity
+                    </th>
+                    <th className="border border-[#17497f] py-1 px-2 text-right font-semibold">
+                      Sub Total
+                    </th>
+                    <th className="border border-[#17497f] py-1 px-2 text-center font-semibold">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cart.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-10 text-center text-slate-500">
+                        Scan a barcode or open the Catalog to add items to this sale.
+                      </td>
+                    </tr>
+                  ) : (
+                    cart.map((item) => {
+                      const isCurrent = item.variantId === currentVariantId;
+                      return (
+                        <tr
+                          key={item.variantId}
+                          onClick={() => setCurrentVariantId(item.variantId)}
+                          className={`cursor-pointer ${
+                            isCurrent ? 'bg-[#cfe4fb]' : 'odd:bg-white even:bg-[#f6f7f8] hover:bg-[#e9f2fd]'
+                          }`}
+                        >
+                          <td className="border border-slate-300 py-1 text-center text-slate-500">
+                            <ChevronRight className="w-3 h-3 inline" />
+                          </td>
+                          <td className="border border-slate-300 py-1 px-2 font-mono text-slate-700">
+                            {item.barcode || item.sku}
+                          </td>
+                          <td className="border border-slate-300 py-1 px-2 font-semibold text-slate-900">
+                            {item.productName}
+                          </td>
+                          <td className="border border-slate-300 py-1 px-2 text-slate-600">
+                            {item.variantName}
+                          </td>
+                          <td className="border border-slate-300 py-1 px-2 text-right text-slate-800">
+                            ৳{item.unitSellingPrice.toFixed(2)}
+                          </td>
+                          <td className="border border-slate-300 py-1 px-2">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateCartQty(item.variantId, -1);
+                                }}
+                                className="w-5 h-5 flex items-center justify-center bg-white border border-slate-400 rounded-sm hover:bg-slate-100"
+                              >
+                                <Minus className="w-2.5 h-2.5" />
+                              </button>
+                              <span className="w-9 text-center font-bold text-slate-900">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateCartQty(item.variantId, 1);
+                                }}
+                                className="w-5 h-5 flex items-center justify-center bg-white border border-slate-400 rounded-sm hover:bg-slate-100"
+                              >
+                                <Plus className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="border border-slate-300 py-1 px-2 text-right font-bold text-slate-900">
+                            ৳{lineTotal(item).toFixed(2)}
+                          </td>
+                          <td className="border border-slate-300 py-1 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeCartItem(item.variantId);
+                                if (isCurrent) setCurrentVariantId(null);
+                              }}
+                              className="text-slate-500 hover:text-rose-600"
+                              title="Remove this line"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Active Cart & Total Panel */}
-        <div className="w-96 lg:w-[420px] flex flex-col bg-slate-900 border-l border-slate-800 shrink-0">
-          {/* Customer Selection Row */}
-          <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
-            <div className="flex items-center space-x-2">
-              <User className="w-4 h-4 text-indigo-400" />
-              <select
-                id="customer-select"
-                value={selectedCustomer?._id || ''}
-                onChange={(e) => {
-                  const cust = customers.find((c) => c._id === e.target.value);
-                  setSelectedCustomer(cust || null);
-                }}
-                className="bg-transparent text-xs text-white font-semibold focus:outline-none max-w-[200px]"
-              >
-                <option value="" className="bg-slate-900 text-white">
-                  Walk-in Customer (F8)
-                </option>
-                {customers.map((c) => (
-                  <option key={c._id} value={c._id} className="bg-slate-900 text-white">
-                    {c.name} ({c.phone})
-                  </option>
-                ))}
-              </select>
-            </div>
-            {selectedCustomer && (
-              <span className="text-[11px] text-amber-400 font-medium">
-                Due: ৳{selectedCustomer.currentDueBalance.toFixed(2)}
-              </span>
-            )}
+        {/* RIGHT COLUMN: action buttons + running totals */}
+        <div className="w-[268px] shrink-0 flex flex-col gap-2">
+          <div className="space-y-2">
+            <button
+              onClick={handleCancelTicket}
+              disabled={cart.length === 0}
+              className="w-full flex items-center justify-between px-4 py-2.5 bg-[#f0a04b] hover:bg-[#e08f3a] disabled:opacity-50 text-white text-sm font-bold rounded-sm border border-[#d9822b] shadow-sm transition"
+            >
+              <span>Cancel</span>
+              <span className="text-[11px] font-normal opacity-90">(Esc)</span>
+            </button>
+
+            <button
+              onClick={handleCloseTerminal}
+              className="w-full flex items-center justify-between px-4 py-2.5 bg-[#e2574c] hover:bg-[#cf4a40] text-white text-sm font-bold rounded-sm border border-[#c33f36] shadow-sm transition"
+            >
+              <span>Close</span>
+              <span className="text-[11px] font-normal opacity-90">(F3)</span>
+            </button>
+
+            <button
+              onClick={handleRemoveCurrent}
+              disabled={!currentItem}
+              className="w-full flex items-center justify-between px-4 py-2.5 bg-[#f2a8a8] hover:bg-[#e89595] disabled:opacity-50 text-[#7a1f1f] text-sm font-bold rounded-sm border border-[#dc8c8c] shadow-sm transition"
+            >
+              <span>Remove</span>
+              <span className="text-[11px] font-normal opacity-90">(Del)</span>
+            </button>
+
+            <button
+              onClick={handleHoldCart}
+              disabled={cart.length === 0}
+              className="w-full flex items-center justify-between px-4 py-2 bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-700 text-xs font-semibold rounded-sm border border-slate-400 transition"
+            >
+              <span>Hold / Park</span>
+              <span className="text-[11px] font-normal opacity-70">(F4)</span>
+            </button>
           </div>
 
-          {/* Cart Items List */}
-          <div className="flex-1 p-3 overflow-y-auto space-y-2">
-            {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2">
-                <ShoppingCart className="w-10 h-10 stroke-[1.5]" />
-                <p className="text-xs">Cart is empty. Scan or tap items.</p>
-              </div>
-            ) : (
-              cart.map((item) => (
-                <div
-                  key={item.variantId}
-                  className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-2 text-xs"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-bold text-white">{item.productName}</div>
-                      <div className="text-[11px] text-slate-400">
-                        {item.variantName} • ৳{item.unitSellingPrice.toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="font-bold text-white text-sm">
-                      ৳{(item.quantity * item.unitSellingPrice).toFixed(2)}
-                    </div>
-                  </div>
+          <fieldset className="bg-[#f7f8f9] border border-slate-400 rounded-sm px-3 pb-3 pt-1">
+            <legend className={legendCls}>Summary</legend>
+            <div className="space-y-2">
+              <div className="grid grid-cols-[62px_1fr] gap-2 items-center">
+                <span className={labelCls}>Subtotal :</span>
+                <input readOnly value={subtotal.toFixed(2)} className={`${fieldCls} text-right font-semibold`} />
 
-                  <div className="flex items-center justify-between pt-1">
-                    {/* Quantity Stepper */}
-                    <div className="flex items-center space-x-1 bg-slate-800 rounded-lg p-0.5 border border-slate-700">
-                      <button
-                        onClick={() => updateCartQty(item.variantId, -1)}
-                        className="p-1 hover:text-white text-slate-400 rounded hover:bg-slate-700"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="w-8 text-center font-bold text-white">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateCartQty(item.variantId, 1)}
-                        className="p-1 hover:text-white text-slate-400 rounded hover:bg-slate-700"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => removeCartItem(item.variantId)}
-                      className="text-slate-500 hover:text-rose-400 p-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Pricing & Checkout Summary Box */}
-          <div className="p-4 bg-slate-950 border-t border-slate-800 space-y-3 shrink-0">
-            <div className="space-y-1.5 text-xs text-slate-400">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span className="text-white font-medium">৳{subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax (VAT):</span>
-                <span className="text-white font-medium">৳{totalTax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Bill Discount:</span>
+                <span className={labelCls}>Discount :</span>
                 <input
                   type="number"
+                  min={0}
                   value={overallDiscount}
                   onChange={(e) => setOverallDiscount(Number(e.target.value))}
+                  className={`${fieldCls} text-right`}
+                />
+
+                <span className={labelCls}>Tax (VAT) :</span>
+                <input readOnly value={totalTax.toFixed(2)} className={`${fieldCls} text-right`} />
+
+                <span className={labelCls}>Total :</span>
+                <input
+                  readOnly
+                  value={grandTotal.toFixed(2)}
+                  className={`${fieldCls} text-right font-bold text-red-600`}
+                />
+
+                <span className={labelCls}>Receive :</span>
+                <input
+                  ref={receiveInputRef}
+                  type="number"
                   min={0}
-                  className="w-20 px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-right text-white font-semibold"
+                  value={cashTendered}
+                  onChange={(e) => setCashTendered(Number(e.target.value))}
+                  className={`${fieldCls} text-right`}
+                />
+
+                <span className={labelCls}>Change :</span>
+                <input
+                  readOnly
+                  value={Math.max(0, cashTendered - grandTotal).toFixed(2)}
+                  className={`${fieldCls} text-right font-bold`}
                 />
               </div>
+
+              <div className="flex gap-1 pt-1">
+                {[100, 500, 1000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setCashTendered(Number(cashTendered) + amt)}
+                    className="flex-1 px-2 py-1 bg-white hover:bg-slate-100 border border-slate-400 rounded-sm text-[10px] font-bold text-slate-700"
+                  >
+                    +{amt}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCashTendered(grandTotal)}
+                className="w-full px-2 py-1 bg-white hover:bg-slate-100 border border-slate-400 rounded-sm text-[10px] font-bold text-slate-700"
+              >
+                Exact amount
+              </button>
+
+              <button
+                onClick={openCheckout}
+                disabled={cart.length === 0}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-[#f0a04b] hover:bg-[#e08f3a] disabled:opacity-50 text-white text-sm font-bold rounded-sm border border-[#d9822b] shadow-sm transition"
+              >
+                <span className="flex items-center gap-2">
+                  <Printer className="w-4 h-4" />
+                  Complete &amp; Print
+                </span>
+                <span className="text-[11px] font-normal opacity-90">(F12)</span>
+              </button>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+
+      {/* Product search / barcode lookup panel */}
+      {showSearchModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-6 overflow-y-auto">
+          <div className="w-full max-w-4xl bg-[#f7f8f9] border border-slate-400 rounded-sm shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[#0f9aa8] border-b-2 border-[#0b7d88]">
+              <h2 className="text-white font-bold text-sm">Product Search — Barcode Lookup</h2>
+              <button
+                onClick={() => setShowSearchModal(false)}
+                className="text-white/90 hover:text-white"
+                title="Close (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Grand Total */}
-            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] uppercase font-bold text-slate-400">Payable Total</div>
-                <div className="text-2xl font-black text-emerald-400 tracking-tight">
-                  ৳{grandTotal.toFixed(2)}
+            <div className="p-3 border-b border-slate-300 bg-white flex items-center gap-2">
+              <Search className="w-4 h-4 text-slate-500 shrink-0" />
+              <input
+                autoFocus
+                value={searchModalTerm}
+                onChange={(e) => setSearchModalTerm(e.target.value)}
+                placeholder="Type product name, SKU or barcode…"
+                className="flex-1 px-2 py-1.5 bg-white border border-slate-400 rounded-sm text-sm text-slate-900 focus:outline-none focus:border-[#0f9aa8]"
+              />
+              <span className="text-[11px] text-slate-500 whitespace-nowrap">
+                {searchModalLoading ? 'Searching…' : `${searchModalResults.length} variant(s)`}
+              </span>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-3">
+              {searchModalResults.length === 0 ? (
+                <div className="py-12 text-center text-sm text-slate-500">
+                  {searchModalTerm.trim().length < 2
+                    ? 'Type at least 2 characters to search.'
+                    : searchModalLoading
+                      ? 'Searching…'
+                      : 'No matching products.'}
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleHoldCart}
-                  disabled={cart.length === 0}
-                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 border border-slate-700 text-amber-400 transition"
-                  title="Park / Hold Cart (F4)"
-                >
-                  <PauseCircle className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={openCheckout}
-                  disabled={cart.length === 0}
-                  className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/30"
-                  title="Pay Now (F9)"
-                >
-                  <span>Pay Now</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              ) : (
+                <table className="w-full border-collapse text-[11px] bg-white">
+                  <thead>
+                    <tr className="bg-[#1f5fa8] text-white">
+                      <th className="border border-[#17497f] py-1 px-2 text-left">Product</th>
+                      <th className="border border-[#17497f] py-1 px-2 text-left">Variant / SKU</th>
+                      <th className="border border-[#17497f] py-1 px-2 text-left">Barcode No.</th>
+                      <th className="border border-[#17497f] py-1 px-2 text-center">Barcode</th>
+                      <th className="border border-[#17497f] py-1 px-2 text-right">Price</th>
+                      <th className="border border-[#17497f] py-1 px-2 text-center">Stock</th>
+                      <th className="border border-[#17497f] py-1 px-2 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {searchModalResults.map((row) => {
+                      const code = row.barcode || row.sku;
+                      return (
+                        <tr key={row.variantId} className="odd:bg-white even:bg-[#f6f7f8]">
+                          <td className="border border-slate-300 py-1.5 px-2 font-semibold text-slate-900">
+                            {row.productName}
+                          </td>
+                          <td className="border border-slate-300 py-1.5 px-2 text-slate-600">
+                            {row.variantName} <span className="text-slate-400">[{row.sku}]</span>
+                          </td>
+                          <td className="border border-slate-300 py-1.5 px-2 font-mono font-bold text-red-600">
+                            {row.barcode || <span className="text-slate-400 font-normal">no barcode</span>}
+                          </td>
+                          <td className="border border-slate-300 py-1.5 px-2">
+                            <div className="flex items-center justify-center bg-white">
+                              <BarcodeRenderer value={code} height={28} width={1.2} />
+                            </div>
+                          </td>
+                          <td className="border border-slate-300 py-1.5 px-2 text-right text-slate-800">
+                            ৳{row.price.toFixed(2)}
+                          </td>
+                          <td className="border border-slate-300 py-1.5 px-2 text-center">
+                            <span
+                              className={`px-1.5 py-0.5 rounded-sm font-bold ${
+                                row.stock <= 5
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {row.stock} {row.unit}
+                            </span>
+                          </td>
+                          <td className="border border-slate-300 py-1.5 px-2 text-center">
+                            <button
+                              onClick={() => addSearchRowToCart(row)}
+                              disabled={row.stock <= 0}
+                              className="px-2 py-1 bg-[#0f9aa8] hover:bg-[#0b7d88] disabled:opacity-40 text-white text-[10px] font-bold rounded-sm whitespace-nowrap"
+                            >
+                              Add to Cart
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="px-3 py-2 border-t border-slate-300 bg-white flex items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-500">
+                The barcode image is scannable and printable.
+              </span>
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f0a04b] hover:bg-[#e08f3a] text-white text-xs font-bold rounded-sm border border-[#d9822b]"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Product catalog slide-over */}
+      {showCatalog && (
+        <div className="fixed inset-0 z-50 flex justify-start">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCatalog(false)} />
+          <div className="relative w-[760px] max-w-full h-full bg-[#f7f8f9] border-r border-slate-400 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[#0f9aa8] border-b-2 border-[#0b7d88] shrink-0">
+              <h2 className="text-white font-bold text-sm">Product Catalog</h2>
+              <button
+                onClick={() => setShowCatalog(false)}
+                className="text-white/90 hover:text-white"
+                title="Close catalog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-3 py-2 border-b border-slate-300 flex items-center gap-2 overflow-x-auto shrink-0 bg-white">
+              <button
+                onClick={() => setSelectedCategory('ALL')}
+                className={`px-3 py-1 rounded-sm text-[11px] font-bold shrink-0 border transition ${
+                  selectedCategory === 'ALL'
+                    ? 'bg-[#0f9aa8] text-white border-[#0b7d88]'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                }`}
+              >
+                All Items
+              </button>
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedCategory(c.id)}
+                  className={`px-3 py-1 rounded-sm text-[11px] font-bold shrink-0 border transition ${
+                    selectedCategory === c.id
+                      ? 'bg-[#0f9aa8] text-white border-[#0b7d88]'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 grid grid-cols-3 gap-2 content-start">
+              {filteredProducts.map((p) =>
+                p.variants.map((v) => (
+                  <button
+                    key={v._id}
+                    type="button"
+                    onClick={() => addToCart(p, v)}
+                    disabled={v.currentStock <= 0}
+                    className={`text-left p-2 bg-white border rounded-sm transition flex flex-col justify-between min-h-[74px] ${
+                      v.currentStock <= 0
+                        ? 'border-slate-300 opacity-50 cursor-not-allowed'
+                        : 'border-slate-300 hover:border-[#0f9aa8] hover:bg-[#eaf7f9]'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-[9px] uppercase tracking-wide text-slate-500 font-semibold">
+                        {p.categoryName || 'General'}
+                      </div>
+                      <div className="font-bold text-[11px] text-slate-900 leading-tight mt-0.5">
+                        {p.name}
+                      </div>
+                      <div className="text-[10px] text-slate-600">
+                        {v.attributeName} <span className="text-slate-400">[{v.sku}]</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-1.5 pt-1 border-t border-slate-200 flex items-center justify-between">
+                      <span className="font-black text-[11px] text-emerald-700">
+                        ৳
+                        {pricingTier === 'WHOLESALE'
+                          ? (v.wholesaleSellingPrice || v.retailSellingPrice).toFixed(2)
+                          : v.retailSellingPrice.toFixed(2)}
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-1 py-0.5 rounded-sm ${
+                          v.currentStock <= 5
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {v.currentStock} {p.unit}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Checkout Modal */}
       {showCheckoutModal && (

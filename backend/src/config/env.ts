@@ -29,3 +29,10 @@ export const env: EnvironmentConfig = {
   NODE_ENV: (process.env.NODE_ENV as EnvironmentConfig['NODE_ENV']) || 'development',
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:3000',
 };
+
+// CLIENT_URL accepts a comma-separated list so several frontends can be
+// trusted at once (e.g. the production Vercel domain plus its preview URLs).
+export const clientOrigins: string[] = env.CLIENT_URL
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);

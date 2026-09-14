@@ -2,7 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { env } from '../config/env';
+import { env, clientOrigins } from '../config/env';
 import { User } from '../models/User';
 import { TokenBlacklist } from '../models/TokenBlacklist';
 
@@ -19,7 +19,7 @@ function parseCookie(cookieHeader: string | undefined, name: string): string | u
 export const initSocket = (httpServer: HttpServer): Server => {
   io = new Server(httpServer, {
     cors: {
-      origin: env.CLIENT_URL || 'http://localhost:3000',
+      origin: clientOrigins,
       credentials: true,
     },
   });

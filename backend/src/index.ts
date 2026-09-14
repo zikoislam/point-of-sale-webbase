@@ -6,7 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
-import { env } from './config/env';
+import { env, clientOrigins } from './config/env';
 import { connectDB } from './config/db';
 import { sendSuccess } from './utils/api-response';
 import { errorHandler } from './middlewares/error-handler';
@@ -50,7 +50,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 app.use(cors({
-  origin: env.CLIENT_URL,
+  origin: clientOrigins,
   credentials: true,
 }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));

@@ -1,0 +1,37 @@
+# Render blueprint — deploy the POS API as a long-running Node web service.
+# Render supports what Vercel cannot: a persistent process (Socket.io WebSockets)
+# and node-cron schedulers, plus a disk for uploaded images.
+#
+# Usage: Render Dashboard -> New -> Blueprint -> pick this repo.
+# Set the secret env vars (marked `sync: false`) in the dashboard when prompted.
+
+services:
+  - type: web
+    name: pos-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    # A disk keeps uploaded logos/avatars across deploys and restarts.
+    # Disks require a paid instance type — remove this block if you stay on free
+    # (uploads will then be wiped on every deploy).
+    disk:
+      name: pos-uploads
+      mountPath: /opt/render/project/src/backend/uploads
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      # Comma-separated list of allowed frontend origins, e.g.
+      # https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
+      - key: CLIENT_URL
+        sync: false

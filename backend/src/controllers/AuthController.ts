@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/AuthService';
 import { sendSuccess } from '../utils/api-response';
-import { env } from '../config/env';
+import { authCookieOptions } from '../utils/cookie';
 
 export class AuthController {
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -15,9 +15,7 @@ export class AuthController {
         : 8 * 60 * 60 * 1000; // 8 hours
 
       res.cookie('pos_token', result.token, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        ...authCookieOptions(),
         maxAge,
       });
 
@@ -33,11 +31,7 @@ export class AuthController {
         await authService.logout(req.token, req.user.userId);
       }
 
-      res.clearCookie('pos_token', {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
+      res.clearCookie('pos_token', authCookieOptions());
 
       sendSuccess(res, 200, 'Logged out successfully');
     } catch (error) {

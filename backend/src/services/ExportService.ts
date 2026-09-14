@@ -292,6 +292,70 @@ class ExportService {
         };
       }
 
+      case 'purchases': {
+        const rep = await reportService.getPurchaseReport(startDate, endDate);
+        return {
+          title: 'Purchases Summary Report',
+          content: [
+            this.summaryRow('Purchase Orders', String(rep.summary.totalPurchaseOrders)),
+            this.summaryRow('Total Ordered Value', `${cur}${rep.summary.totalOrderedValue.toFixed(2)}`),
+            this.summaryRow('Total Paid', `${cur}${rep.summary.totalPaid.toFixed(2)}`),
+            this.summaryRow('Total Outstanding', `${cur}${rep.summary.totalDue.toFixed(2)}`),
+            { text: '', margin: [0, 10, 0, 0] as [number, number, number, number] },
+            {
+              table: {
+                headerRows: 1,
+                widths: ['auto', 'auto', '*', 'auto', 'auto', 'auto', 'auto'],
+                body: [
+                  this.headerRow(['PO #', 'Date', 'Supplier', 'Status', 'Total', 'Paid', 'Due']),
+                  ...rep.data.map((po: any) => [
+                    { text: po.poNumber, fontSize: 8 },
+                    { text: new Date(po.createdAt).toLocaleDateString('en-GB'), fontSize: 8 },
+                    { text: po.supplierId?.companyName || '—', fontSize: 8 },
+                    { text: po.status, fontSize: 8 },
+                    { text: `${cur}${po.totalAmount?.toFixed(2)}`, alignment: 'right' as const, fontSize: 8, bold: true },
+                    { text: `${cur}${po.paidAmount?.toFixed(2)}`, alignment: 'right' as const, fontSize: 8 },
+                    { text: `${cur}${po.dueAmount?.toFixed(2)}`, alignment: 'right' as const, fontSize: 8, color: po.dueAmount > 0 ? '#dc2626' : '#000' },
+                  ]),
+                ],
+              },
+              layout: 'lightHorizontalLines',
+            },
+          ],
+        };
+      }
+
+      case 'wastage': {
+        const rep = await reportService.getInventoryWastageReport(startDate, endDate);
+        return {
+          title: 'Wastage & Shrinkage Report',
+          content: [
+            this.summaryRow('Wastage Events', String(rep.summary.totalWastageEvents)),
+            this.summaryRow('Total Units Written Off', String(rep.summary.totalQty)),
+            this.summaryRow('Total Loss Value', `${cur}${rep.summary.totalLossValue.toFixed(2)}`),
+            { text: '', margin: [0, 10, 0, 0] as [number, number, number, number] },
+            {
+              table: {
+                headerRows: 1,
+                widths: ['*', 'auto', 'auto', 'auto', '*', 'auto'],
+                body: [
+                  this.headerRow(['Product', 'Qty', 'Unit Cost', 'Loss Value', 'Reason', 'Date']),
+                  ...rep.data.map((m: any) => [
+                    { text: m.productName, fontSize: 8, bold: true },
+                    { text: `${m.quantity} ${m.unit}`, fontSize: 8 },
+                    { text: `${cur}${m.unitCost?.toFixed(2)}`, alignment: 'right' as const, fontSize: 8 },
+                    { text: `${cur}${m.lossValue?.toFixed(2)}`, alignment: 'right' as const, fontSize: 8, bold: true, color: '#dc2626' },
+                    { text: m.reason || '—', fontSize: 8 },
+                    { text: new Date(m.createdAt).toLocaleDateString('en-GB'), fontSize: 8 },
+                  ]),
+                ],
+              },
+              layout: 'lightHorizontalLines',
+            },
+          ],
+        };
+      }
+
       default:
         return { title: 'Report', content: [{ text: 'Unknown report type.' }] };
     }
@@ -518,6 +582,76 @@ class ExportService {
         sumRow.font = { bold: true };
 
         this.formatCurrencyColumns(ws, [4], cur);
+        break;
+      }
+
+      case 'purchases': {
+        const rep = await reportService.getPurchaseReport(startDate, endDate);
+        ws.name = 'Purchases Summary';
+
+        this.addExcelHeaders(ws, ['PO #', 'Date', 'Supplier', 'Status', 'Total', 'Paid', 'Due']);
+
+        for (const po of rep.data as any[]) {
+          ws.addRow([
+            po.poNumber,
+            new Date(po.createdAt).toLocaleDateString('en-GB'),
+            po.supplierId?.companyName || '—',
+            po.status,
+            po.totalAmount,
+            po.paidAmount,
+            po.dueAmount,
+          ]);
+        }
+
+        ws.addRow([]);
+        const sumRow = ws.addRow([
+          'TOTALS',
+          '',
+          '',
+          '',
+          rep.summary.totalOrderedValue,
+          rep.summary.totalPaid,
+          rep.summary.totalDue,
+        ]);
+        sumRow.font = { bold: true };
+
+        this.formatCurrencyColumns(ws, [5, 6, 7], cur);
+        break;
+      }
+
+      case 'wastage': {
+        const rep = await reportService.getInventoryWastageReport(startDate, endDate);
+        ws.name = 'Wastage & Shrinkage';
+
+        this.addExcelHeaders(ws, [
+          'Product',
+          'Qty',
+          'Unit',
+          'Unit Cost',
+          'Loss Value',
+          'Reason',
+          'Recorded By',
+          'Date',
+        ]);
+
+        for (const m of rep.data) {
+          ws.addRow([
+            m.productName,
+            m.quantity,
+            m.unit,
+            m.unitCost,
+            m.lossValue,
+            m.reason || '—',
+            m.recordedBy || '—',
+            new Date(m.createdAt).toLocaleDateString('en-GB'),
+          ]);
+        }
+
+        ws.addRow([]);
+        const sumRow = ws.addRow(['TOTALS', rep.summary.totalQty, '', '', rep.summary.totalLossValue]);
+        sumRow.font = { bold: true };
+
+        this.formatCurrencyColumns(ws, [4, 5], cur);
         break;
       }
 

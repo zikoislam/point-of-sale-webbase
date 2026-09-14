@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { reportService } from '../services/ReportService';
 import { exportService } from '../services/ExportService';
 import { sendSuccess } from '../utils/api-response';
+import { AppError } from '../utils/app-error';
 
 class ReportController {
   async getDashboard(req: Request, res: Response, next: NextFunction) {
@@ -104,12 +105,37 @@ class ReportController {
         for (const s of rep.data) {
           csv += `"${s.companyName}","${s.contactPerson}","${s.phone}",${s.currentPayableBalance}\n`;
         }
-      } else {
+      } else if (type === 'pnl') {
+        const rep = await reportService.getProfitAndLoss(startDate as string, endDate as string);
+        csv = 'Section,Line Item,Amount\n';
+        csv += `"Revenue","Gross Net Sales",${rep.revenue.totalSales}\n`;
+        csv += `"Revenue","Cost of Goods Sold",${rep.revenue.cogs}\n`;
+        csv += `"Revenue","Gross Trading Margin",${rep.revenue.grossProfit}\n`;
+        for (const [cat, amt] of Object.entries(rep.expenses.breakdown || {})) {
+          csv += `"Expenses","${cat}",${amt}\n`;
+        }
+        csv += `"Expenses","Total Operating Overheads",${rep.expenses.totalExpenses}\n`;
+        csv += `"Result","Net Operating Profit",${rep.netProfit}\n`;
+      } else if (type === 'purchases') {
+        const rep = await reportService.getPurchaseReport(startDate as string, endDate as string);
+        csv = 'PO Number,Date,Supplier,Status,Total,Paid,Due\n';
+        for (const po of rep.data as any[]) {
+          csv += `"${po.poNumber}","${new Date(po.createdAt).toISOString()}","${po.supplierId?.companyName || ''}","${po.status}",${po.totalAmount},${po.paidAmount},${po.dueAmount}\n`;
+        }
+      } else if (type === 'wastage') {
+        const rep = await reportService.getInventoryWastageReport(startDate as string, endDate as string);
+        csv = 'Product,Qty,Unit,Unit Cost,Loss Value,Reason,Recorded By,Date\n';
+        for (const m of rep.data) {
+          csv += `"${m.productName}",${m.quantity},"${m.unit}",${m.unitCost},${m.lossValue},"${(m.reason || '').replace(/"/g, "'")}","${m.recordedBy || ''}","${new Date(m.createdAt).toISOString()}"\n`;
+        }
+      } else if (type === 'products') {
         const items = await reportService.getProductPerformance(startDate as string, endDate as string);
         csv = 'Product Name,Variant,SKU,Units Sold,Gross Revenue,Cost,Gross Profit\n';
         for (const i of items) {
           csv += `"${i.productName}","${i.variantName}","${i.sku}",${i.unitsSold},${i.revenue},${i.cost},${i.grossProfit}\n`;
         }
+      } else {
+        throw new AppError(400, 'UNKNOWN_REPORT_TYPE', `Unknown report type: ${type}`);
       }
 
       res.setHeader('Content-Type', 'text/csv');

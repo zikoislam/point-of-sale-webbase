@@ -85,7 +85,19 @@ interface CartItem {
   taxType: string;
   discount: number;
   stockAvailable: number;
+  /** Product unit — decides whether fractional quantities are allowed. */
+  unit: string;
 }
+
+// Countable goods are sold in whole units; measured goods (Kg, Gram, Ltr, Ml,
+// Meter, Goj) can be sold in fractions such as 0.25 / 0.5 / 0.75.
+const WHOLE_UNITS = ['Pcs', 'Box'];
+const isWholeUnit = (unit?: string) => !unit || WHOLE_UNITS.includes(unit);
+const qtyStep = (unit?: string) => (isWholeUnit(unit) ? 1 : 0.25);
+const minQty = (unit?: string) => (isWholeUnit(unit) ? 1 : 0.25);
+
+/** 1 → "1", 0.5 → "0.5", 2.25 → "2.25" (no floating point noise) */
+const formatQty = (n: number) => String(Number(n.toFixed(2)));
 
 interface Customer {
   _id: string;
@@ -135,35 +147,40 @@ interface SearchRow {
 function QtyInput({
   value,
   max,
+  step = 1,
+  min = 1,
   onCommit,
   className,
 }: {
   value: number;
   max: number;
+  step?: number;
+  min?: number;
   onCommit: (qty: number) => void;
   className?: string;
 }) {
-  const [draft, setDraft] = useState(String(value));
+  const [draft, setDraft] = useState(formatQty(value));
 
   // Mirror changes made elsewhere (+/- buttons, scanning, resuming a cart)
   useEffect(() => {
-    setDraft(String(value));
+    setDraft(formatQty(value));
   }, [value]);
 
   return (
     <input
       type="number"
-      inputMode="numeric"
-      min={1}
+      inputMode="decimal"
+      step={step}
+      min={min}
       max={max}
       value={draft}
       onChange={(e) => {
         const raw = e.target.value;
         setDraft(raw);
         const n = Number(raw);
-        if (raw.trim() !== '' && Number.isFinite(n) && n >= 1) onCommit(n);
+        if (raw.trim() !== '' && Number.isFinite(n) && n >= min) onCommit(n);
       }}
-      onBlur={() => setDraft(String(value))}
+      onBlur={() => setDraft(formatQty(value))}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -172,6 +189,38 @@ function QtyInput({
       }}
       className={className}
     />
+  );
+}
+
+/** Quick quarter-step picks shown for measured units (Goj, Meter, Kg, ...). */
+function FractionPicks({
+  unit,
+  onPick,
+  active,
+}: {
+  unit?: string;
+  onPick: (qty: number) => void;
+  active?: number;
+}) {
+  if (isWholeUnit(unit)) return null;
+  return (
+    <div className="flex items-center gap-1">
+      {[0.25, 0.5, 0.75].map((q) => (
+        <button
+          key={q}
+          type="button"
+          onClick={() => onPick(q)}
+          className={`px-2 py-0.5 rounded-sm border text-[10px] font-bold transition ${
+            active === q
+              ? 'bg-[#0f9aa8] text-white border-[#0b7d88]'
+              : 'bg-white text-slate-700 border-slate-400 hover:bg-slate-100'
+          }`}
+          title={`Set quantity to ${q} ${unit || ''}`}
+        >
+          {formatQty(q)}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -357,6 +406,7 @@ export default function POSTerminalPage() {
             taxType: product.taxType || 'INCLUSIVE',
             discount: 0,
             stockAvailable: variant.currentStock,
+            unit: product.unit,
           },
         ];
       }
@@ -554,32 +604,34 @@ export default function POSTerminalPage() {
     alert(`No exact product found for "${term}". Pick one from the search results list.`);
   };
 
-  const updateCartQty = (variantId: string, delta: number) => {
+  const updateCartQty = (variantId: string, direction: number) => {
     setCart((prev) =>
       prev
         .map((item) => {
-          if (item.variantId === variantId) {
-            const newQty = item.quantity + delta;
-            if (newQty <= 0) return null;
-            if (newQty > item.stockAvailable) {
-              alert(`Max available stock is ${item.stockAvailable}`);
-              return item;
-            }
-            return { ...item, quantity: newQty };
+          if (item.variantId !== variantId) return item;
+          // Measured units step by 0.25, countable units by 1
+          const next = Number((item.quantity + direction * qtyStep(item.unit)).toFixed(2));
+          if (next <= 0) return null;
+          if (next > item.stockAvailable) {
+            alert(`Max available stock is ${item.stockAvailable}`);
+            return item;
           }
-          return item;
+          return { ...item, quantity: next };
         })
         .filter(Boolean) as CartItem[]
     );
   };
 
-  // Type an exact quantity, clamped to 1..available stock
+  // Type an exact quantity, clamped to the unit's minimum..available stock
   const setCartQty = (variantId: string, qty: number) => {
     setCart((prev) =>
       prev.map((item) => {
         if (item.variantId !== variantId) return item;
         if (!Number.isFinite(qty)) return item;
-        const clamped = Math.min(Math.max(Math.trunc(qty), 1), item.stockAvailable);
+        const snapped = isWholeUnit(item.unit)
+          ? Math.round(qty)
+          : Math.round(qty * 100) / 100;
+        const clamped = Math.min(Math.max(snapped, minQty(item.unit)), item.stockAvailable);
         return { ...item, quantity: clamped };
       })
     );
@@ -698,6 +750,9 @@ export default function POSTerminalPage() {
             taxType: i.taxType || 'INCLUSIVE',
             discount: i.discount || 0,
             stockAvailable: 999, // default
+            unit:
+              products.find((p) => p.variants.some((v) => v._id === i.variantId))?.unit ||
+              'Pcs',
           }))
         );
         setPricingTier(hc.pricingTier || 'RETAIL');
@@ -1236,11 +1291,23 @@ export default function POSTerminalPage() {
                   <QtyInput
                     value={currentItem.quantity}
                     max={currentItem.stockAvailable}
+                    step={qtyStep(currentItem.unit)}
+                    min={minQty(currentItem.unit)}
                     onCommit={(qty) => setCartQty(currentItem.variantId, qty)}
-                    className={`${fieldCls} w-14 text-center font-bold`}
+                    className={`${fieldCls} w-16 text-center font-bold`}
                   />
                 ) : (
-                  <input readOnly value="" className={`${fieldCls} w-14 text-center font-bold`} />
+                  <input readOnly value="" className={`${fieldCls} w-16 text-center font-bold`} />
+                )}
+                <span className="text-[10px] font-bold text-slate-500 w-10">
+                  {currentItem?.unit || ''}
+                </span>
+                {currentItem && !isWholeUnit(currentItem.unit) && (
+                  <FractionPicks
+                    unit={currentItem.unit}
+                    active={currentItem.quantity}
+                    onPick={(qty) => setCartQty(currentItem.variantId, qty)}
+                  />
                 )}
                 <button
                   type="button"
@@ -1333,9 +1400,14 @@ export default function POSTerminalPage() {
                               <QtyInput
                                 value={item.quantity}
                                 max={item.stockAvailable}
+                                step={qtyStep(item.unit)}
+                                min={minQty(item.unit)}
                                 onCommit={(qty) => setCartQty(item.variantId, qty)}
-                                className="w-12 px-1 py-0.5 text-center font-bold text-slate-900 bg-white border border-slate-400 rounded-sm focus:outline-none focus:border-[#0f9aa8]"
+                                className="w-14 px-1 py-0.5 text-center font-bold text-slate-900 bg-white border border-slate-400 rounded-sm focus:outline-none focus:border-[#0f9aa8]"
                               />
+                              <span className="w-8 text-left text-[10px] font-semibold text-slate-500">
+                                {item.unit}
+                              </span>
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -1919,7 +1991,7 @@ export default function POSTerminalPage() {
                     <div>
                       <div>{item.productName}</div>
                       <div className="text-[10px] text-slate-500">
-                        {item.quantity} x ৳{item.unitSellingPrice.toFixed(2)}
+                        {formatQty(item.quantity)} x ৳{item.unitSellingPrice.toFixed(2)}
                       </div>
                     </div>
                     <div className="font-bold">৳{item.lineTotal.toFixed(2)}</div>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { NumberInput } from '../ui/NumberInput';
 import { useToast } from '../ui/Toast';
 import { api } from '../../lib/api-client';
 import { Monitor, DollarSign, AlertCircle } from 'lucide-react';
@@ -104,13 +105,12 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({
             <DollarSign className="w-3.5 h-3.5 text-slate-400" />
             Opening Float (৳)
           </label>
-          <Input
-            type="number"
+          <NumberInput
             min={0}
-            step="0.01"
             placeholder="0.00"
             value={openingFloat}
-            onChange={(e) => setOpeningFloat(parseFloat(e.target.value) || 0)}
+            onValueChange={setOpeningFloat}
+            className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none transition-all"
           />
           <p className="text-xs text-slate-500 mt-1">
             Count the cash in your drawer and enter the exact amount before starting.

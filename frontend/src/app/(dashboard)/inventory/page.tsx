@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
+import { NumberInput } from '../../../components/ui/NumberInput';
 import {
   Boxes,
   AlertTriangle,
@@ -476,10 +477,9 @@ export default function InventoryPage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Wastage / Discard Quantity *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={wastageQty}
-                  onChange={(e) => setWastageQty(Number(e.target.value))}
+                  onValueChange={setWastageQty}
                   min={1}
                   className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-base focus:outline-none focus:border-rose-500"
                 />

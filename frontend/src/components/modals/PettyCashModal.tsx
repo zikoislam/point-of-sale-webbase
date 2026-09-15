@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { NumberInput } from '../ui/NumberInput';
 import { useToast } from '../ui/Toast';
 import { api } from '../../lib/api-client';
 import { ArrowDownCircle, ArrowUpCircle, AlertCircle, Wallet } from 'lucide-react';
@@ -130,13 +131,12 @@ export const PettyCashModal: React.FC<PettyCashModalProps> = ({
           <label className="block text-xs font-medium text-slate-300 mb-1.5">
             Amount (৳)
           </label>
-          <Input
-            type="number"
-            min={0.01}
-            step="0.01"
+          <NumberInput
+            min={0}
             placeholder="0.00"
-            value={amount || ''}
-            onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+            value={amount}
+            onValueChange={setAmount}
+            className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none transition-all"
             required
           />
         </div>

@@ -39,6 +39,7 @@ import { queueOfflineSale } from '../../../lib/offline-queue';
 import { EscposBuilder } from '../../../lib/escpos-builder';
 import { openCashDrawer } from '../../../lib/cash-drawer';
 import { BarcodeRenderer } from '../../../components/BarcodeRenderer';
+import { NumberInput } from '../../../components/ui/NumberInput';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -168,14 +169,12 @@ function QtyInput({
 
   return (
     <input
-      type="number"
+      type="text"
       inputMode="decimal"
-      step={step}
-      min={min}
-      max={max}
       value={draft}
       onChange={(e) => {
-        const raw = e.target.value;
+        let raw = e.target.value.replace(/[^0-9.-]/g, '');
+        raw = raw.replace(/^(-?)0+(?=\d)/, '$1');
         setDraft(raw);
         const n = Number(raw);
         if (raw.trim() !== '' && Number.isFinite(n) && n >= min) onCommit(n);
@@ -1494,11 +1493,10 @@ export default function POSTerminalPage() {
                 <input readOnly value={subtotal.toFixed(2)} className={`${fieldCls} text-right font-semibold`} />
 
                 <span className={labelCls}>Discount :</span>
-                <input
-                  type="number"
+                <NumberInput
                   min={0}
                   value={overallDiscount}
-                  onChange={(e) => setOverallDiscount(Number(e.target.value))}
+                  onValueChange={setOverallDiscount}
                   className={`${fieldCls} text-right`}
                 />
 
@@ -1513,12 +1511,11 @@ export default function POSTerminalPage() {
                 />
 
                 <span className={labelCls}>Receive :</span>
-                <input
+                <NumberInput
                   ref={receiveInputRef}
-                  type="number"
                   min={0}
                   value={cashTendered}
-                  onChange={(e) => setCashTendered(Number(e.target.value))}
+                  onValueChange={setCashTendered}
                   className={`${fieldCls} text-right`}
                 />
 
@@ -1840,10 +1837,9 @@ export default function POSTerminalPage() {
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
                       Cash Tendered (৳)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={cashTendered}
-                      onChange={(e) => setCashTendered(Number(e.target.value))}
+                      onValueChange={setCashTendered}
                       className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-lg focus:outline-none focus:border-indigo-500"
                     />
                   </div>

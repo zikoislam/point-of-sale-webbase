@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Select';
 import { Plus, Trash2, Layers, AlertCircle, RefreshCw } from 'lucide-react';
 import { api } from '../../lib/api-client';
@@ -20,6 +21,19 @@ export interface ProductVariantForm {
   currentStock: number;
   alertQty: number;
 }
+
+/** Variant columns that hold plain numbers (kept as strings in form state). */
+const NUMERIC_VARIANT_FIELDS = new Set([
+  'costPrice',
+  'retailSellingPrice',
+  'wholesaleSellingPrice',
+  'currentStock',
+  'alertQty',
+]);
+
+/** "050000" -> "50000", while "0.5" and "" are left alone. */
+const stripLeadingZeros = (raw: string) =>
+  raw.replace(/[^0-9.]/g, '').replace(/^(-?)0+(?=\d)/, '$1');
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -247,7 +261,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleVariantChange = (index: number, field: keyof ProductVariantForm, val: any) => {
     setVariants((prev) => {
       const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: val };
+      copy[index] = {
+        ...copy[index],
+        [field]:
+          typeof val === 'string' && NUMERIC_VARIANT_FIELDS.has(String(field))
+            ? stripLeadingZeros(val)
+            : val,
+      };
       return copy;
     });
   };
@@ -405,12 +425,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
                   VAT Rate (%)
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   min={0}
                   max={100}
                   value={taxRate}
-                  onChange={(e) => setTaxRate(Number(e.target.value))}
+                  onValueChange={setTaxRate}
                   className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
                 />
               </div>
@@ -522,9 +541,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           Cost Price (৳)
                         </label>
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           value={v.costPrice}
                           onChange={(e) => handleVariantChange(idx, 'costPrice', e.target.value)}
                           className="w-full h-8 px-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"
@@ -537,9 +555,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         Retail Price (৳) *
                       </label>
                       <input
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         value={v.retailSellingPrice}
                         onChange={(e) => handleVariantChange(idx, 'retailSellingPrice', e.target.value)}
                         className="w-full h-8 px-2.5 bg-slate-900 border border-emerald-500/50 rounded-lg text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-400"
@@ -553,9 +570,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                           Wholesale (৳)
                         </label>
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           value={v.wholesaleSellingPrice}
                           onChange={(e) =>
                             handleVariantChange(idx, 'wholesaleSellingPrice', e.target.value)
@@ -570,8 +586,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         Current Stock
                       </label>
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="numeric"
                         value={v.currentStock}
                         onChange={(e) => handleVariantChange(idx, 'currentStock', e.target.value)}
                         className="w-full h-8 px-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"
@@ -583,8 +599,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         Alert Qty
                       </label>
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
+                        inputMode="numeric"
                         value={v.alertQty}
                         onChange={(e) => handleVariantChange(idx, 'alertQty', e.target.value)}
                         className="w-full h-8 px-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"

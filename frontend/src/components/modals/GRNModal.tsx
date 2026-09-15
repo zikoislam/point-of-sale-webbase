@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Select';
 import { Badge } from '../ui/Badge';
 import { api } from '../../lib/api-client';
@@ -282,13 +283,12 @@ export const GRNModal: React.FC<GRNModalProps> = ({
                           <label className="block text-xs text-slate-400 mb-1">
                             Receiving Now (Max: {remaining})
                           </label>
-                          <Input
-                            type="number"
+                          <NumberInput
                             min={0}
                             max={remaining}
                             value={item.receivingNow}
-                            onChange={(e) => handleQtyChange(idx, parseFloat(e.target.value) || 0)}
-                            className="h-8 text-sm font-semibold"
+                            onValueChange={(v) => handleQtyChange(idx, v)}
+                            className="w-full h-8 px-3.5 bg-slate-900 text-slate-100 text-sm font-semibold rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none transition-all"
                           />
                         </div>
 
@@ -344,14 +344,13 @@ export const GRNModal: React.FC<GRNModalProps> = ({
             <label className="block text-xs font-medium text-slate-300 mb-1">
               Pay Now to Supplier (Optional)
             </label>
-            <Input
-              type="number"
+            <NumberInput
               min={0}
               max={totalReceivingValue}
-              value={paidNow || ''}
+              value={paidNow}
               placeholder="0.00"
-              onChange={(e) => setPaidNow(parseFloat(e.target.value) || 0)}
-              className="h-9 text-sm font-medium"
+              onValueChange={setPaidNow}
+              className="w-full h-9 px-3.5 bg-slate-900 text-slate-100 text-sm font-medium rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none transition-all"
             />
           </div>
 

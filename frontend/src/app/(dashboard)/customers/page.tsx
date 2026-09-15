@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { NumberInput } from '../../../components/ui/NumberInput';
 import {
   Users,
   Plus,
@@ -494,10 +495,9 @@ export default function CustomersPage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Credit Limit (৳)
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={formCreditLimit}
-                  onChange={(e) => setFormCreditLimit(Number(e.target.value))}
+                  onValueChange={setFormCreditLimit}
                   min={0}
                   className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold focus:outline-none focus:border-cyan-500"
                 />
@@ -574,10 +574,9 @@ export default function CustomersPage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Collection Amount (৳) *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={payAmount}
-                  onChange={(e) => setPayAmount(Number(e.target.value))}
+                  onValueChange={setPayAmount}
                   min={1}
                   max={paymentCustomer.currentDueBalance}
                   className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-base focus:outline-none focus:border-emerald-500"

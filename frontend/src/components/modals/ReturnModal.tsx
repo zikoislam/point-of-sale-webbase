@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { NumberInput } from '../ui/NumberInput';
 import { api } from '../../lib/api-client';
 import { formatCurrency } from '../../lib/utils';
 import { RotateCcw, AlertCircle, Check, Ticket } from 'lucide-react';
@@ -183,15 +184,14 @@ export function ReturnModal({ sale, onClose, onSuccess }: ReturnModalProps) {
                     <label className="block text-[10px] text-slate-400 mb-0.5">
                       Return Qty (Max {item.soldQty})
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={item.returnQty}
-                      onChange={(e) => {
+                      onValueChange={(v) => {
                         const updated = [...returnItems];
-                        const val = Math.min(item.soldQty, Math.max(0, Number(e.target.value)));
-                        updated[idx].returnQty = val;
+                        updated[idx].returnQty = Math.min(item.soldQty, Math.max(0, v));
                         setReturnItems(updated);
                       }}
+                      allowDecimal={false}
                       min={0}
                       max={item.soldQty}
                       className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold"

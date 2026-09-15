@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { NumberInput } from '../../../components/ui/NumberInput';
 import {
   Wallet,
   Building,
@@ -396,10 +397,9 @@ export default function AccountsPage() {
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Opening Initial Balance (৳)
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={formInitial}
-                    onChange={(e) => setFormInitial(Number(e.target.value))}
+                    onValueChange={setFormInitial}
                     min={0}
                     className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold focus:outline-none focus:border-teal-500"
                   />
@@ -492,10 +492,9 @@ export default function AccountsPage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Transfer Amount (৳) *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={transferAmount}
-                  onChange={(e) => setTransferAmount(Number(e.target.value))}
+                  onValueChange={setTransferAmount}
                   min={1}
                   className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-base focus:outline-none focus:border-teal-500"
                 />

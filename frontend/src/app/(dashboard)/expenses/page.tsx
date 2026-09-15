@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { NumberInput } from '../../../components/ui/NumberInput';
 import {
   Receipt,
   Plus,
@@ -336,12 +337,10 @@ export default function ExpensesPage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Expense Amount (৳) *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={expAmount}
-                  onChange={(e) => setExpAmount(Number(e.target.value))}
+                  onValueChange={setExpAmount}
                   min={1}
-                  step="0.01"
                   className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold text-lg focus:outline-none focus:border-orange-500"
                 />
               </div>

@@ -49,8 +49,16 @@ const Field: React.FC<FieldProps> = ({ label, value, onChange, type = 'text', pl
   <div>
     <label className="block text-xs font-medium text-slate-400 mb-1.5">{label}</label>
     <input
-      type={type} value={value} placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
+      type={type === 'number' ? 'text' : type}
+      inputMode={type === 'number' ? 'decimal' : undefined}
+      value={value} placeholder={placeholder}
+      onChange={(e) => {
+        let val = e.target.value;
+        if (type === 'number') {
+          val = val.replace(/[^0-9.-]/g, '').replace(/^(-?)0+(?=\d)/, '$1');
+        }
+        onChange(val);
+      }}
       className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all placeholder:text-slate-500"
     />
   </div>

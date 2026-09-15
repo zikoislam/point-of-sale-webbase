@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Select';
 import { api } from '../../lib/api-client';
 import { formatCurrency } from '../../lib/utils';
@@ -116,13 +117,11 @@ export const SupplierPaymentModal: React.FC<SupplierPaymentModalProps> = ({
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
             Payment Amount (৳) *
           </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
+          <NumberInput
+            min={0}
             max={supplier.currentPayableBalance}
             value={amount}
-            onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+            onValueChange={setAmount}
             className="w-full h-10 px-3.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
             required
           />

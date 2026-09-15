@@ -537,11 +537,13 @@ export default function SalesHistoryPage() {
                             Return Qty (Max {item.soldQty})
                           </label>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             value={item.returnQty}
                             onChange={(e) => {
+                              const raw = e.target.value.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
                               const updated = [...returnItems];
-                              const val = Math.min(item.soldQty, Math.max(0, Number(e.target.value)));
+                              const val = Math.min(item.soldQty, Math.max(0, Number(raw)));
                               updated[idx].returnQty = val;
                               setReturnItems(updated);
                             }}

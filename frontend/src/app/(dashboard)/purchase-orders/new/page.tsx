@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumberInput } from '@/components/ui/NumberInput';
 import { Select } from '@/components/ui/Select';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Badge } from '@/components/ui/Badge';
@@ -453,26 +454,20 @@ export default function CreatePurchaseOrderPage() {
                             <p className="text-xs font-mono text-slate-400">{item.sku}</p>
                           </td>
                           <td className="p-3">
-                            <Input
-                              type="number"
+                            <NumberInput
                               min={1}
+                              allowDecimal={false}
                               value={item.orderedQty}
-                              onChange={(e) =>
-                                handleUpdateItem(idx, 'orderedQty', parseFloat(e.target.value) || 0)
-                              }
-                              className="h-8 text-sm font-semibold"
+                              onValueChange={(v) => handleUpdateItem(idx, 'orderedQty', v)}
+                              className="w-full h-8 px-3.5 bg-slate-900 text-slate-100 text-sm font-semibold rounded-lg border border-slate-700 hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
                             />
                           </td>
                           <td className="p-3">
-                            <Input
-                              type="number"
+                            <NumberInput
                               min={0}
-                              step="0.01"
                               value={item.unitCost}
-                              onChange={(e) =>
-                                handleUpdateItem(idx, 'unitCost', parseFloat(e.target.value) || 0)
-                              }
-                              className="h-8 text-sm font-semibold"
+                              onValueChange={(v) => handleUpdateItem(idx, 'unitCost', v)}
+                              className="w-full h-8 px-3.5 bg-slate-900 text-slate-100 text-sm font-semibold rounded-lg border border-slate-700 hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
                             />
                           </td>
                           <td className="p-3 text-right font-semibold text-slate-100">
@@ -535,13 +530,12 @@ export default function CreatePurchaseOrderPage() {
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-slate-400">Estimated Tax:</span>
                   <div className="w-32">
-                    <Input
-                      type="number"
+                    <NumberInput
                       min={0}
-                      value={taxAmount || ''}
+                      value={taxAmount}
                       placeholder="0.00"
-                      onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)}
-                      className="h-8 text-right text-xs"
+                      onValueChange={setTaxAmount}
+                      className="w-full h-8 px-3.5 bg-slate-900 text-slate-100 text-xs rounded-lg border border-slate-700 hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-right transition-all"
                     />
                   </div>
                 </div>
@@ -549,13 +543,12 @@ export default function CreatePurchaseOrderPage() {
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-slate-400">Shipping / Freight:</span>
                   <div className="w-32">
-                    <Input
-                      type="number"
+                    <NumberInput
                       min={0}
-                      value={shippingCost || ''}
+                      value={shippingCost}
                       placeholder="0.00"
-                      onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
-                      className="h-8 text-right text-xs"
+                      onValueChange={setShippingCost}
+                      className="w-full h-8 px-3.5 bg-slate-900 text-slate-100 text-xs rounded-lg border border-slate-700 hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-right transition-all"
                     />
                   </div>
                 </div>

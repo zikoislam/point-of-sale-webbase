@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Select';
 import { api } from '../../lib/api-client';
 import { useToast } from '../ui/Toast';
@@ -152,12 +153,11 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
               Default VAT Rate (%)
             </label>
-            <input
-              type="number"
+            <NumberInput
               min={0}
               max={100}
               value={defaultTaxRate}
-              onChange={(e) => setDefaultTaxRate(Number(e.target.value))}
+              onValueChange={setDefaultTaxRate}
               className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
             />
           </div>

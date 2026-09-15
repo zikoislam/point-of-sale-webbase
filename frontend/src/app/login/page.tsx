@@ -11,7 +11,6 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  CheckCircle2,
   ArrowRight,
 } from 'lucide-react';
 import { Spinner } from '../../components/ui/Spinner';
@@ -91,12 +90,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fillCredentials = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-    setErrorMsg('');
   };
 
   return (
@@ -222,25 +215,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Login Preset Helper */}
-          <div className="mt-8 pt-6 border-t border-slate-800">
-            <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-2 text-center">
-              Quick Fill Demo Credentials
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => fillCredentials('admin', 'Admin@123')}
-                className="px-3 py-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-lg text-xs text-slate-300 flex items-center justify-between transition-all"
-              >
-                <span>
-                  Admin: <span className="text-white font-mono font-medium">admin</span> /{' '}
-                  <span className="text-white font-mono font-medium">Admin@123</span>
-                </span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}

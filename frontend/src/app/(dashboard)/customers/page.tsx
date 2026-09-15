@@ -54,8 +54,18 @@ interface LedgerEntry {
   referenceType: string;
   narration: string;
   recordedById?: { name: string };
+  transactionDate?: string;
   createdAt: string;
 }
+
+/** Today as YYYY-MM-DD in the shop's own timezone, for a date input default. */
+const todayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** OPENING is a brought-forward due, so it increases what the customer owes. */
+const increasesDue = (type: string) => type === 'SALE_DUE' || type === 'OPENING';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -85,6 +95,11 @@ export default function CustomersPage() {
   // Payment State
   const [payAmount, setPayAmount] = useState(0);
   const [payMethod, setPayMethod] = useState<'CASH' | 'CARD' | 'MFS_BKASH' | 'MFS_NAGAD'>('CASH');
+  /**
+   * The day the money was actually received, which may not be today — a receipt
+   * collected now can belong to a payment that came in earlier.
+   */
+  const [payDate, setPayDate] = useState('');
   const [payNotes, setPayNotes] = useState('');
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState('');
@@ -181,6 +196,7 @@ export default function CustomersPage() {
     setPayAmount(c.currentDueBalance);
     setPayMethod('CASH');
     setPayNotes('');
+    setPayDate(todayLocal());
     setPayError('');
     setShowPaymentModal(true);
   };
@@ -206,6 +222,7 @@ export default function CustomersPage() {
           amount: Number(payAmount),
           paymentMethod: payMethod,
           notes: payNotes.trim() || undefined,
+          date: payDate || undefined,
         }),
       }));
 
@@ -569,6 +586,23 @@ export default function CustomersPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Payment Date *
+                </label>
+                <input
+                  type="date"
+                  value={payDate}
+                  max={todayLocal()}
+                  onChange={(e) => setPayDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-emerald-500"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  The day the money was received — change it if you are entering an older
+                  receipt.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Payment Tender Method
                 </label>
                 <select
@@ -662,15 +696,23 @@ export default function CustomersPage() {
                       <div>
                         <div className="font-semibold text-white">{e.narration}</div>
                         <div className="text-slate-400 mt-0.5">
-                          {new Date(e.createdAt).toLocaleString()} • Type: {e.transactionType}
+                          {new Date(e.transactionDate || e.createdAt).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}{' '}
+                          • Type: {e.transactionType}
                         </div>
                       </div>
                       <div className="text-right">
                         <div
-                          className={`font-bold text-sm ${e.transactionType === 'SALE_DUE' ? 'text-rose-400' : 'text-emerald-400'
-                            }`}
+                          className={`font-bold text-sm ${
+                            increasesDue(e.transactionType) ? 'text-rose-400' : 'text-emerald-400'
+                          }`}
                         >
-                          {e.transactionType === 'SALE_DUE' ? `+৳${e.amount.toFixed(2)}` : `-৳${e.amount.toFixed(2)}`}
+                          {increasesDue(e.transactionType)
+                            ? `+৳${e.amount.toFixed(2)}`
+                            : `-৳${e.amount.toFixed(2)}`}
                         </div>
                         <div className="text-slate-400 mt-0.5">
                           Balance: ৳{e.balanceAfter.toFixed(2)}

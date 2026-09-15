@@ -30,6 +30,8 @@ export interface DuePaymentDto {
   paymentAccountId?: string;
   narration?: string;
   notes?: string;
+  /** YYYY-MM-DD the payment was received; defaults to now. */
+  date?: string;
 }
 
 class CustomerService {
@@ -127,7 +129,7 @@ class CustomerService {
     const [entries, total] = await Promise.all([
       CustomerLedger.find({ customerId })
         .populate('recordedById', 'name')
-        .sort({ createdAt: -1 })
+        .sort({ transactionDate: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
@@ -169,6 +171,8 @@ class CustomerService {
             referenceType: 'RECEIPT',
             referenceId: new Types.ObjectId(recordedById),
             narration: `Due payment collection via ${dto.paymentMethod}. ${dto.narration || dto.notes || ''}`.trim(),
+            // The collector can date the receipt to the day the money arrived
+            transactionDate: dto.date ? new Date(`${dto.date}T12:00:00.000Z`) : new Date(),
             recordedById: new Types.ObjectId(recordedById),
           },
         ],

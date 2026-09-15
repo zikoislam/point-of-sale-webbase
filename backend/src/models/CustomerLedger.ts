@@ -10,6 +10,12 @@ export interface ICustomerLedger extends Document {
   referenceType: 'SALE' | 'RECEIPT' | 'RETURN' | 'OPENING';
   referenceId: Types.ObjectId;
   narration: string;
+  /**
+   * The day the money actually changed hands, which is not always the day the
+   * entry was typed in — a due collected today can belong to yesterday's
+   * receipt. Defaults to now when the caller does not supply one.
+   */
+  transactionDate: Date;
   recordedById: Types.ObjectId; // Ref: users
   createdAt: Date;
 }
@@ -51,6 +57,11 @@ const CustomerLedgerSchema = new Schema<ICustomerLedger>(
       type: String,
       required: true,
       trim: true,
+    },
+    transactionDate: {
+      type: Date,
+      required: true,
+      default: Date.now,
     },
     recordedById: {
       type: Schema.Types.ObjectId,

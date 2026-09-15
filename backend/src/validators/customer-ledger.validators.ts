@@ -11,12 +11,19 @@ export const customerDuePaymentSchema = z
     accountId: z.string().optional(),
     narration: z.string().trim().optional(),
     notes: z.string().trim().optional(),
+    /** YYYY-MM-DD; the day the payment was actually received. Defaults to today. */
+    date: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+      .optional(),
   })
   .transform((val) => ({
     amount: (val.amount ?? val.amountPaid) as number,
     paymentMethod: val.paymentMethod,
     paymentAccountId: val.paymentAccountId ?? val.accountId,
     narration: val.narration ?? val.notes,
+    date: val.date,
   }))
   .refine((val) => val.amount !== undefined && val.amount > 0, {
     message: 'Payment amount must be greater than 0',

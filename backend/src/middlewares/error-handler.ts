@@ -27,6 +27,19 @@ export const errorHandler = (
     return;
   }
 
+  // Malformed JSON body — body-parser rejects it before any route runs, so it
+  // never reached the Zod validator. Without this it surfaced as a 500.
+  if ((err as any).type === 'entity.parse.failed') {
+    sendError(res, 400, 'INVALID_PAYLOAD', 'Request body is not valid JSON');
+    return;
+  }
+
+  // Body larger than the express.json() limit
+  if ((err as any).type === 'entity.too.large') {
+    sendError(res, 413, 'PAYLOAD_TOO_LARGE', 'Request body is too large');
+    return;
+  }
+
   // Multer upload errors (file too large, etc.)
   if (err.name === 'MulterError') {
     const message = (err as any).code === 'LIMIT_FILE_SIZE' ? 'Image must be 2 MB or smaller' : err.message;

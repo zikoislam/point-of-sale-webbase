@@ -3,11 +3,11 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 export interface ICustomerLedger extends Document {
   _id: Types.ObjectId;
   customerId: Types.ObjectId; // Ref: customers
-  transactionType: 'SALE_DUE' | 'PAYMENT_COLLECTION' | 'RETURN_CREDIT';
+  transactionType: 'SALE_DUE' | 'PAYMENT_COLLECTION' | 'RETURN_CREDIT' | 'OPENING';
   amount: number;
   balanceBefore: number;
   balanceAfter: number;
-  referenceType: 'SALE' | 'RECEIPT' | 'RETURN';
+  referenceType: 'SALE' | 'RECEIPT' | 'RETURN' | 'OPENING';
   referenceId: Types.ObjectId;
   narration: string;
   recordedById: Types.ObjectId; // Ref: users
@@ -23,7 +23,7 @@ const CustomerLedgerSchema = new Schema<ICustomerLedger>(
     },
     transactionType: {
       type: String,
-      enum: ['SALE_DUE', 'PAYMENT_COLLECTION', 'RETURN_CREDIT'],
+      enum: ['SALE_DUE', 'PAYMENT_COLLECTION', 'RETURN_CREDIT', 'OPENING'],
       required: true,
     },
     amount: {
@@ -40,7 +40,7 @@ const CustomerLedgerSchema = new Schema<ICustomerLedger>(
     },
     referenceType: {
       type: String,
-      enum: ['SALE', 'RECEIPT', 'RETURN'],
+      enum: ['SALE', 'RECEIPT', 'RETURN', 'OPENING'],
       required: true,
     },
     referenceId: {

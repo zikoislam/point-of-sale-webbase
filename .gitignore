@@ -111,3 +111,9 @@ backend/uploads/*
 
 # Local database backups produced by backend/scripts/db-tool.js
 backend/backups/
+
+# Business spreadsheets — customer ledgers, supplier lists and Excel lock files
+# hold real customer names and balances, so they must not reach the repository.
+*.xlsx
+*.xls
+~$*

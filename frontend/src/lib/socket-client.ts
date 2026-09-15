@@ -4,7 +4,12 @@ let socket: Socket | null = null;
 
 export const getSocket = (): Socket => {
   if (!socket) {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
+    // Fall back to this very origin so the socket handshake and its auth cookie
+    // stay first-party (a cross-domain handshake gets its cookie blocked on iOS).
+    const socketUrl =
+      process.env.NEXT_PUBLIC_SOCKET_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
+
     socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,

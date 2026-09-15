@@ -46,7 +46,11 @@ function buildUrl(endpoint: string, params?: Record<string, any>): string {
 
   if (!params) return base;
 
-  const url = new URL(base);
+  // API_BASE_URL may be relative (e.g. "/api/v1" when the API is proxied through
+  // this same domain), so resolve it against the current origin.
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const url = new URL(base, origin);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.append(key, String(value));

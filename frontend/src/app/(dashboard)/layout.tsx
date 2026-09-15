@@ -50,9 +50,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const requiredPermission = resolvePermission(pathname);
 
+  // h-screen stays as the fallback height; where the browser supports dynamic
+  // viewport units, 100dvh keeps the bottom of the page clear of the mobile
+  // browser chrome instead of hiding it underneath.
   return (
     <ProtectedRoute requiredPermission={requiredPermission}>
-      <div className="flex h-screen bg-slate-950 overflow-hidden">
+      <div className="flex h-screen supports-[height:100dvh]:h-[100dvh] bg-slate-950 overflow-hidden">
         {/* Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}
@@ -72,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onMenuClick={() => setSidebarOpen((v) => !v)}
             sidebarCollapsed={sidebarCollapsed}
           />
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             {children}
           </main>
         </div>

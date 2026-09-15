@@ -61,6 +61,16 @@ export function DataTable<T extends Record<string, any>>({
     });
   }, [data, sortKey, sortDirection]);
 
+  // A `w-full` table inside `overflow-x-auto` shrinks to fit instead of
+  // scrolling, which squashes every column into an unreadable stack on a phone.
+  // Giving the table a floor width lets the wrapper scroll sideways properly.
+  const minWidthClass =
+    columns.length <= 4
+      ? 'min-w-[520px]'
+      : columns.length <= 6
+        ? 'min-w-[720px]'
+        : 'min-w-[900px]';
+
   return (
     <div
       className={cn(
@@ -69,7 +79,7 @@ export function DataTable<T extends Record<string, any>>({
       )}
     >
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className={cn('w-full text-left border-collapse', minWidthClass)}>
           <thead>
             <tr className="bg-slate-950/60 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider select-none">
               {columns.map((col) => (

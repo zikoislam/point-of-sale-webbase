@@ -20,9 +20,11 @@ const TONES: Record<string, string> = {
 
 export function KpiCard({ label, value, tone = 'white', hint }: KpiCardProps) {
   return (
-    <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+    <div className="p-3 sm:p-4 bg-slate-900 border border-slate-800 rounded-2xl min-w-0">
       <div className="text-xs text-slate-400">{label}</div>
-      <div className={`text-2xl font-black mt-1 ${TONES[tone]}`}>{value}</div>
+      <div className={`text-lg sm:text-2xl font-black mt-1 break-words ${TONES[tone]}`}>
+        {value}
+      </div>
       {hint && <div className="text-[11px] text-slate-500 mt-1">{hint}</div>}
     </div>
   );

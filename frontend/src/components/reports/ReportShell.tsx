@@ -44,13 +44,13 @@ export function ReportShell({
   return (
     <div className="space-y-6">
       {/* Header + actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-2xl">
+        <div className="flex items-center space-x-3 min-w-0">
+          <div className="w-12 h-12 shrink-0 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
             <Icon className="w-6 h-6" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">{title}</h1>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">{title}</h1>
             <p className="text-sm text-slate-400">{subtitle}</p>
           </div>
         </div>
@@ -98,7 +98,7 @@ export function ReportShell({
 
       {/* Date range */}
       {showDateFilter && onDateChange && (
-        <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 p-4 rounded-xl print:hidden">
+        <div className="flex flex-wrap items-center gap-3 bg-slate-900/60 border border-slate-800 p-4 rounded-xl print:hidden">
           <span className="text-xs font-bold text-slate-400 uppercase">Period</span>
           <div className="flex items-center space-x-2 text-xs">
             <input
@@ -155,7 +155,7 @@ export function ReportTable({
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full min-w-[760px] text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-950/40 uppercase font-semibold text-slate-400">
               {headers.map((h, i) => (

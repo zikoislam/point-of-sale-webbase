@@ -66,6 +66,33 @@ export class AuthController {
       next(error);
     }
   }
+
+  /** Step 1 of "forgot password" — emails a 6-digit reset code. */
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { username } = req.body;
+      const result = await authService.requestPasswordReset(username);
+      sendSuccess(
+        res,
+        200,
+        'If that account exists, a reset code has been sent to the recovery email.',
+        result
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** Step 2 — verifies the code and sets the new password. */
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { username, otp, newPassword } = req.body;
+      const result = await authService.resetPassword(username, otp, newPassword);
+      sendSuccess(res, 200, 'Password updated. You can sign in now.', result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const authController = new AuthController();

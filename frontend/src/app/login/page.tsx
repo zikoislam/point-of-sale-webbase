@@ -13,9 +13,12 @@ import {
   AlertCircle,
   ArrowRight,
   KeyRound,
+  Mail,
+  CheckCircle2,
   X,
 } from 'lucide-react';
 import { Spinner } from '../../components/ui/Spinner';
+import { apiClient } from '../../lib/api-client';
 import { SOFTWARE_CREDIT } from '../../lib/constants';
 
 export default function LoginPage() {
@@ -30,6 +33,15 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [showForgotHelp, setShowForgotHelp] = useState(false);
+
+  // Forgot-password flow: ask for a code, then exchange it for a new password
+  const [forgotStep, setForgotStep] = useState<'request' | 'verify' | 'done'>('request');
+  const [forgotUsername, setForgotUsername] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMaskedEmail, setForgotMaskedEmail] = useState('');
 
   // Redirect once auth check is done and user is already logged in
   useEffect(() => {
@@ -92,6 +104,67 @@ export default function LoginPage() {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const openForgotHelp = () => {
+    setForgotStep('request');
+    setForgotUsername(username); // whatever they already typed on the form
+    setForgotOtp('');
+    setForgotNewPassword('');
+    setForgotError('');
+    setForgotMaskedEmail('');
+    setShowForgotHelp(true);
+  };
+
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotUsername.trim()) {
+      setForgotError('Enter your username or email.');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      const res = await apiClient<{ sent: boolean; maskedEmail: string }>(
+        '/auth/forgot-password',
+        { method: 'POST', body: JSON.stringify({ username: forgotUsername.trim() }) }
+      );
+      setForgotMaskedEmail(res.data?.maskedEmail || '');
+      setForgotStep('verify');
+    } catch (err: any) {
+      setForgotError(err?.message || 'Could not send the reset code.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(forgotOtp.trim())) {
+      setForgotError('The reset code is 6 digits.');
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      setForgotError('Password must be at least 6 characters.');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      await apiClient('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: forgotUsername.trim(),
+          otp: forgotOtp.trim(),
+          newPassword: forgotNewPassword,
+        }),
+      });
+      setForgotStep('done');
+    } catch (err: any) {
+      setForgotError(err?.message || 'Could not reset the password.');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -222,7 +295,7 @@ export default function LoginPage() {
           <div className="mt-5 pt-4 border-t border-slate-800 text-center">
             <button
               type="button"
-              onClick={() => setShowForgotHelp(true)}
+              onClick={openForgotHelp}
               className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2 transition-colors"
             >
               <KeyRound className="w-3.5 h-3.5" />
@@ -255,14 +328,14 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Password recovery help */}
+      {/* Forgot password */}
       {showForgotHelp && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-blue-400" />
-                Forgot password?
+                {forgotStep === 'done' ? 'Password updated' : 'Forgot password?'}
               </h3>
               <button
                 type="button"
@@ -274,54 +347,143 @@ export default function LoginPage() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
-              <p className="text-sm text-slate-300 leading-relaxed">
-                For security, passwords are not reset from this screen. A{' '}
-                <span className="text-white font-semibold">manager</span> or the{' '}
-                <span className="text-white font-semibold">administrator</span> sets a new
-                one for you.
-              </p>
-
-              <ol className="space-y-2 text-xs text-slate-400">
-                <li className="flex gap-2">
-                  <span className="text-blue-400 font-bold">1.</span>
-                  <span>Ask your shop manager or the administrator.</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-blue-400 font-bold">2.</span>
-                  <span>
-                    They open{' '}
-                    <span className="text-slate-200 font-medium">Users</span>, pick your
-                    account and set a new password there.
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-blue-400 font-bold">3.</span>
-                  <span>Sign in here with the new password.</span>
-                </li>
-              </ol>
-
-              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-xs space-y-1.5">
-                <div className="text-slate-400">Still locked out? Contact support</div>
-                <a
-                  href={`tel:${SOFTWARE_CREDIT.phone}`}
-                  className="block text-blue-400 hover:text-blue-300 font-semibold"
-                >
-                  {SOFTWARE_CREDIT.developer} · {SOFTWARE_CREDIT.phone}
-                </a>
-                <div className="text-slate-500">{SOFTWARE_CREDIT.company}</div>
+            {forgotError && (
+              <div className="mx-5 mt-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-2 text-rose-300 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{forgotError}</span>
               </div>
-            </div>
+            )}
 
-            <div className="px-5 py-4 border-t border-slate-800 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowForgotHelp(false)}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition"
-              >
-                Got it
-              </button>
-            </div>
+            {forgotStep === 'request' && (
+              <form onSubmit={handleRequestOtp} className="p-5 space-y-4">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  We will email a 6-digit code to the recovery address. Enter that code on
+                  the next screen to set a new password.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Username or Email
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={forgotUsername}
+                    onChange={(e) => setForgotUsername(e.target.value)}
+                    placeholder="admin"
+                    className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition flex items-center justify-center gap-2"
+                >
+                  {forgotLoading ? <Spinner size="sm" color="white" /> : <Mail className="w-4 h-4" />}
+                  <span>{forgotLoading ? 'Sending...' : 'Send reset code'}</span>
+                </button>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  No access to that email? Ask your manager or the administrator — they can
+                  set a new password for you from{' '}
+                  <span className="text-slate-400">Users</span>. Or call{' '}
+                  <a
+                    href={`tel:${SOFTWARE_CREDIT.phone}`}
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    {SOFTWARE_CREDIT.phone}
+                  </a>
+                  .
+                </p>
+              </form>
+            )}
+
+            {forgotStep === 'verify' && (
+              <form onSubmit={handleResetPassword} className="p-5 space-y-4">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {forgotMaskedEmail ? (
+                    <>
+                      A 6-digit code was sent to{' '}
+                      <span className="text-slate-200 font-semibold">{forgotMaskedEmail}</span>
+                      . It expires in 10 minutes.
+                    </>
+                  ) : (
+                    <>If that account exists, a 6-digit code has been sent. It expires in 10 minutes.</>
+                  )}
+                </p>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                    Reset code
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    autoFocus
+                    value={forgotOtp}
+                    onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    className="w-full text-center tracking-[0.5em] font-mono text-lg px-3 py-2.5 bg-slate-950/60 border border-slate-700/80 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                    New password
+                  </label>
+                  <input
+                    type="password"
+                    value={forgotNewPassword}
+                    onChange={(e) => setForgotNewPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition flex items-center justify-center gap-2"
+                >
+                  {forgotLoading ? <Spinner size="sm" color="white" /> : <KeyRound className="w-4 h-4" />}
+                  <span>{forgotLoading ? 'Saving...' : 'Set new password'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotStep('request');
+                    setForgotError('');
+                  }}
+                  className="w-full text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  ← Use a different account
+                </button>
+              </form>
+            )}
+
+            {forgotStep === 'done' && (
+              <div className="p-5 space-y-4">
+                <div className="flex items-start gap-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <p className="text-xs text-emerald-300 leading-relaxed">
+                    Your password has been changed. Sign in with the new one.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotHelp(false);
+                    setPassword('');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

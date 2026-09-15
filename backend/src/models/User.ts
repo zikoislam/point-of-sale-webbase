@@ -14,6 +14,10 @@ export interface IUser extends Document {
   terminalLocked: boolean; // Quick screen lock state
   avatarUrl?: string; // Profile picture URL
   lastLoginAt?: Date;
+  // One-time code for the "forgot password" flow. Select is false so these can
+  // never leak through a normal user query or API response.
+  resetOtpHash?: string;
+  resetOtpExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -72,6 +76,14 @@ const UserSchema = new Schema<IUser>(
     },
     lastLoginAt: {
       type: Date,
+    },
+    resetOtpHash: {
+      type: String,
+      select: false,
+    },
+    resetOtpExpiresAt: {
+      type: Date,
+      select: false,
     },
   },
   {

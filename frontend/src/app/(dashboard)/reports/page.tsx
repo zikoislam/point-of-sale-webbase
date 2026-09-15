@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   BarChart3,
   Calendar,
@@ -33,8 +34,32 @@ const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
 type ReportTab = 'SALES' | 'PRODUCTS' | 'INVENTORY' | 'PNL' | 'DUES' | 'PAYABLES';
 
 export default function ReportsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ReportTab>('SALES');
   const [loading, setLoading] = useState(true);
+
+  // Customer picker for the per-customer due detail report
+  const [dueCustomerId, setDueCustomerId] = useState('');
+  const [customerOptions, setCustomerOptions] = useState<
+    { _id: string; name: string; phone: string; currentDueBalance: number }[]
+  >([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API}/customers?limit=200`, fetchOpts());
+        const j = await res.json();
+        if (!j.success) return;
+        const list = j.data?.data || j.data || [];
+        // biggest debtors first — that is the list a shop actually works through
+        setCustomerOptions(
+          [...list].sort((a, b) => (b.currentDueBalance || 0) - (a.currentDueBalance || 0))
+        );
+      } catch {
+        // the picker simply stays empty
+      }
+    })();
+  }, []);
 
   // Date Range
   const [startDate, setStartDate] = useState('');
@@ -173,6 +198,45 @@ export default function ReportsPage() {
           >
             <Download className="w-3.5 h-3.5" />
             <span>CSV</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Customer due detail report picker */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <Users className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold text-white">Customer Due Detail Report</h2>
+            <p className="text-xs text-slate-400">
+              Pick a customer to open the full date-by-date ledger, ready to print
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <select
+            value={dueCustomerId}
+            onChange={(e) => setDueCustomerId(e.target.value)}
+            className="w-full sm:w-64 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+          >
+            <option value="">Select a customer...</option>
+            {customerOptions.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.name} — ৳{(c.currentDueBalance || 0).toFixed(2)}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={!dueCustomerId}
+            onClick={() => dueCustomerId && router.push(`/customers/${dueCustomerId}/ledger`)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition"
+          >
+            Open Report
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

@@ -12,6 +12,8 @@ import {
   EyeOff,
   AlertCircle,
   ArrowRight,
+  KeyRound,
+  X,
 } from 'lucide-react';
 import { Spinner } from '../../components/ui/Spinner';
 import { SOFTWARE_CREDIT } from '../../lib/constants';
@@ -27,6 +29,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showForgotHelp, setShowForgotHelp] = useState(false);
 
   // Redirect once auth check is done and user is already logged in
   useEffect(() => {
@@ -215,6 +218,17 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Passwords are reset by a manager or admin — no self-service here */}
+          <div className="mt-5 pt-4 border-t border-slate-800 text-center">
+            <button
+              type="button"
+              onClick={() => setShowForgotHelp(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2 transition-colors"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              Forgot password?
+            </button>
+          </div>
         </div>
 
         {/* Footer info */}
@@ -240,6 +254,77 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Password recovery help */}
+      {showForgotHelp && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-blue-400" />
+                Forgot password?
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowForgotHelp(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-300 leading-relaxed">
+                For security, passwords are not reset from this screen. A{' '}
+                <span className="text-white font-semibold">manager</span> or the{' '}
+                <span className="text-white font-semibold">administrator</span> sets a new
+                one for you.
+              </p>
+
+              <ol className="space-y-2 text-xs text-slate-400">
+                <li className="flex gap-2">
+                  <span className="text-blue-400 font-bold">1.</span>
+                  <span>Ask your shop manager or the administrator.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-blue-400 font-bold">2.</span>
+                  <span>
+                    They open{' '}
+                    <span className="text-slate-200 font-medium">Users</span>, pick your
+                    account and set a new password there.
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-blue-400 font-bold">3.</span>
+                  <span>Sign in here with the new password.</span>
+                </li>
+              </ol>
+
+              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-xs space-y-1.5">
+                <div className="text-slate-400">Still locked out? Contact support</div>
+                <a
+                  href={`tel:${SOFTWARE_CREDIT.phone}`}
+                  className="block text-blue-400 hover:text-blue-300 font-semibold"
+                >
+                  {SOFTWARE_CREDIT.developer} · {SOFTWARE_CREDIT.phone}
+                </a>
+                <div className="text-slate-500">{SOFTWARE_CREDIT.company}</div>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowForgotHelp(false)}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

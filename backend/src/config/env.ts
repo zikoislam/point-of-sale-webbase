@@ -18,6 +18,10 @@ interface EnvironmentConfig {
   SMTP_USER?: string;
   SMTP_PASS?: string;
   SMTP_FROM?: string;
+  SMTP_FROM_NAME?: string;
+  /** HTTP email API — needed on hosts that block outbound SMTP (Railway). */
+  EMAIL_API_PROVIDER?: string;
+  EMAIL_API_KEY?: string;
   /** Where reset codes are delivered; falls back to the user's own email. */
   PASSWORD_RESET_EMAIL?: string;
 }
@@ -46,6 +50,9 @@ export const env: EnvironmentConfig = {
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   SMTP_FROM: process.env.SMTP_FROM,
+  SMTP_FROM_NAME: process.env.SMTP_FROM_NAME,
+  EMAIL_API_PROVIDER: process.env.EMAIL_API_PROVIDER,
+  EMAIL_API_KEY: process.env.EMAIL_API_KEY,
   PASSWORD_RESET_EMAIL: process.env.PASSWORD_RESET_EMAIL,
 };
 

@@ -1,15 +1,23 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { env } from '../config/env';
 
-let transporter: Transporter | null = null;
-
 /**
+ * Email delivery for the password-reset OTP.
+ *
+ * Two channels are supported:
+ *   1. An HTTP email API (Brevo / Resend) — preferred in production, because
+ *      hosts such as Railway block outbound SMTP ports entirely (connection
+ *      ETIMEDOUT / ESOCKET on both 587 and 465).
+ *   2. Plain SMTP — works anywhere the ports are open, e.g. when running the
+ *      API on your own machine or a VPS.
+ *
  * Email is optional. The rest of the app runs fine without it; only the
- * "forgot password" OTP flow needs it, and that endpoint reports a clear error
- * when it is not configured rather than failing silently.
+ * "forgot password" flow needs it and reports that clearly when it is missing.
  */
 export const isMailConfigured = (): boolean =>
-  Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+  Boolean(env.EMAIL_API_KEY) || Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+
+let transporter: Transporter | null = null;
 
 function getTransporter(): Transporter {
   if (!transporter) {
@@ -17,13 +25,50 @@ function getTransporter(): Transporter {
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
-      auth: {
-        user: env.SMTP_USER,
-        pass: env.SMTP_PASS,
-      },
+      auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
     });
   }
   return transporter;
+}
+
+async function sendViaHttpApi(params: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<void> {
+  const { to, subject, text, html } = params;
+  const provider = (env.EMAIL_API_PROVIDER || 'brevo').toLowerCase();
+  const fromEmail = env.SMTP_USER || to;
+  const fromName = env.SMTP_FROM_NAME || 'POS';
+
+  let url: string;
+  let headers: Record<string, string>;
+  let body: unknown;
+
+  if (provider === 'resend') {
+    url = 'https://api.resend.com/emails';
+    headers = { Authorization: `Bearer ${env.EMAIL_API_KEY}`, 'Content-Type': 'application/json' };
+    body = { from: `${fromName} <${fromEmail}>`, to: [to], subject, text, html };
+  } else if (provider === 'brevo') {
+    url = 'https://api.brevo.com/v3/smtp/email';
+    headers = { 'api-key': env.EMAIL_API_KEY!, 'Content-Type': 'application/json' };
+    body = {
+      sender: { email: fromEmail, name: fromName },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text,
+    };
+  } else {
+    throw new Error(`Unsupported EMAIL_API_PROVIDER "${provider}" (use "brevo" or "resend")`);
+  }
+
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`${provider} email API responded ${res.status}: ${detail.slice(0, 300)}`);
+  }
 }
 
 export async function sendPasswordResetOtp(params: {
@@ -34,7 +79,6 @@ export async function sendPasswordResetOtp(params: {
   minutes: number;
 }): Promise<void> {
   const { to, otp, fullName, shopName, minutes } = params;
-  const from = env.SMTP_FROM || env.SMTP_USER!;
 
   const subject = `${otp} is your ${shopName} password reset code`;
 
@@ -74,5 +118,16 @@ export async function sendPasswordResetOtp(params: {
   </body>
 </html>`;
 
-  await getTransporter().sendMail({ from, to, subject, text, html });
+  if (env.EMAIL_API_KEY) {
+    await sendViaHttpApi({ to, subject, text, html });
+    return;
+  }
+
+  await getTransporter().sendMail({
+    from: env.SMTP_FROM || env.SMTP_USER!,
+    to,
+    subject,
+    text,
+    html,
+  });
 }

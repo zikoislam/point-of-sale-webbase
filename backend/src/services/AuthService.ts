@@ -162,6 +162,18 @@ export class AuthService {
     usernameOrEmail: string
   ): Promise<{ sent: boolean; maskedEmail: string }> {
     const query = usernameOrEmail.toLowerCase().trim();
+
+    // Checked before the lookup on purpose: when no mail channel is configured
+    // every caller gets the same answer, so the reply cannot be used to work out
+    // which usernames exist.
+    if (!isMailConfigured()) {
+      throw new AppError(
+        503,
+        'EMAIL_NOT_CONFIGURED',
+        'Email delivery is not set up on this server, so a reset code cannot be sent. Ask a manager or the administrator to reset your password.'
+      );
+    }
+
     const user = await User.findOne({ $or: [{ username: query }, { email: query }] }).select(
       '+resetOtpHash +resetOtpExpiresAt'
     );
@@ -170,14 +182,6 @@ export class AuthService {
 
     if (!user || !user.isActive) {
       return { sent: true, maskedEmail: mask };
-    }
-
-    if (!isMailConfigured()) {
-      throw new AppError(
-        503,
-        'EMAIL_NOT_CONFIGURED',
-        'Email delivery is not set up on this server, so a reset code cannot be sent. Ask a manager or the administrator to reset your password.'
-      );
     }
 
     const otp = String(crypto.randomInt(100000, 1000000));

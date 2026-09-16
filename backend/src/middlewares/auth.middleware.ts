@@ -30,17 +30,19 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   try {
     let token: string | undefined;
 
-    // Check HTTP-only cookie first
-    if (req.cookies && req.cookies.pos_token) {
-      token = req.cookies.pos_token;
-    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    // Check Authorization: Bearer header first (tab-isolated session), then fallback to HTTP-only cookie
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.substring(7);
+    } else if (req.cookies && req.cookies.pos_token) {
+      token = req.cookies.pos_token;
     }
 
     if (!token) {
       sendError(res, 401, 'AUTH_REQUIRED', 'Authentication required. Please login.');
       return;
     }
+
+    req.token = token;
 
     // Check if token is blacklisted via SHA-256 hash
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');

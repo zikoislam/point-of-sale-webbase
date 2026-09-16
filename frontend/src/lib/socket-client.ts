@@ -14,6 +14,10 @@ export const getSocket = (): Socket => {
       transports: ['websocket', 'polling'],
       autoConnect: true,
       withCredentials: true,
+      auth: (cb) => {
+        const token = typeof window !== 'undefined' ? sessionStorage.getItem('pos_token') : null;
+        cb({ token });
+      },
     });
 
     socket.on('connect', () => {

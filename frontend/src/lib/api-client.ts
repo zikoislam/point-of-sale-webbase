@@ -72,6 +72,13 @@ export async function apiClient<T = any>(
     Accept: 'application/json',
   };
 
+  if (typeof window !== 'undefined') {
+    const token = sessionStorage.getItem('pos_token');
+    if (token) {
+      defaultHeaders['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
   if (idempotencyKey) {
     defaultHeaders['Idempotency-Key'] = idempotencyKey;
   }
@@ -95,10 +102,12 @@ export async function apiClient<T = any>(
 
   // Handle 401 Unauthorized globally — but never redirect from login page itself
   if (response.status === 401) {
-    const isOnLoginPage =
-      typeof window !== 'undefined' && window.location.pathname.startsWith('/login');
-    if (typeof window !== 'undefined' && !isOnLoginPage) {
-      window.location.href = '/login';
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pos_token');
+      const isOnLoginPage = window.location.pathname.startsWith('/login');
+      if (!isOnLoginPage) {
+        window.location.href = '/login';
+      }
     }
     // Always throw immediately on 401 so React Query transitions to error state
     // instead of leaving isLoading stuck as true forever.

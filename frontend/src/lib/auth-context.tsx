@@ -39,6 +39,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const mountedRef = useRef(true);
 
   const refreshUser = useCallback(async () => {
+    // If no token exists in this tab's sessionStorage, do not fetch /auth/me
+    // to prevent picking up another tab's cookie session.
+    if (typeof window !== 'undefined') {
+      const token = sessionStorage.getItem('pos_token');
+      if (!token) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), SESSION_CHECK_TIMEOUT_MS);
 
@@ -48,10 +59,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.success && res.data) {
         setUser(res.data);
       } else {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('pos_token');
+        }
         setUser(null);
       }
     } catch {
       if (!mountedRef.current) return;
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('pos_token');
+      }
       setUser(null);
     } finally {
       clearTimeout(timeoutId);
@@ -76,6 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (res.success && res.data) {
+      if (typeof window !== 'undefined' && res.data.token) {
+        sessionStorage.setItem('pos_token', res.data.token);
+      }
       setUser(res.data.user);
       return res.data.user;
     }
@@ -86,6 +106,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await apiClient('/auth/logout', { method: 'POST' });
     } finally {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('pos_token');
+      }
       setUser(null);
     }
   };

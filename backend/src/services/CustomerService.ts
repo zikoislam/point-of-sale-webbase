@@ -1,4 +1,4 @@
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { Customer, ICustomer } from '../models/Customer';
 import { CustomerLedger } from '../models/CustomerLedger';
 import { Shift } from '../models/Shift';
@@ -236,86 +236,72 @@ class CustomerService {
     if (!Types.ObjectId.isValid(customerId)) throw new AppError(400, 'INVALID_ID', 'Invalid customer ID');
     if (!Types.ObjectId.isValid(ledgerId)) throw new AppError(400, 'INVALID_ID', 'Invalid ledger ID');
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const customer = await Customer.findById(customerId);
+    if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
 
-    try {
-      const customer = await Customer.findById(customerId).session(session);
-      if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+    const targetLedger = await CustomerLedger.findOne({ _id: ledgerId, customerId });
+    if (!targetLedger) throw new AppError(404, 'LEDGER_NOT_FOUND', 'Ledger entry not found');
 
-      const targetLedger = await CustomerLedger.findOne({ _id: ledgerId, customerId }).session(session);
-      if (!targetLedger) throw new AppError(404, 'LEDGER_NOT_FOUND', 'Ledger entry not found');
-
-      // Build update fields for the target entry and write directly via updateOne
-      // (bypasses Mongoose validators so older entries with empty narration don't crash)
-      const entryUpdate: Record<string, any> = {};
-      if (data.amount !== undefined && data.amount >= 0) {
-        entryUpdate.amount = roundMoney(data.amount);
-      }
-      if (data.narration !== undefined) {
-        entryUpdate.narration = data.narration.trim();
-      }
-      if (data.transactionDate) {
-        entryUpdate.transactionDate = new Date(data.transactionDate);
-      }
-
-      if (Object.keys(entryUpdate).length > 0) {
-        await CustomerLedger.updateOne(
-          { _id: ledgerId, customerId },
-          { $set: entryUpdate },
-          { session } as any
-        );
-      }
-
-      // Recalculate all balances from the beginning using lean() + bulkWrite
-      // to avoid per-document save() calls triggering Mongoose validators
-      const allLedgers = await CustomerLedger.find({ customerId })
-        .sort({ transactionDate: 1, createdAt: 1 })
-        .session(session)
-        .lean();
-
-      let runningBalance = 0;
-      const bulkOps: any[] = [];
-
-      for (const ledger of allLedgers) {
-        const balanceBefore = runningBalance;
-
-        if (ledger.transactionType === 'OPENING' || ledger.transactionType === 'SALE_DUE') {
-          runningBalance = roundMoney(runningBalance + ledger.amount);
-        } else if (
-          ledger.transactionType === 'PAYMENT_COLLECTION' ||
-          ledger.transactionType === 'RETURN_CREDIT'
-        ) {
-          runningBalance = roundMoney(runningBalance - ledger.amount);
-        }
-
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: ledger._id },
-            update: { $set: { balanceBefore, balanceAfter: runningBalance } },
-          },
-        });
-      }
-
-      if (bulkOps.length > 0) {
-        await CustomerLedger.bulkWrite(bulkOps, { session } as any);
-      }
-
-      // Update customer due balance directly (avoid customer.save() validators)
-      await Customer.updateOne(
-        { _id: customerId },
-        { $set: { currentDueBalance: runningBalance } },
-        { session } as any
-      );
-
-      await session.commitTransaction();
-      return { success: true, newBalance: runningBalance };
-    } catch (err) {
-      await session.abortTransaction();
-      throw err;
-    } finally {
-      session.endSession();
+    // Build update fields for the target entry and write directly via updateOne
+    // (bypasses Mongoose validators so older entries with empty narration don't crash)
+    const entryUpdate: Record<string, any> = {};
+    if (data.amount !== undefined && data.amount >= 0) {
+      entryUpdate.amount = roundMoney(data.amount);
     }
+    if (data.narration !== undefined) {
+      entryUpdate.narration = data.narration.trim();
+    }
+    if (data.transactionDate) {
+      entryUpdate.transactionDate = new Date(data.transactionDate);
+    }
+
+    if (Object.keys(entryUpdate).length > 0) {
+      await CustomerLedger.updateOne(
+        { _id: ledgerId, customerId },
+        { $set: entryUpdate }
+      );
+    }
+
+    // Recalculate all balances from the beginning using lean() + bulkWrite
+    // to avoid per-document save() calls triggering Mongoose validators
+    const allLedgers = await CustomerLedger.find({ customerId })
+      .sort({ transactionDate: 1, createdAt: 1 })
+      .lean();
+
+    let runningBalance = 0;
+    const bulkOps: any[] = [];
+
+    for (const ledger of allLedgers) {
+      const balanceBefore = runningBalance;
+
+      if (ledger.transactionType === 'OPENING' || ledger.transactionType === 'SALE_DUE') {
+        runningBalance = roundMoney(runningBalance + ledger.amount);
+      } else if (
+        ledger.transactionType === 'PAYMENT_COLLECTION' ||
+        ledger.transactionType === 'RETURN_CREDIT'
+      ) {
+        runningBalance = roundMoney(runningBalance - ledger.amount);
+      }
+
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: ledger._id },
+          update: { $set: { balanceBefore, balanceAfter: runningBalance } },
+        },
+      });
+    }
+
+    if (bulkOps.length > 0) {
+      await CustomerLedger.bulkWrite(bulkOps);
+    }
+
+    // Update customer due balance directly (avoid customer.save() validators)
+    await Customer.updateOne(
+      { _id: customerId },
+      { $set: { currentDueBalance: runningBalance } }
+    );
+
+    return { success: true, newBalance: runningBalance };
   }
 }
 

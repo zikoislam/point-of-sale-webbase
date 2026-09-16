@@ -7,6 +7,9 @@ export interface IExpense extends Document {
   accountId: Types.ObjectId; // Ref: accounts (Debited account)
   receiptVoucherUrl?: string; // Media URL for physical receipt
   description: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvedById?: Types.ObjectId; // Ref: users
+  rejectionReason?: string;
   createdById: Types.ObjectId; // Ref: users
   createdAt: Date;
 }
@@ -35,6 +38,21 @@ const ExpenseSchema = new Schema<IExpense>(
     description: {
       type: String,
       required: true,
+      trim: true,
+    },
+    status: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'REJECTED'],
+      default: 'APPROVED',
+      required: true,
+    },
+    approvedById: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    rejectionReason: {
+      type: String,
       trim: true,
     },
     createdById: {

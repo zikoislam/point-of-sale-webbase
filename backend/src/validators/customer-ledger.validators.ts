@@ -37,3 +37,11 @@ export const customerLedgerQuerySchema = z.object({
 
 export type CustomerDuePaymentInput = z.infer<typeof customerDuePaymentSchema>;
 export type CustomerLedgerQueryInput = z.infer<typeof customerLedgerQuerySchema>;
+
+export const editCustomerLedgerSchema = z.object({
+  amount: z.coerce.number().min(0, 'Amount must be 0 or positive').optional(),
+  narration: z.string().trim().optional(),
+  transactionDate: z.string().trim().optional(),
+});
+
+export type EditCustomerLedgerInput = z.infer<typeof editCustomerLedgerSchema>;

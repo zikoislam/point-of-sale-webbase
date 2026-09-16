@@ -2,7 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IRole extends Document {
   _id: Types.ObjectId;
-  name: string; // "SUPER_ADMIN" | "BRANCH_MANAGER" | "CASHIER"
+  name: string; // "SUPER_ADMIN" | "ADMIN" | "BRANCH_MANAGER" | "CASHIER"
   displayName: string;
   permissions: string[]; // e.g. ["pos:checkout", "inv:view", "inv:adjust", "reports:pnl"]
   isSystemRole: boolean;

@@ -217,7 +217,8 @@ async function runPhasesVerification() {
         accountId: targetAccount._id.toString(),
         description: 'Monthly cleaning supplies',
       },
-      adminUserId
+      adminUserId,
+      'SUPER_ADMIN'
     );
     assert(!!expRecord._id, 22, 'Expense record created');
 

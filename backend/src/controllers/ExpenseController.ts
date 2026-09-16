@@ -45,8 +45,18 @@ class ExpenseController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user._id.toString();
-      const expense = await expenseService.createExpense(req.body, userId);
+      const userRole = (req as any).user.role?.name || (req as any).user.role;
+      const expense = await expenseService.createExpense(req.body, userId, userRole);
       sendSuccess(res, 201, 'Expense recorded successfully', expense);
+    } catch (err) { next(err); }
+  }
+
+  async approve(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { isApproved, rejectionReason } = req.body;
+      const adminUserId = req.user?._id?.toString() || (req as any).user._id.toString();
+      const expense = await expenseService.approveExpense(req.params.id, adminUserId, isApproved, rejectionReason);
+      sendSuccess(res, 200, `Expense ${isApproved ? 'approved' : 'rejected'} successfully`, expense);
     } catch (err) { next(err); }
   }
 }

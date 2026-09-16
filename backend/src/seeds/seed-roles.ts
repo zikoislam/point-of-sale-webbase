@@ -37,6 +37,7 @@ export const ALL_PERMISSIONS = [
   'users:manage',
   'roles:view',
   'roles:manage',
+  'approvals:manage',
 ];
 
 export const MANAGER_PERMISSIONS = [
@@ -70,6 +71,43 @@ export const MANAGER_PERMISSIONS = [
   'roles:view',
 ];
 
+export const ADMIN_PERMISSIONS = [
+  'pos:checkout',
+  'inv:view',
+  'inv:manage',
+  'inv:adjust',
+  'inv:labels',
+  'procurement:view',
+  'procurement:manage',
+  'procurement:receive',
+  'procurement:pay',
+  'sales:view',
+  'returns:authorize',
+  'shifts:operate',
+  'shifts:view',
+  'customers:view',
+  'customers:create',
+  'customers:manage',
+  'customers:pay_due',
+  'accounts:view',
+  'accounts:manage',
+  'accounts:transfer',
+  'expenses:view',
+  'expenses:create',
+  'expenses:manage',
+  'reports:dashboard',
+  'reports:sales',
+  'reports:inventory',
+  'reports:purchases',
+  'reports:dues',
+  'reports:payables',
+  'reports:pnl',
+  'reports:export',
+  'users:view',
+  'roles:view',
+  'approvals:manage', // Admin can approve manager/cashier actions
+];
+
 export const CASHIER_PERMISSIONS = [
   'pos:checkout',
   'sales:view',
@@ -87,6 +125,12 @@ export const seedRoles = async (): Promise<void> => {
       name: 'SUPER_ADMIN',
       displayName: 'Super Administrator',
       permissions: ALL_PERMISSIONS,
+      isSystemRole: true,
+    },
+    {
+      name: 'ADMIN',
+      displayName: 'Administrator',
+      permissions: ADMIN_PERMISSIONS,
       isSystemRole: true,
     },
     {
@@ -111,5 +155,5 @@ export const seedRoles = async (): Promise<void> => {
     );
   }
 
-  console.log('✅ Default roles seeded successfully (SUPER_ADMIN, BRANCH_MANAGER, CASHIER)');
+  console.log('✅ Default roles seeded successfully (SUPER_ADMIN, ADMIN, BRANCH_MANAGER, CASHIER)');
 };

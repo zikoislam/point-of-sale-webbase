@@ -77,7 +77,7 @@ class ExpenseService {
     return { data: expenses, total, page, totalPages: Math.ceil(total / limit) };
   }
 
-  async createExpense(dto: CreateExpenseDto, userId: string): Promise<IExpense> {
+  async createExpense(dto: CreateExpenseDto, userId: string, userRole: string): Promise<IExpense> {
     if (!Types.ObjectId.isValid(dto.categoryId) || !Types.ObjectId.isValid(dto.accountId)) {
       throw new AppError(400, 'INVALID_ID', 'Invalid category or account ID');
     }
@@ -91,18 +91,20 @@ class ExpenseService {
     try {
       const account = await Account.findById(dto.accountId).session(session);
       if (!account) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Payment account not found');
-      if (account.currentBalance < amount) {
-        throw new AppError(
-          400,
-          'INSUFFICIENT_BALANCE',
-          `Insufficient balance in ${account.name}. Available: ৳${account.currentBalance.toFixed(2)}`
-        );
-      }
+      const isAutoApproved = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
+      const status = isAutoApproved ? 'APPROVED' : 'PENDING';
 
-      const balanceBefore = account.currentBalance;
-      const balanceAfter = balanceBefore - amount;
-      account.currentBalance = balanceAfter;
-      await account.save({ session });
+      if (isAutoApproved) {
+        if (account.currentBalance < amount) {
+          throw new AppError(
+            400,
+            'INSUFFICIENT_BALANCE',
+            `Insufficient balance in ${account.name}. Available: ৳${account.currentBalance.toFixed(2)}`
+          );
+        }
+        account.currentBalance -= amount;
+        await account.save({ session });
+      }
 
       const expense = await Expense.create(
         [
@@ -112,44 +114,126 @@ class ExpenseService {
             accountId: new Types.ObjectId(dto.accountId),
             description: dto.description.trim(),
             receiptVoucherUrl: dto.receiptVoucherUrl?.trim(),
+            status,
             createdById: new Types.ObjectId(userId),
+            ...(isAutoApproved ? { approvedById: new Types.ObjectId(userId) } : {}),
           },
         ],
         { session }
       );
+
+      if (isAutoApproved) {
+        await AccountTransaction.create(
+          [
+            {
+              accountId: account._id,
+              type: 'DEBIT',
+              amount,
+              balanceBefore: account.currentBalance + amount,
+              balanceAfter: account.currentBalance,
+              referenceType: 'EXPENSE',
+              referenceId: expense[0]._id,
+              description: `Expense: ${dto.description}`,
+            },
+          ],
+          { session }
+        );
+
+        if (account.accountType === 'CASH') {
+          const activeShift = await Shift.findOne({
+            userId: new Types.ObjectId(userId),
+            status: 'OPEN',
+          }).session(session);
+
+          if (activeShift) {
+            activeShift.cashExpensesTotal += amount;
+            activeShift.expectedCash = Math.max(0, activeShift.expectedCash - amount);
+            await activeShift.save({ session });
+          }
+        }
+      }
+
+      await session.commitTransaction();
+      return expense[0].toObject() as unknown as IExpense;
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  async approveExpense(expenseId: string, adminUserId: string, isApproved: boolean, rejectionReason?: string): Promise<IExpense> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const expense = await Expense.findById(expenseId).session(session);
+      if (!expense) throw new AppError(404, 'EXPENSE_NOT_FOUND', 'Expense not found');
+      if (expense.status !== 'PENDING') {
+        throw new AppError(400, 'INVALID_STATUS', 'Only pending expenses can be approved or rejected');
+      }
+
+      if (!isApproved) {
+        expense.status = 'REJECTED';
+        expense.rejectionReason = rejectionReason;
+        expense.approvedById = new Types.ObjectId(adminUserId);
+        await expense.save({ session });
+        await session.commitTransaction();
+        return expense.toObject() as unknown as IExpense;
+      }
+
+      const account = await Account.findById(expense.accountId).session(session);
+      if (!account) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Payment account not found');
+      if (account.currentBalance < expense.amount) {
+        throw new AppError(
+          400,
+          'INSUFFICIENT_BALANCE',
+          `Insufficient balance in ${account.name}. Available: ৳${account.currentBalance.toFixed(2)}`
+        );
+      }
+
+      const balanceBefore = account.currentBalance;
+      const balanceAfter = balanceBefore - expense.amount;
+      account.currentBalance = balanceAfter;
+      await account.save({ session });
+
+      expense.status = 'APPROVED';
+      expense.approvedById = new Types.ObjectId(adminUserId);
+      await expense.save({ session });
 
       await AccountTransaction.create(
         [
           {
             accountId: account._id,
             type: 'DEBIT',
-            amount,
+            amount: expense.amount,
             balanceBefore,
             balanceAfter,
             referenceType: 'EXPENSE',
-            referenceId: expense[0]._id,
-            description: `Expense: ${dto.description}`,
+            referenceId: expense._id,
+            description: `Expense: ${expense.description}`,
           },
         ],
         { session }
       );
 
-      // If paid from cash account, check active cashier shift to deduct cashExpensesTotal
+      // If paid from cash account, find the active shift of the creator (if any) and update
       if (account.accountType === 'CASH') {
         const activeShift = await Shift.findOne({
-          userId: new Types.ObjectId(userId),
+          userId: expense.createdById,
           status: 'OPEN',
         }).session(session);
 
         if (activeShift) {
-          activeShift.cashExpensesTotal += amount;
-          activeShift.expectedCash = Math.max(0, activeShift.expectedCash - amount);
+          activeShift.cashExpensesTotal += expense.amount;
+          activeShift.expectedCash = Math.max(0, activeShift.expectedCash - expense.amount);
           await activeShift.save({ session });
         }
       }
 
       await session.commitTransaction();
-      return expense[0].toObject() as unknown as IExpense;
+      return expense.toObject() as unknown as IExpense;
     } catch (err) {
       await session.abortTransaction();
       throw err;

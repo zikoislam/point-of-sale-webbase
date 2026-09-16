@@ -22,6 +22,8 @@ import {
   AlertCircle,
   FileText,
 } from 'lucide-react';
+import { CustomerEditModal } from '../../../components/modals/CustomerEditModal';
+import { useAuth } from '../../../hooks/useAuth';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -69,6 +71,9 @@ const todayLocal = () => {
 const increasesDue = (type: string) => type === 'SALE_DUE' || type === 'OPENING';
 
 export default function CustomersPage() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -76,6 +81,7 @@ export default function CustomersPage() {
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
@@ -129,7 +135,6 @@ export default function CustomersPage() {
   }, [fetchCustomers]);
 
   const openCreateModal = () => {
-    setEditTarget(null);
     setFormName('');
     setFormPhone('');
     setFormEmail('');
@@ -141,13 +146,7 @@ export default function CustomersPage() {
 
   const openEditModal = (c: Customer) => {
     setEditTarget(c);
-    setFormName(c.name);
-    setFormPhone(c.phone);
-    setFormEmail(c.email || '');
-    setFormAddress(c.address || '');
-    setFormCreditLimit(c.creditLimit || 0);
-    setFormError('');
-    setShowCreateModal(true);
+    setShowEditModal(true);
   };
 
   const handleSaveCustomer = async () => {
@@ -172,8 +171,8 @@ export default function CustomersPage() {
         creditLimit: Number(formCreditLimit) || 0,
       };
 
-      const url = editTarget ? `${API}/customers/${editTarget._id}` : `${API}/customers`;
-      const method = editTarget ? 'PUT' : 'POST';
+      const url = `${API}/customers`;
+      const method = 'POST';
 
       const res = await fetch(url, fetchOpts({
         method,
@@ -432,13 +431,13 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Add / Edit Customer Modal */}
+      {/* Add Customer Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
               <h2 className="text-lg font-bold text-white">
-                {editTarget ? 'Edit Customer Profile' : 'Add New Customer'}
+                Add New Customer
               </h2>
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -734,6 +733,20 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+
+      {/* New Edit Customer Modal */}
+      <CustomerEditModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditTarget(null);
+        }}
+        customer={editTarget}
+        isSuperAdmin={isSuperAdmin}
+        onSuccess={() => {
+          fetchCustomers();
+        }}
+      />
     </div>
   );
 }

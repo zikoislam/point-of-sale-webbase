@@ -6,7 +6,10 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../../../lib/api-client';
 import { useBranding } from '../../../../../hooks/useBranding';
+import { useAuth } from '../../../../../hooks/useAuth';
 import { formatCurrency, formatDate } from '../../../../../lib/utils';
+import { CustomerEditModal } from '../../../../../components/modals/CustomerEditModal';
+import { LedgerEditModal, LedgerEntryForEdit } from '../../../../../components/modals/LedgerEditModal';
 import {
   ArrowLeft,
   Printer,
@@ -17,6 +20,7 @@ import {
   TrendingUp,
   TrendingDown,
   Wallet,
+  Pencil,
 } from 'lucide-react';
 
 interface LedgerEntry {
@@ -63,11 +67,16 @@ export default function CustomerDueReportPage() {
   const params = useParams();
   const id = params?.id as string;
   const branding = useBranding();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [editEntry, setEditEntry] = useState<LedgerEntryForEdit | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [customerEditModalOpen, setCustomerEditModalOpen] = useState(false);
 
-  const { data: customer } = useQuery({
+  const { data: customer, refetch: refetchCustomer } = useQuery({
     queryKey: ['customer-detail', id],
     queryFn: async () => (await api.get(`/customers/${id}`)).data,
     enabled: !!id,
@@ -169,6 +178,14 @@ export default function CustomerDueReportPage() {
           </div>
 
           <div className="flex items-center gap-2 print:hidden">
+            <button
+              type="button"
+              onClick={() => setCustomerEditModalOpen(true)}
+              className="p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:text-white transition-colors"
+              title="Edit Customer Info"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
             <button
               type="button"
               onClick={() => refetch()}
@@ -289,6 +306,9 @@ export default function CustomerDueReportPage() {
                   <th className="px-4 py-3 text-right">Due</th>
                   <th className="px-4 py-3 text-right">Paid</th>
                   <th className="px-4 py-3 text-right">Balance</th>
+                  {isSuperAdmin && (
+                    <th className="px-4 py-3 text-center print:hidden">Edit</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -297,7 +317,7 @@ export default function CustomerDueReportPage() {
                     {/* one band per day, carrying that day's own totals */}
                     <tr className="bg-slate-950/60 border-y border-slate-800">
                       <td
-                        colSpan={6}
+                        colSpan={isSuperAdmin ? 7 : 6}
                         className="px-4 py-2 font-bold text-slate-200 text-[11px] uppercase tracking-wide"
                       >
                         {formatDate(group.date)}
@@ -338,6 +358,21 @@ export default function CustomerDueReportPage() {
                           <td className="px-4 py-2.5 text-right font-bold text-amber-300">
                             {formatCurrency(e.balanceAfter)}
                           </td>
+                          {isSuperAdmin && (
+                            <td className="px-4 py-2.5 text-center print:hidden">
+                              <button
+                                type="button"
+                                title="Edit this ledger entry"
+                                onClick={() => {
+                                  setEditEntry(e as LedgerEntryForEdit);
+                                  setEditModalOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 border border-slate-700 hover:border-indigo-500/40 transition-colors"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -356,12 +391,40 @@ export default function CustomerDueReportPage() {
                   <td className="px-4 py-3 text-right text-amber-300">
                     {formatCurrency(closingBalance)}
                   </td>
+                  {isSuperAdmin && <td className="print:hidden" />}
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
       </div>
+
+      {/* Super Admin: Edit ledger entry modal */}
+      {isSuperAdmin && (
+        <LedgerEditModal
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditEntry(null);
+          }}
+          onSuccess={() => {
+            refetch();
+          }}
+          customerId={id}
+          entry={editEntry}
+        />
+      )}
+
+      {/* Edit Customer Info Modal */}
+      <CustomerEditModal
+        isOpen={customerEditModalOpen}
+        onClose={() => setCustomerEditModalOpen(false)}
+        customer={customer?.data || customer} // Handle backend response wrapping if any
+        isSuperAdmin={isSuperAdmin}
+        onSuccess={() => {
+          refetchCustomer();
+        }}
+      />
     </div>
   );
 }

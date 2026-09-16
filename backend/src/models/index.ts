@@ -24,3 +24,4 @@ export * from './DailySalesSummary';
 export * from './AuditLog';
 export * from './HoldCart';
 export * from './Settings';
+export * from './StockAdjustment';

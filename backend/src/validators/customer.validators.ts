@@ -14,6 +14,7 @@ export const updateCustomerSchema = z.object({
   email: z.string().trim().email('Invalid email').optional().or(z.literal('')),
   address: z.string().trim().optional(),
   creditLimit: z.coerce.number().min(0).optional(),
+  loyaltyPoints: z.coerce.number().min(0, 'Loyalty points cannot be negative').optional(),
   isActive: z.boolean().optional(),
 });
 

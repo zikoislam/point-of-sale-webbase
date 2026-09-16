@@ -21,6 +21,7 @@ export interface UpdateCustomerDto {
   email?: string;
   address?: string;
   creditLimit?: number;
+  loyaltyPoints?: number;
   isActive?: boolean;
 }
 
@@ -102,6 +103,7 @@ class CustomerService {
     if (dto.email !== undefined) updates.email = dto.email;
     if (dto.address !== undefined) updates.address = dto.address;
     if (dto.creditLimit !== undefined) updates.creditLimit = dto.creditLimit;
+    if (dto.loyaltyPoints !== undefined) updates.loyaltyPoints = dto.loyaltyPoints;
     if (dto.isActive !== undefined) updates.isActive = dto.isActive;
 
     const customer = await Customer.findByIdAndUpdate(
@@ -222,6 +224,64 @@ class CustomerService {
 
       await session.commitTransaction();
       return { customer, ledger: ledger[0] };
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  async editLedgerEntry(customerId: string, ledgerId: string, data: { amount?: number; narration?: string; transactionDate?: string }) {
+    if (!Types.ObjectId.isValid(customerId)) throw new AppError(400, 'INVALID_ID', 'Invalid customer ID');
+    if (!Types.ObjectId.isValid(ledgerId)) throw new AppError(400, 'INVALID_ID', 'Invalid ledger ID');
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const customer = await Customer.findById(customerId).session(session);
+      if (!customer) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
+
+      const targetLedger = await CustomerLedger.findOne({ _id: ledgerId, customerId }).session(session);
+      if (!targetLedger) throw new AppError(404, 'LEDGER_NOT_FOUND', 'Ledger entry not found');
+
+      // Update the fields if provided
+      if (data.amount !== undefined && data.amount >= 0) {
+        targetLedger.amount = roundMoney(data.amount);
+      }
+      if (data.narration !== undefined) {
+        targetLedger.narration = data.narration;
+      }
+      if (data.transactionDate) {
+        targetLedger.transactionDate = new Date(data.transactionDate);
+      }
+
+      await targetLedger.save({ session });
+
+      // Recalculate all balances from the beginning
+      const allLedgers = await CustomerLedger.find({ customerId })
+        .sort({ transactionDate: 1, createdAt: 1 })
+        .session(session);
+
+      let runningBalance = 0;
+      for (const ledger of allLedgers) {
+        ledger.balanceBefore = runningBalance;
+        if (ledger.transactionType === 'OPENING' || ledger.transactionType === 'SALE_DUE') {
+          runningBalance = roundMoney(runningBalance + ledger.amount);
+        } else if (ledger.transactionType === 'PAYMENT_COLLECTION' || ledger.transactionType === 'RETURN_CREDIT') {
+          runningBalance = roundMoney(runningBalance - ledger.amount);
+        }
+        ledger.balanceAfter = runningBalance;
+        await ledger.save({ session });
+      }
+
+      // Update customer due balance
+      customer.currentDueBalance = runningBalance;
+      await customer.save({ session });
+
+      await session.commitTransaction();
+      return { success: true, newBalance: runningBalance };
     } catch (err) {
       await session.abortTransaction();
       throw err;

@@ -22,5 +22,6 @@ router.delete('/categories/:id', requirePermissions('expenses:manage'), (req, re
 // Expenses (Phase 22)
 router.get('/', requirePermissions('expenses:view'), validate(queryExpenseSchema, 'query'), (req, res, next) => expenseController.list(req, res, next));
 router.post('/', requirePermissions('expenses:create'), validate(createExpenseSchema), (req, res, next) => expenseController.create(req, res, next));
+router.put('/:id/approve', requirePermissions('approvals:manage'), (req, res, next) => expenseController.approve(req, res, next));
 
 export default router;

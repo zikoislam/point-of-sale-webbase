@@ -131,10 +131,58 @@
     font-weight: 700 !important;
   }
 
-  /* ── Page margins & breaks ── */
+  /* ── Page margins & breaks: Default to A4 for all reports ── */
   @page {
     margin: 15mm 12mm;
-    size: A4;
+    size: A4 portrait;
+  }
+
+  /* ── Dedicated Page Size for Sale Memo (7" wide x 9" high) ── */
+  @page sale-memo-page {
+    size: 7in 9in;
+    margin: 6mm 8mm;
+  }
+
+  body:has(.print-sale-memo) {
+    page: sale-memo-page;
+  }
+
+  .print-sale-memo {
+    page: sale-memo-page;
+    width: 100% !important;
+    max-width: 7in !important;
+    margin: 0 auto !important;
+  }
+
+  /* In modal preview context, isolate the modal content so backdrop/outer content is hidden */
+  body:has(.print-sale-memo.fixed) > *:not(:has(.print-sale-memo)) {
+    display: none !important;
+  }
+
+  .print-sale-memo.fixed {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    inset: auto !important;
+  }
+
+  .print-sale-memo.fixed > div {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  .print-sale-memo.fixed > div > div.overflow-y-auto {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 10px 15px !important;
   }
 
   h1, h2, h3 {

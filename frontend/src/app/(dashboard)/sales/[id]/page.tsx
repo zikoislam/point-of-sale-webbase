@@ -101,9 +101,9 @@ export default function SaleInvoiceDetailPage() {
   }
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="space-y-6 pb-16 print-sale-memo">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
         <div className="flex items-center gap-3.5">
           <Link href="/sales">
             <button

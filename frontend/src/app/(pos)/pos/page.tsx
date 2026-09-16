@@ -1950,9 +1950,9 @@ export default function POSTerminalPage() {
 
       {/* Thermal Receipt Print Modal */}
       {showReceiptModal && completedSale && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 print-sale-memo">
           <div className="bg-white text-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl font-mono text-xs">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-100">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-100 print:hidden">
               <span className="font-bold text-slate-700">SALE RECEIPT</span>
               <div className="flex items-center space-x-2">
                 <button

@@ -246,39 +246,67 @@ class CustomerService {
       const targetLedger = await CustomerLedger.findOne({ _id: ledgerId, customerId }).session(session);
       if (!targetLedger) throw new AppError(404, 'LEDGER_NOT_FOUND', 'Ledger entry not found');
 
-      // Update the fields if provided
+      // Build update fields for the target entry and write directly via updateOne
+      // (bypasses Mongoose validators so older entries with empty narration don't crash)
+      const entryUpdate: Record<string, any> = {};
       if (data.amount !== undefined && data.amount >= 0) {
-        targetLedger.amount = roundMoney(data.amount);
+        entryUpdate.amount = roundMoney(data.amount);
       }
       if (data.narration !== undefined) {
-        targetLedger.narration = data.narration;
+        entryUpdate.narration = data.narration.trim();
       }
       if (data.transactionDate) {
-        targetLedger.transactionDate = new Date(data.transactionDate);
+        entryUpdate.transactionDate = new Date(data.transactionDate);
       }
 
-      await targetLedger.save({ session });
+      if (Object.keys(entryUpdate).length > 0) {
+        await CustomerLedger.updateOne(
+          { _id: ledgerId, customerId },
+          { $set: entryUpdate },
+          { session } as any
+        );
+      }
 
-      // Recalculate all balances from the beginning
+      // Recalculate all balances from the beginning using lean() + bulkWrite
+      // to avoid per-document save() calls triggering Mongoose validators
       const allLedgers = await CustomerLedger.find({ customerId })
         .sort({ transactionDate: 1, createdAt: 1 })
-        .session(session);
+        .session(session)
+        .lean();
 
       let runningBalance = 0;
+      const bulkOps: any[] = [];
+
       for (const ledger of allLedgers) {
-        ledger.balanceBefore = runningBalance;
+        const balanceBefore = runningBalance;
+
         if (ledger.transactionType === 'OPENING' || ledger.transactionType === 'SALE_DUE') {
           runningBalance = roundMoney(runningBalance + ledger.amount);
-        } else if (ledger.transactionType === 'PAYMENT_COLLECTION' || ledger.transactionType === 'RETURN_CREDIT') {
+        } else if (
+          ledger.transactionType === 'PAYMENT_COLLECTION' ||
+          ledger.transactionType === 'RETURN_CREDIT'
+        ) {
           runningBalance = roundMoney(runningBalance - ledger.amount);
         }
-        ledger.balanceAfter = runningBalance;
-        await ledger.save({ session });
+
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: ledger._id },
+            update: { $set: { balanceBefore, balanceAfter: runningBalance } },
+          },
+        });
       }
 
-      // Update customer due balance
-      customer.currentDueBalance = runningBalance;
-      await customer.save({ session });
+      if (bulkOps.length > 0) {
+        await CustomerLedger.bulkWrite(bulkOps, { session } as any);
+      }
+
+      // Update customer due balance directly (avoid customer.save() validators)
+      await Customer.updateOne(
+        { _id: customerId },
+        { $set: { currentDueBalance: runningBalance } },
+        { session } as any
+      );
 
       await session.commitTransaction();
       return { success: true, newBalance: runningBalance };

@@ -55,7 +55,8 @@ const CustomerLedgerSchema = new Schema<ICustomerLedger>(
     },
     narration: {
       type: String,
-      required: true,
+      required: false,
+      default: '',
       trim: true,
     },
     transactionDate: {

@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { Customer, ICustomer } from '../models/Customer';
 import { CustomerLedger } from '../models/CustomerLedger';
 import { Shift } from '../models/Shift';
@@ -255,53 +255,70 @@ class CustomerService {
       entryUpdate.transactionDate = new Date(data.transactionDate);
     }
 
-    if (Object.keys(entryUpdate).length > 0) {
-      await CustomerLedger.updateOne(
-        { _id: ledgerId, customerId },
-        { $set: entryUpdate }
-      );
-    }
+    // Use a session so the ledger bulkWrite + customer balance update are atomic.
+    // Without this, a crash between the two writes leaves the ledger corrected
+    // but the customer's currentDueBalance stale — which is the bug seen in prod.
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Recalculate all balances from the beginning using lean() + bulkWrite
-    // to avoid per-document save() calls triggering Mongoose validators
-    const allLedgers = await CustomerLedger.find({ customerId })
-      .sort({ transactionDate: 1, createdAt: 1 })
-      .lean();
-
-    let runningBalance = 0;
-    const bulkOps: any[] = [];
-
-    for (const ledger of allLedgers) {
-      const balanceBefore = runningBalance;
-
-      if (ledger.transactionType === 'OPENING' || ledger.transactionType === 'SALE_DUE') {
-        runningBalance = roundMoney(runningBalance + ledger.amount);
-      } else if (
-        ledger.transactionType === 'PAYMENT_COLLECTION' ||
-        ledger.transactionType === 'RETURN_CREDIT'
-      ) {
-        runningBalance = roundMoney(runningBalance - ledger.amount);
+    try {
+      if (Object.keys(entryUpdate).length > 0) {
+        await CustomerLedger.updateOne(
+          { _id: ledgerId, customerId },
+          { $set: entryUpdate },
+          { session }
+        );
       }
 
-      bulkOps.push({
-        updateOne: {
-          filter: { _id: ledger._id },
-          update: { $set: { balanceBefore, balanceAfter: runningBalance } },
-        },
-      });
+      // Recalculate all balances from the beginning.
+      // Must run inside the session so we read our own un-committed write above.
+      const allLedgers = await CustomerLedger.find({ customerId })
+        .sort({ transactionDate: 1, createdAt: 1 })
+        .session(session)
+        .lean();
+
+      let runningBalance = 0;
+      const bulkOps: any[] = [];
+
+      for (const ledger of allLedgers) {
+        const balanceBefore = runningBalance;
+
+        if (ledger.transactionType === 'OPENING' || ledger.transactionType === 'SALE_DUE') {
+          runningBalance = roundMoney(runningBalance + ledger.amount);
+        } else if (
+          ledger.transactionType === 'PAYMENT_COLLECTION' ||
+          ledger.transactionType === 'RETURN_CREDIT'
+        ) {
+          runningBalance = roundMoney(runningBalance - ledger.amount);
+        }
+
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: ledger._id },
+            update: { $set: { balanceBefore, balanceAfter: runningBalance } },
+          },
+        });
+      }
+
+      if (bulkOps.length > 0) {
+        await CustomerLedger.bulkWrite(bulkOps, { session });
+      }
+
+      // Update customer due balance directly (avoid customer.save() validators)
+      await Customer.updateOne(
+        { _id: customerId },
+        { $set: { currentDueBalance: runningBalance } },
+        { session }
+      );
+
+      await session.commitTransaction();
+      return { success: true, newBalance: runningBalance };
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
     }
-
-    if (bulkOps.length > 0) {
-      await CustomerLedger.bulkWrite(bulkOps);
-    }
-
-    // Update customer due balance directly (avoid customer.save() validators)
-    await Customer.updateOne(
-      { _id: customerId },
-      { $set: { currentDueBalance: runningBalance } }
-    );
-
-    return { success: true, newBalance: runningBalance };
   }
 }
 

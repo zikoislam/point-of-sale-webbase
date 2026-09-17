@@ -21,7 +21,7 @@ router.delete('/:id', requirePermissions('customers:manage'), (req, res, next) =
 
 router.post('/:id/pay-due', requirePermissions('customers:pay_due'), validate(customerDuePaymentSchema), (req, res, next) => customerController.collectPayment(req, res, next));
 
-// Super admin specific route
-router.put('/:id/ledger/:ledgerId', validate(editCustomerLedgerSchema), (req, res, next) => customerController.editLedger(req, res, next));
+// Super admin specific route – only SUPER_ADMIN has 'customers:edit_ledger' permission
+router.put('/:id/ledger/:ledgerId', requirePermissions('customers:edit_ledger'), validate(editCustomerLedgerSchema), (req, res, next) => customerController.editLedger(req, res, next));
 
 export default router;

@@ -38,6 +38,7 @@ export const ALL_PERMISSIONS = [
   'roles:view',
   'roles:manage',
   'approvals:manage',
+  'customers:edit_ledger',
 ];
 
 export const MANAGER_PERMISSIONS = [

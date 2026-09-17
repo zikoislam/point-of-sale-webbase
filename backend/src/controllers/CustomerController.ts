@@ -60,10 +60,6 @@ class CustomerController {
 
   async editLedger(req: Request, res: Response, next: NextFunction) {
     try {
-      // Additional safety check, although route should be protected by middleware
-      if ((req as any).user.role !== 'SUPER_ADMIN') {
-        return res.status(403).json({ success: false, message: 'Only super admin can edit ledger entries' });
-      }
       const result = await customerService.editLedgerEntry(req.params.id, req.params.ledgerId, req.body);
       sendSuccess(res, 200, 'Ledger entry updated successfully', result);
     } catch (err) { next(err); }

@@ -26,6 +26,7 @@ const ROUTE_PERMISSIONS: Array<[string, string]> = [
   ['/users', 'users:manage'],
   ['/roles', 'roles:view'],
   ['/audit-logs', 'audit:view'],
+  ['/backup', 'settings:manage'],
   ['/settings', 'settings:manage'],
 ];
 

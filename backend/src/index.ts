@@ -38,6 +38,7 @@ import hardwareRoutes from './routes/hardware.routes';
 import syncRoutes from './routes/sync.routes';
 import { syncService } from './sync/SyncService';
 import { getDbMode, isDatabaseReady } from './config/db';
+import backupRoutes from './routes/backup.routes';
 import './models';
 
 const app = express();
@@ -67,6 +68,12 @@ const uploadsDir = path.resolve(__dirname, '../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+// Database snapshots may live under uploads/backups on hosts with a persistent
+// volume, but they must never be served as static files — only through the
+// authenticated /api/v1/backups endpoints. This guard must run before static.
+app.use('/uploads/backups', (req: Request, res: Response) => {
+  res.status(404).end();
+});
 app.use('/uploads', express.static(uploadsDir));
 
 // Health Check Endpoint — also tells the desktop shell which database is live
@@ -102,6 +109,7 @@ app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
 app.use('/api/v1/hardware', hardwareRoutes);
 app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/backups', backupRoutes);
 
 // Global Error Boundary Middleware
 app.use(errorHandler);

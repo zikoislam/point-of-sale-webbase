@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import { runDailySummaryJob } from './daily-summary.job';
 import { cleanupExpiredHoldCarts } from './expired-cart-cleanup';
 import { scanFefoExpiryAlerts } from './fefo-expiry-scan';
+import { runAutoBackup } from './backup.job';
+import { env } from '../config/env';
 
 export const initJobs = (): void => {
   // 1. Daily Materialized Sales Summary: Midnight 00:05 AM
@@ -32,7 +34,19 @@ export const initJobs = (): void => {
     }
   });
 
-  console.log('⏰ Background Cron Schedulers initialized (Summary @ 00:05, Cart Cleanup hourly, FEFO Scan @ 07:00)');
+  // 4. Automatic database backup: daily at 02:00 AM (configurable)
+  if (env.BACKUP_AUTO_ENABLED) {
+    cron.schedule(env.BACKUP_CRON, async () => {
+      try {
+        await runAutoBackup();
+      } catch (e) {
+        console.error('❌ [CRON] Auto backup job failed:', e);
+      }
+    });
+    console.log(`⏰ Background Cron Schedulers initialized (Summary @ 00:05, Cart Cleanup hourly, FEFO Scan @ 07:00, Auto Backup @ ${env.BACKUP_CRON})`);
+  } else {
+    console.log('⏰ Background Cron Schedulers initialized (Summary @ 00:05, Cart Cleanup hourly, FEFO Scan @ 07:00, Auto Backup disabled)');
+  }
 };
 
-export { runDailySummaryJob, cleanupExpiredHoldCarts, scanFefoExpiryAlerts };
+export { runDailySummaryJob, cleanupExpiredHoldCarts, scanFefoExpiryAlerts, runAutoBackup };

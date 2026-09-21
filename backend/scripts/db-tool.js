@@ -342,6 +342,13 @@ async function cmdRestore(db, file, confirmed) {
   if (!fs.existsSync(abs)) fail(`Backup file not found: ${abs}`);
 
   const parsed = JSON.parse(fs.readFileSync(abs, 'utf8'));
+
+  // Backups taken from the app (Settings → Backup, or the nightly job) hold
+  // every collection in one file, tagged `type: "full"`.
+  if (parsed && parsed.type === 'full' && parsed.data && typeof parsed.data === 'object') {
+    return restoreFullBackup(db, abs, parsed, confirmed);
+  }
+
   const coll = parsed.collection;
   const docs = parsed.documents;
   if (!coll || !Array.isArray(docs)) fail('Not a db-tool backup file (missing collection/documents).');
@@ -367,6 +374,47 @@ async function cmdRestore(db, file, confirmed) {
     else if (res.modifiedCount) replaced++;
   }
   console.log(`  ✓ ${added} inserted, ${replaced} updated in ${coll}\n`);
+}
+
+/**
+ * Restore a full (all-collections) backup produced by the app. Like the single
+ * collection restore this is an upsert — documents missing from the backup are
+ * left alone — and every affected collection is snapshotted first.
+ */
+async function restoreFullBackup(db, abs, parsed, confirmed) {
+  const names = Object.keys(parsed.data);
+  const totalDocs = names.reduce((n, c) => n + (Array.isArray(parsed.data[c]) ? parsed.data[c].length : 0), 0);
+
+  console.log(`\nRestore FULL backup from ${path.basename(abs)}`);
+  console.log(`  taken at : ${parsed.takenAt || 'unknown'}  (trigger: ${parsed.trigger || 'n/a'})`);
+  console.log(`  database : ${parsed.database || 'unknown'}  (connected to: ${db.databaseName})`);
+  console.log(`  contents : ${names.length} collections, ${totalDocs} documents\n`);
+
+  if (!confirmed) {
+    console.log('Nothing was written. Re-run with --yes to confirm.\n');
+    return;
+  }
+
+  let added = 0;
+  let replaced = 0;
+
+  for (const coll of names) {
+    const docs = Array.isArray(parsed.data[coll]) ? parsed.data[coll] : [];
+    if (PROTECTED[coll]) console.log(`  ⚠ ${PROTECTED[coll]}`);
+
+    await backupCollection(db, coll, 'before full restore');
+
+    for (const raw of docs) {
+      const doc = decode(raw);
+      if (!doc || doc._id === undefined) continue;
+      const res = await db.collection(coll).replaceOne({ _id: doc._id }, doc, { upsert: true });
+      if (res.upsertedCount) added++;
+      else if (res.modifiedCount) replaced++;
+    }
+    console.log(`  ${coll.padEnd(28)} ${docs.length}`);
+  }
+
+  console.log(`\n  ✓ ${added} inserted, ${replaced} updated across ${names.length} collections\n`);
 }
 
 function guardProtected(coll) {
@@ -395,6 +443,7 @@ db-tool — নিরাপদ MongoDB maintenance tool
   backup [coll]                        পুরো DB বা একটা collection-এর backup
   backups                              আগের backup গুলোর তালিকা
   restore <file.json> [--yes]          backup ফাইল থেকে ফিরিয়ে আনো
+                                       (single collection অথবা full app backup)
 
   filter / update তিনভাবে দেওয়া যায়:
     code=DAIRY                  সরল key=value (একাধিক হলে কমা দিয়ে: code=DAIRY,name=Milk)

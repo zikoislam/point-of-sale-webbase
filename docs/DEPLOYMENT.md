@@ -46,6 +46,7 @@ CLIENT_URL=https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
 | `JWT_SECRET` | Generate with `openssl rand -hex 32` |
 | `JWT_EXPIRES_IN` | `8h` |
 | `CLIENT_URL` | Comma-separated Vercel origin(s) |
+| `BACKUP_DIR` | *(optional)* Folder for database snapshots. Defaults to `<uploads>/backups` in production — already on the persistent volume. |
 
 ## Deploy the backend (Railway)
 
@@ -54,6 +55,9 @@ CLIENT_URL=https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
 3. **Networking → Generate Domain** to get a public HTTPS URL.
 4. Add the environment variables listed above.
 5. Add a **Volume** mounted at `/app/uploads` so logos and avatars survive redeploys.
+   Database snapshots are written to `/app/uploads/backups` inside that same volume
+   (set `BACKUP_DIR` to override), so they survive redeploys too. An automatic snapshot
+   runs daily at 02:00 and the newest 7 are kept; take more from the **Backup** page.
 6. `backend/railway.json` sets the build/start commands and health check automatically.
 
 ## Deploy the backend (Render — alternative)

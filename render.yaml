@@ -35,3 +35,7 @@ services:
       # https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
       - key: CLIENT_URL
         sync: false
+      # Database snapshots go inside the uploads disk above, so they survive
+      # redeploys. Take them from the Backup page; an automatic one runs daily.
+      - key: BACKUP_DIR
+        value: /opt/render/project/src/backend/uploads/backups

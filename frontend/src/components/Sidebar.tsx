@@ -25,6 +25,7 @@ import {
   Shield,
   ScrollText,
   Settings,
+  Database,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -148,6 +149,12 @@ const navItems: NavItem[] = [
     icon: ScrollText,
     href: '/audit-logs',
     permission: 'audit:view',
+  },
+  {
+    label: 'Backup',
+    icon: Database,
+    href: '/backup',
+    permission: 'settings:manage',
   },
   {
     label: 'Settings',

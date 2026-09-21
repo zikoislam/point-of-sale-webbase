@@ -30,6 +30,14 @@ interface EnvironmentConfig {
   EMAIL_API_KEY?: string;
   /** Where reset codes are delivered; falls back to the user's own email. */
   PASSWORD_RESET_EMAIL?: string;
+  /** Folder for database backup files. Defaults to <backend>/backups. */
+  BACKUP_DIR?: string;
+  /** Master switch for the scheduled automatic backup. */
+  BACKUP_AUTO_ENABLED: boolean;
+  /** Cron expression for the automatic backup (default: every day at 02:00). */
+  BACKUP_CRON: string;
+  /** How many automatic backups to keep before the oldest are pruned. */
+  BACKUP_RETENTION: number;
 }
 
 const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET'] as const;
@@ -64,6 +72,12 @@ export const env: EnvironmentConfig = {
   EMAIL_API_PROVIDER: process.env.EMAIL_API_PROVIDER,
   EMAIL_API_KEY: process.env.EMAIL_API_KEY,
   PASSWORD_RESET_EMAIL: process.env.PASSWORD_RESET_EMAIL,
+  BACKUP_DIR: process.env.BACKUP_DIR,
+  BACKUP_AUTO_ENABLED: process.env.BACKUP_AUTO_ENABLED
+    ? process.env.BACKUP_AUTO_ENABLED !== 'false'
+    : true,
+  BACKUP_CRON: process.env.BACKUP_CRON || '0 2 * * *',
+  BACKUP_RETENTION: parseInt(process.env.BACKUP_RETENTION || '7', 10),
 };
 
 // CLIENT_URL accepts a comma-separated list so several frontends can be

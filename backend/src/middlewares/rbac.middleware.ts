@@ -59,3 +59,23 @@ export const requireAnyPermission = (...permissions: string[]) => {
     next();
   };
 };
+
+/**
+ * Hard role gate. Unlike requirePermissions — which a custom role could satisfy
+ * by being granted the permission string — this only ever passes for the system
+ * SUPER_ADMIN role. Used for irreversible/destructive operations such as
+ * restoring a database snapshot.
+ */
+export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    sendError(res, 401, 'AUTH_REQUIRED', 'Authentication required.');
+    return;
+  }
+
+  if (req.user.role !== 'SUPER_ADMIN') {
+    sendError(res, 403, 'PERMISSION_DENIED', 'This action is restricted to the Super Admin.');
+    return;
+  }
+
+  next();
+};

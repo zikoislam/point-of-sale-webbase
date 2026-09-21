@@ -11,19 +11,35 @@ import {
   Clock,
   HardDrive,
   Info,
+  History,
+  AlertTriangle,
 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { API_BASE_URL } from '../../../lib/constants';
-import { Button, ConfirmDialog, useToast } from '../../../components/ui';
+import { Button, ConfirmDialog, Modal, useToast } from '../../../components/ui';
+import { useAuth } from '../../../hooks/useAuth';
+
+type BackupTrigger = 'manual' | 'auto' | 'pre-restore';
 
 interface BackupMeta {
   name: string;
-  trigger: 'manual' | 'auto';
+  trigger: BackupTrigger;
   takenAt: string;
   database: string;
   collections: number;
   documents: number;
   size: number;
+}
+
+interface RestoreResult {
+  restoredFrom: string;
+  restoredAt: string;
+  safetyBackup: string;
+  collections: number;
+  documents: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
 }
 
 function formatBytes(bytes: number): string {
@@ -46,14 +62,30 @@ function formatDateTime(iso: string): string {
   });
 }
 
+function triggerBadge(trigger: BackupTrigger): { label: string; className: string } {
+  if (trigger === 'auto') {
+    return { label: 'AUTO', className: 'bg-blue-500/10 text-blue-300 border-blue-500/20' };
+  }
+  if (trigger === 'pre-restore') {
+    return { label: 'SAFETY', className: 'bg-amber-500/10 text-amber-300 border-amber-500/20' };
+  }
+  return { label: 'MANUAL', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' };
+}
+
 export default function BackupPage() {
   const toast = useToast();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   const [backups, setBackups] = useState<BackupMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BackupMeta | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<BackupMeta | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [confirmName, setConfirmName] = useState('');
 
   const fetchBackups = useCallback(async () => {
     setLoading(true);
@@ -131,6 +163,34 @@ export default function BackupPage() {
     }
   };
 
+  const openRestore = (backup: BackupMeta) => {
+    setConfirmName('');
+    setRestoreTarget(backup);
+  };
+
+  const handleRestore = async () => {
+    if (!restoreTarget) return;
+    setRestoring(true);
+    try {
+      const res = await api.post<RestoreResult>(
+        `/backups/${encodeURIComponent(restoreTarget.name)}/restore`
+      );
+      const r = res.data;
+      toast.success(
+        `Restored ${r?.inserted ?? 0} missing and updated ${r?.updated ?? 0} changed documents. A safety snapshot "${r?.safetyBackup}" was saved first.`,
+        'Database restored'
+      );
+      setRestoreTarget(null);
+      await fetchBackups();
+    } catch (err: any) {
+      toast.error(err?.message || 'Restore failed');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const canConfirmRestore = !!restoreTarget && confirmName.trim() === restoreTarget.name;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -142,7 +202,8 @@ export default function BackupPage() {
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Database Backup</h1>
             <p className="text-sm text-slate-400">
-              Take a manual snapshot any time, or download an existing one — an automatic backup also runs every day.
+              Take a manual snapshot any time, download one, or restore the database from a snapshot — an automatic
+              backup also runs every day.
             </p>
           </div>
         </div>
@@ -174,8 +235,15 @@ export default function BackupPage() {
         <div className="text-xs text-slate-400 leading-relaxed">
           <p className="text-slate-200 font-semibold text-sm mb-0.5">Automatic daily backup is active</p>
           A full snapshot is taken every day at <span className="text-slate-200">02:00 AM</span> and the newest 7
-          automatic backups are kept (older ones are removed automatically). Manual backups are never
-          removed automatically — download them to keep an off-server copy.
+          automatic backups are kept (older ones are removed automatically). Manual backups are never removed
+          automatically — download them to keep an off-server copy.
+          {isSuperAdmin && (
+            <>
+              {' '}
+              Restoring a snapshot is restricted to the{' '}
+              <span className="text-slate-200">Super Admin</span> and always saves a safety snapshot first.
+            </>
+          )}
         </div>
       </div>
 
@@ -217,57 +285,66 @@ export default function BackupPage() {
                   </td>
                 </tr>
               ) : (
-                backups.map((b) => (
-                  <tr key={b.name} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3 px-4 text-slate-300 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-slate-500" />
-                        {formatDateTime(b.takenAt)}
-                      </span>
-                      <div className="text-[10px] text-slate-600 font-mono mt-0.5 truncate max-w-[240px]">
-                        {b.name}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                          b.trigger === 'auto'
-                            ? 'bg-blue-500/10 text-blue-300 border-blue-500/20'
-                            : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
-                        }`}
-                      >
-                        {b.trigger === 'auto' ? 'AUTO' : 'MANUAL'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-300">{b.collections}</td>
-                    <td className="py-3 px-4 text-slate-300">{b.documents}</td>
-                    <td className="py-3 px-4 text-slate-400 whitespace-nowrap">{formatBytes(b.size)}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleDownload(b)}
-                          disabled={downloading === b.name}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold disabled:opacity-50 transition"
-                          title="Download"
+                backups.map((b) => {
+                  const badge = triggerBadge(b.trigger);
+                  return (
+                    <tr key={b.name} className="hover:bg-slate-800/40 transition">
+                      <td className="py-3 px-4 text-slate-300 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          {formatDateTime(b.takenAt)}
+                        </span>
+                        <div className="text-[10px] text-slate-600 font-mono mt-0.5 truncate max-w-[240px]">
+                          {b.name}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${badge.className}`}
                         >
-                          {downloading === b.name ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Download className="w-3.5 h-3.5" />
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">{b.collections}</td>
+                      <td className="py-3 px-4 text-slate-300">{b.documents}</td>
+                      <td className="py-3 px-4 text-slate-400 whitespace-nowrap">{formatBytes(b.size)}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleDownload(b)}
+                            disabled={downloading === b.name}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-semibold disabled:opacity-50 transition"
+                            title="Download"
+                          >
+                            {downloading === b.name ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5" />
+                            )}
+                            Download
+                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => openRestore(b)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold transition"
+                              title="Restore from this backup"
+                            >
+                              <History className="w-3.5 h-3.5" />
+                              Restore
+                            </button>
                           )}
-                          Download
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(b)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-semibold transition"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <button
+                            onClick={() => setDeleteTarget(b)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-semibold transition"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -288,6 +365,87 @@ export default function BackupPage() {
           </>
         }
       />
+
+      {/* Restore confirmation — Super Admin only, requires typing the file name */}
+      <Modal
+        isOpen={!!restoreTarget}
+        onClose={() => !restoring && setRestoreTarget(null)}
+        title="Restore database from backup"
+        subtitle="This overwrites live data. It cannot be undone without another backup."
+        closeOnEsc={!restoring}
+        closeOnOverlayClick={!restoring}
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
+            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-rose-200 leading-relaxed">
+              Every document in this snapshot is written back into the live database. Recent records that are{' '}
+              <span className="font-semibold">not</span> in the snapshot are kept, but any changes made to documents
+              it contains will be overwritten. Staff may need to sign in again afterwards.
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3">
+              <p className="text-slate-500">Snapshot taken</p>
+              <p className="text-slate-200 font-semibold mt-0.5">
+                {restoreTarget ? formatDateTime(restoreTarget.takenAt) : '—'}
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3">
+              <p className="text-slate-500">Contents</p>
+              <p className="text-slate-200 font-semibold mt-0.5">
+                {restoreTarget?.documents ?? 0} docs · {restoreTarget?.collections ?? 0} collections
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-slate-400 leading-relaxed">
+              A safety snapshot of the current database is saved automatically before restoring, so you can roll back
+              by restoring that one.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+              Type the backup file name to confirm
+            </label>
+            <input
+              type="text"
+              value={confirmName}
+              onChange={(e) => setConfirmName(e.target.value)}
+              placeholder={restoreTarget?.name || ''}
+              disabled={restoring}
+              className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 placeholder:text-slate-600"
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={restoring}
+            onClick={() => setRestoreTarget(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            loading={restoring}
+            disabled={!canConfirmRestore}
+            onClick={handleRestore}
+            leftIcon={<History className="w-4 h-4" />}
+          >
+            Restore Database
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import { env } from '../config/env';
 import { AppError } from '../utils/app-error';
 
-export type BackupTrigger = 'manual' | 'auto';
+export type BackupTrigger = 'manual' | 'auto' | 'pre-restore';
 
 export interface BackupMeta {
   name: string;
@@ -14,6 +14,18 @@ export interface BackupMeta {
   collections: number;
   documents: number;
   size: number;
+}
+
+export interface RestoreResult {
+  restoredFrom: string;
+  restoredAt: string;
+  /** Snapshot of the *previous* state, taken automatically so the restore can be undone. */
+  safetyBackup: string;
+  collections: number;
+  documents: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
 }
 
 const META_SUFFIX = '.meta.json';
@@ -59,6 +71,20 @@ function encode(value: any): any {
   if (typeof value === 'object') {
     const out: Record<string, any> = {};
     for (const [k, v] of Object.entries(value)) out[k] = encode(v);
+    return out;
+  }
+  return value;
+}
+
+/** Inverse of encode() — rebuilds ObjectId / Date values tagged in a snapshot. */
+function decode(value: any): any {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(decode);
+  if (typeof value === 'object') {
+    if (typeof value.$oid === 'string') return new mongoose.Types.ObjectId(value.$oid);
+    if (typeof value.$date === 'string') return new Date(value.$date);
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = decode(v);
     return out;
   }
   return value;
@@ -164,7 +190,72 @@ class BackupService {
     }
   }
 
-  /** Keep only the newest `keep` automatic backups; manual ones are never pruned. */
+  /**
+   * Restore the database from a full snapshot.
+   *
+   * - Documents are upserted by `_id`, so records that exist only in the live
+   *   database (created after the snapshot) are left untouched rather than
+   *   silently deleted.
+   * - A safety snapshot of the current state is written first, so even a wrong
+   *   restore can be rolled back by restoring that snapshot.
+   */
+  async restoreBackup(name: string): Promise<RestoreResult> {
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new AppError(503, 'DATABASE_NOT_CONNECTED', 'Database connection is not ready yet. Try again in a moment.');
+    }
+
+    const { abs, name: safe } = this.getBackupFile(name);
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(await fs.promises.readFile(abs, 'utf8'));
+    } catch {
+      throw new AppError(422, 'BACKUP_FILE_INVALID', `Backup "${safe}" could not be read as JSON.`);
+    }
+
+    if (!parsed || parsed.type !== 'full' || !parsed.data || typeof parsed.data !== 'object') {
+      throw new AppError(422, 'BACKUP_FILE_INVALID', `Backup "${safe}" is not a full POS snapshot.`);
+    }
+
+    // Snapshot the current state before touching anything.
+    const safety = await this.createBackup('pre-restore');
+
+    const collections = Object.keys(parsed.data);
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const coll of collections) {
+      const docs = Array.isArray(parsed.data[coll]) ? parsed.data[coll] : [];
+      for (const raw of docs) {
+        const doc = decode(raw);
+        if (!doc || doc._id === undefined) {
+          skipped++;
+          continue;
+        }
+        const res = await db.collection(coll).replaceOne({ _id: doc._id }, doc, { upsert: true });
+        if (res.upsertedCount) inserted++;
+        else if (res.modifiedCount) updated++;
+      }
+    }
+
+    return {
+      restoredFrom: safe,
+      restoredAt: new Date().toISOString(),
+      safetyBackup: safety.name,
+      collections: collections.length,
+      documents: parsed.documents ?? inserted + updated,
+      inserted,
+      updated,
+      skipped,
+    };
+  }
+
+  /**
+   * Keep only the newest `keep` automatic backups. Manual backups are never
+   * pruned, and neither are the `pre-restore` safety snapshots.
+   */
   async pruneAutoBackups(keep: number): Promise<number> {
     if (!Number.isFinite(keep) || keep < 0) return 0;
     const autos = (await this.listBackups()).filter((b) => b.trigger === 'auto');

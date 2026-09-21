@@ -41,6 +41,38 @@ class BackupController {
     }
   }
 
+  async restore(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await backupService.restoreBackup(req.params.name);
+
+      if (req.user) {
+        await auditService
+          .logAction(
+            req.user.userId,
+            'UPDATE',
+            'backups',
+            result.restoredFrom,
+            {
+              action: 'RESTORE',
+              restoredFrom: result.restoredFrom,
+              safetyBackup: result.safetyBackup,
+              collections: result.collections,
+              documents: result.documents,
+              inserted: result.inserted,
+              updated: result.updated,
+              skipped: result.skipped,
+            },
+            req.ip
+          )
+          .catch(() => undefined);
+      }
+
+      sendSuccess(res, 200, 'Database restored successfully', result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async download(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { abs, name } = backupService.getBackupFile(req.params.name);

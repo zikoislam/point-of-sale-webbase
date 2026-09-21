@@ -34,6 +34,10 @@ import voucherRoutes from './routes/voucher.routes';
 import uploadRoutes from './routes/upload.routes';
 import reportRoutes from './routes/report.routes';
 import auditRoutes from './routes/audit.routes';
+import hardwareRoutes from './routes/hardware.routes';
+import syncRoutes from './routes/sync.routes';
+import { syncService } from './sync/SyncService';
+import { getDbMode, isDatabaseReady } from './config/db';
 import './models';
 
 const app = express();
@@ -65,9 +69,13 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
-// Health Check Endpoint
+// Health Check Endpoint — also tells the desktop shell which database is live
 app.get('/api/v1/health', (req: Request, res: Response) => {
-  sendSuccess(res, 200, 'Server is running smoothly');
+  sendSuccess(res, 200, 'Server is running smoothly', {
+    database: getDbMode(),
+    databaseReady: isDatabaseReady(),
+    syncEnabled: syncService.enabled,
+  });
 });
 
 // API Routes
@@ -92,6 +100,8 @@ app.use('/api/v1/vouchers', voucherRoutes);
 app.use('/api/v1/uploads', uploadRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/audit-logs', auditRoutes);
+app.use('/api/v1/hardware', hardwareRoutes);
+app.use('/api/v1/sync', syncRoutes);
 
 // Global Error Boundary Middleware
 app.use(errorHandler);
@@ -102,6 +112,9 @@ const startServer = async (): Promise<void> => {
 
   // Initialize Background Cron Jobs
   initJobs();
+
+  // Mirror the local database to the cloud whenever both are available
+  void syncService.start();
 
   server.listen(env.PORT, () => {
     console.log(`🚀 Server listening on port ${env.PORT} in ${env.NODE_ENV} mode with Socket.IO & Cron enabled`);

@@ -11,6 +11,12 @@ interface EnvironmentConfig {
   JWT_EXPIRES_IN: string;
   NODE_ENV: 'development' | 'production' | 'test';
   CLIENT_URL: string;
+  /** Local mongod bundled with the desktop app. Preferred over the cloud URI. */
+  LOCAL_MONGODB_URI?: string;
+  /** MongoDB Atlas endpoint used for synchronising an offline install. */
+  CLOUD_MONGODB_URI?: string;
+  SYNC_ENABLED: boolean;
+  SYNC_INTERVAL_SECONDS: number;
   // Optional email delivery, used only by the "forgot password" OTP flow.
   SMTP_HOST?: string;
   SMTP_PORT: number;
@@ -41,6 +47,10 @@ export const env: EnvironmentConfig = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '8h',
   NODE_ENV: (process.env.NODE_ENV as EnvironmentConfig['NODE_ENV']) || 'development',
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:3000',
+  LOCAL_MONGODB_URI: process.env.LOCAL_MONGODB_URI,
+  CLOUD_MONGODB_URI: process.env.CLOUD_MONGODB_URI,
+  SYNC_ENABLED: process.env.SYNC_ENABLED === 'true',
+  SYNC_INTERVAL_SECONDS: parseInt(process.env.SYNC_INTERVAL_SECONDS || '60', 10),
   SMTP_HOST: process.env.SMTP_HOST,
   // 465 is implicit TLS; 587 (the usual Gmail/API port) upgrades with STARTTLS.
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),

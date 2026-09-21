@@ -1,0 +1,92 @@
+{
+  "name": "unique-pos-desktop",
+  "version": "1.0.0",
+  "description": "Unique POS & Shop Management System — Desktop App",
+  "main": "electron/main.js",
+  "author": "Bdbbc.com — Zakirul Islam",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "make:icon": "node electron/scripts/make-icon.js",
+    "fetch:mongod": "node scripts/fetch-mongod.js",
+    "license:init": "node tools/license-generator/init-keys.js",
+    "license:new": "node tools/license-generator/make-license.js",
+    "license:check": "node tools/license-generator/check-license.js",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev": "cross-env NODE_ENV=development electron .",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "pack": "npm run build:backend && npm run build:frontend && node scripts/prepare-resources.js",
+    "dist": "npm run pack && electron-builder --win",
+    "dist:dir": "npm run pack && electron-builder --win --dir"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.bdbbc.unique-pos",
+    "productName": "Unique POS",
+    "copyright": "Copyright © Bdbbc.com",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "electron/assets"
+    },
+    "files": [
+      "electron/main.js",
+      "electron/preload.js",
+      "electron/config.js",
+      "electron/hardware.js",
+      "electron/license.js",
+      "electron/license.html",
+      "electron/splash.html",
+      "electron/assets/**/*",
+      "!electron/mongodb/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/backend",
+        "to": "backend"
+      },
+      {
+        "from": "build/frontend",
+        "to": "frontend"
+      },
+      {
+        "from": "build/mongodb",
+        "to": "mongodb"
+      },
+      {
+        "from": "build/config",
+        "to": "config"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "electron/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Unique POS",
+      "installerIcon": "electron/assets/icon.ico",
+      "uninstallerIcon": "electron/assets/icon.ico",
+      "installerHeaderIcon": "electron/assets/icon.ico",
+      "license": "LICENSE.txt",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": null
+  }
+}

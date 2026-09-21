@@ -1,0 +1,76 @@
+Unique POS & Shop Management System
+End User License Agreement (EULA)
+
+Software by Bdbbc.com
+Developer: Zakirul Islam
+Contact: +8801534000350
+
+Copyright (c) Bdbbc.com. All rights reserved.
+
+-------------------------------------------------------------------------------
+1. GRANT OF LICENSE
+-------------------------------------------------------------------------------
+This software is licensed, not sold. Bdbbc.com grants the licensee a
+non-exclusive, non-transferable right to install and use this software on the
+computers owned or operated by the licensed shop, for the purpose of running
+that shop's point of sale and inventory operations.
+
+-------------------------------------------------------------------------------
+2. RESTRICTIONS
+-------------------------------------------------------------------------------
+You may not:
+  a) redistribute, sublicense, rent, lease or sell copies of this software to
+     any third party without written permission from Bdbbc.com;
+  b) reverse engineer, decompile, or disassemble the software, except to the
+     extent permitted by applicable law;
+  c) remove or alter any copyright, trademark or attribution notices contained
+     in the software.
+
+-------------------------------------------------------------------------------
+3. DATA OWNERSHIP
+-------------------------------------------------------------------------------
+All business data entered into this software — sales, stock, customer ledgers,
+supplier records and financial entries — remains the sole property of the
+licensee. Bdbbc.com claims no ownership over this data.
+
+The licensee is responsible for maintaining backups of their business data.
+The software provides a built-in backup utility for this purpose.
+
+-------------------------------------------------------------------------------
+4. NETWORK AND OFFLINE OPERATION
+-------------------------------------------------------------------------------
+This software is designed to run offline. When configured with a cloud
+database, it synchronises records to that database whenever an internet
+connection is available. The licensee is responsible for the accuracy and
+security of the database credentials configured on their installation.
+
+-------------------------------------------------------------------------------
+5. HARDWARE
+-------------------------------------------------------------------------------
+Thermal receipt printers, cash drawers and barcode scanners are third-party
+devices. Bdbbc.com does not warrant such hardware. Cash drawer operation
+requires the drawer to be connected through a compatible receipt printer or
+serial interface.
+
+-------------------------------------------------------------------------------
+6. WARRANTY DISCLAIMER
+-------------------------------------------------------------------------------
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+
+-------------------------------------------------------------------------------
+7. LIMITATION OF LIABILITY
+-------------------------------------------------------------------------------
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+
+-------------------------------------------------------------------------------
+8. ACCEPTANCE
+-------------------------------------------------------------------------------
+By installing or using this software you acknowledge that you have read and
+agree to the terms above.
+
+Technical support: Bdbbc.com — +8801534000350

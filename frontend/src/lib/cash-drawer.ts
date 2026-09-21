@@ -1,7 +1,15 @@
 /**
  * Cash Drawer Hardware Utility
- * Sends standard ESC/POS pin 2 / pin 5 kick pulse command
+ * ────────────────────────────
+ * - Desktop (Electron): ESC/POS kick command over IPC to the spooler
+ * - Web on the till computer: the API sends the same bytes via WritePrinter
+ *
+ * In both cases the drawer is wired to the receipt printer, so the pulse is
+ * delivered as a raw print job rather than through any browser API.
  */
+
+import { electronBridge, isElectron } from './electron-bridge';
+import { api } from './api-client';
 
 export const CASH_DRAWER_COMMANDS = {
   /** ESC p 0 25 250 - Kick pin 2 (standard 24V drawer) */
@@ -11,17 +19,23 @@ export const CASH_DRAWER_COMMANDS = {
 };
 
 /**
- * Triggers cash drawer kick via Web Serial, Web USB, or Raw ESC/POS Print stream
+ * Triggers cash drawer kick.
+ *
+ * @param printerName  Optional printer name the drawer is attached to.
+ *                     Leave undefined to use the configured or default printer.
  */
-export const openCashDrawer = async (): Promise<boolean> => {
+export const openCashDrawer = async (printerName?: string): Promise<boolean> => {
+  if (isElectron()) {
+    const result = await electronBridge.openCashDrawer({ printerName });
+    if (!result.success) console.warn('Cash drawer did not open:', result.error);
+    return result.success;
+  }
+
   try {
-    // Check if Web Serial API is available (for direct USB-to-RJ11 or COM drawer triggers)
-    if ('serial' in navigator) {
-      console.log('🔌 Triggering cash drawer via Web Serial / Printer kick pulse...');
-    }
+    await api.post('/hardware/cash-drawer', { printerName }, { keepalive: true });
     return true;
-  } catch (err) {
-    console.error('Failed to trigger cash drawer:', err);
+  } catch (error: any) {
+    console.warn('Cash drawer did not open:', error?.message || error);
     return false;
   }
 };

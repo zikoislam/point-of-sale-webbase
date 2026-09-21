@@ -36,8 +36,10 @@ import { usePOSHotkeys } from '../../../hooks/usePOSHotkeys';
 import { useOfflineSync } from '../../../hooks/useOfflineSync';
 import { useAuth } from '../../../hooks/useAuth';
 import { queueOfflineSale } from '../../../lib/offline-queue';
-import { EscposBuilder } from '../../../lib/escpos-builder';
 import { openCashDrawer } from '../../../lib/cash-drawer';
+import { printSaleReceipt } from '../../../lib/receipt-printer';
+import { electronBridge, isElectron } from '../../../lib/electron-bridge';
+import { useBranding } from '../../../hooks/useBranding';
 import { BarcodeRenderer } from '../../../components/BarcodeRenderer';
 import { NumberInput } from '../../../components/ui/NumberInput';
 
@@ -272,6 +274,35 @@ export default function POSTerminalPage() {
   const [cashTendered, setCashTendered] = useState<number>(0);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [printNotice, setPrintNotice] = useState('');
+  const branding = useBranding();
+
+  // Where receipts print, chosen in Settings → Receipt Printing (desktop only).
+  const [printerPrefs, setPrinterPrefs] = useState<{
+    printMode?: 'thermal' | 'document';
+    printerName?: string;
+    paperWidth?: '58mm' | '80mm';
+    documentPrinterName?: string;
+    paperSize?: 'A4' | 'Letter';
+    showPrintDialog?: boolean;
+  }>({});
+
+  useEffect(() => {
+    if (!isElectron()) return;
+
+    electronBridge.getConfig().then((config) => {
+      if (config?.hardware) {
+        setPrinterPrefs({
+          printMode: config.hardware.printMode || 'thermal',
+          printerName: config.hardware.printerName || undefined,
+          paperWidth: config.hardware.paperWidth,
+          documentPrinterName: config.hardware.documentPrinterName || undefined,
+          paperSize: config.hardware.paperSize,
+          showPrintDialog: config.hardware.showPrintDialog,
+        });
+      }
+    });
+  }, []);
 
   // PIN Lock State
   const [isLocked, setIsLocked] = useState(false);
@@ -874,6 +905,33 @@ export default function POSTerminalPage() {
     } finally {
       setCheckoutLoading(false);
     }
+  };
+
+  // Send the completed sale to the printer configured in Settings. A thermal
+  // printer gets raw ESC/POS; an ordinary printer gets a laid-out page instead.
+  // The drawer is kicked at payment time, not here, so it does not open twice.
+  const handlePrintReceipt = async () => {
+    if (!completedSale) return;
+    setPrintNotice('');
+
+    const result = await printSaleReceipt(completedSale, branding, {
+      printMode: printerPrefs.printMode,
+      printerName: printerPrefs.printerName,
+      paperWidth: printerPrefs.paperWidth,
+      documentPrinterName: printerPrefs.documentPrinterName,
+      paperSize: printerPrefs.paperSize,
+      showPrintDialog: printerPrefs.showPrintDialog,
+    });
+
+    if (result.success) {
+      setPrintNotice(`Receipt sent to ${result.printerName || 'the default printer'}.`);
+      return;
+    }
+
+    setPrintNotice(
+      `${result.error || 'No printer available'} — opened the browser print dialog instead.`
+    );
+    window.print();
   };
 
   // Lock terminal on both client and server so the API is actually protected
@@ -1956,7 +2014,7 @@ export default function POSTerminalPage() {
               <span className="font-bold text-slate-700">SALE RECEIPT</span>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrintReceipt}
                   className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs flex items-center space-x-1"
                 >
                   <Printer className="w-3 h-3" />
@@ -1970,6 +2028,12 @@ export default function POSTerminalPage() {
                 </button>
               </div>
             </div>
+
+            {printNotice && (
+              <div className="px-4 py-2 text-[11px] bg-slate-100 text-slate-600 border-b border-slate-200 print:hidden">
+                {printNotice}
+              </div>
+            )}
 
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="text-center border-b border-dashed border-slate-300 pb-3">

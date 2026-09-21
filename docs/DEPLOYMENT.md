@@ -6,6 +6,10 @@ This project is a monorepo with two independently deployed halves:
 |:---|:---|:---|:---|
 | Frontend | `frontend/` | **Vercel** | Next.js 14 App Router — native Vercel support |
 | Backend | `backend/` | **Railway** or **Render** | Needs a long-running process (Socket.io) + node-cron |
+| Desktop app | `electron/` | **Windows installer (.exe)** | Runs the same frontend + backend on the shop's own PC, with a bundled MongoDB for offline use |
+
+The desktop build, its bundled MongoDB, offline sync engine and hardware setup are documented
+separately in [`DESKTOP-BN.md`](./DESKTOP-BN.md).
 
 ## Why the backend cannot run on Vercel
 

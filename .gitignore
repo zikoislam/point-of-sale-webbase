@@ -9,6 +9,21 @@ lerna-debug.log*
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# Desktop app build output. dist-electron-tmp is used when a locked app.asar in
+# dist-electron forces a build into a different folder.
+dist-electron/
+dist-electron-tmp/
+build/
+build-verify/
+
+# Portable MongoDB server fetched for offline mode (binary, not source)
+electron/mongodb/
+
+# License signing key. private.pem is the master secret: anyone holding it can
+# mint valid licenses, so it must never be committed or packed into an installer.
+tools/license-generator/keys/
+tools/license-generator/issued.csv
+
 # Runtime data
 pids
 *.pid
@@ -117,3 +132,7 @@ backend/backups/
 *.xlsx
 *.xls
 ~$*
+
+# Stray empty repository (contains only a .git with no commits). It blocks
+# `git add -A` because git tries to record it as a submodule.
+untitled-project/

@@ -72,6 +72,13 @@ CLIENT_URL=https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
    > `NODE_ENV=production`, and a plain `npm ci` then omits devDependencies —
    > which includes `typescript`, so the `tsc` build step dies with
    > *"tsc: not found"*.
+   >
+   > **Live service (`pos-api`).** Source is connected to `zikoislam/point-of-sale-webbase`
+   > (branch `main`) with Root Directory left blank, so the repo-root `railway.json`
+   > is the one that runs. A build can be triggered from the CLI with
+   > `railway up` (uploads the current folder — use it from `backend/`), or from the
+   > dashboard's **Deploy** button. If pushes should deploy on their own, turn on
+   > **Auto Deploy** in *service → Settings → Source*.
 
 ## Deploy the backend (Render — alternative)
 

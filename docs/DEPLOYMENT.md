@@ -60,6 +60,14 @@ CLIENT_URL=https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
    runs daily at 02:00 and the newest 7 are kept; take more from the **Backup** page.
 6. `backend/railway.json` sets the build/start commands and health check automatically.
 
+   > **If Root Directory is left blank** (the repo root), Railway reads `railway.json`
+   > at the repo root instead — which forwards the build/start into `backend/`.
+   > This exists because the repo root also holds the Electron desktop app's
+   > `package.json`, which has **no `build` script**, so a root-level
+   > `npm ci && npm run build` fails with *"Missing script: build"* and the
+   > deployment silently keeps the previous build. Setting Root Directory to
+   > `backend` is still the cleaner option; the root config is the safety net.
+
 ## Deploy the backend (Render — alternative)
 
 1. **New → Blueprint**, select this repository; `render.yaml` at the repo root is detected.

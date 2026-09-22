@@ -60,25 +60,27 @@ CLIENT_URL=https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
    runs daily at 02:00 and the newest 7 are kept; take more from the **Backup** page.
 6. `backend/railway.json` sets the build/start commands and health check automatically.
 
-   > **If Root Directory is left blank** (the repo root), Railway reads `railway.json`
-   > at the repo root instead — which forwards the build/start into `backend/`.
-   > This exists because the repo root also holds the Electron desktop app's
-   > `package.json`, which has **no `build` script**, so a root-level
-   > `npm ci && npm run build` fails with *"Missing script: build"* and the
-   > deployment silently keeps the previous build. Setting Root Directory to
-   > `backend` is still the cleaner option; the root config is the safety net.
+   > **Root Directory must be `backend`.** The repo root also holds the Electron
+   > desktop app's `package.json`, which has no `build` script, so a root-level
+   > build fails with *"Missing script: build"*. Worse, a root-level build also
+   > changes the runtime layout: `dist/` lands in `/app/backend/dist`, so
+   > `../../uploads` resolves to `/app/backend/uploads` — **outside** the
+   > `/app/uploads` volume, and uploads plus database snapshots are then lost on
+   > every redeploy.
    >
-   > Both configs build with `npm ci --include=dev`: Railway sets
+   > **`NPM_CONFIG_PRODUCTION=false`** is set on the service. Railway sets
    > `NODE_ENV=production`, and a plain `npm ci` then omits devDependencies —
-   > which includes `typescript`, so the `tsc` build step dies with
-   > *"tsc: not found"*.
+   > including `typescript`, so the `tsc` build dies with *"tsc: not found"*.
+   > With this variable the builder's own install includes devDependencies, so
+   > `railway.json` only has to run `npm run build` (re-running `npm ci` in the
+   > build step collides with the mounted node_modules cache: `EBUSY`).
    >
    > **Live service (`pos-api`).** Source is connected to `zikoislam/point-of-sale-webbase`
-   > (branch `main`) with Root Directory left blank, so the repo-root `railway.json`
-   > is the one that runs. A build can be triggered from the CLI with
-   > `railway up` (uploads the current folder — use it from `backend/`), or from the
-   > dashboard's **Deploy** button. If pushes should deploy on their own, turn on
-   > **Auto Deploy** in *service → Settings → Source*.
+   > (branch `main`). A build can be triggered with `railway up` (run it from the
+   > **repo root**, since Root Directory is `backend`), from the dashboard's
+   > **Deploy** button, or via the API (`serviceInstanceDeploy`, `latestCommit: true`).
+   > If pushes should deploy on their own, turn on **Auto Deploy** in
+   > *service → Settings → Source*.
 
 ## Deploy the backend (Render — alternative)
 

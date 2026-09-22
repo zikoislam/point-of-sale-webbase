@@ -67,6 +67,11 @@ CLIENT_URL=https://pos-shop.vercel.app,https://pos-shop-git-main-you.vercel.app
    > `npm ci && npm run build` fails with *"Missing script: build"* and the
    > deployment silently keeps the previous build. Setting Root Directory to
    > `backend` is still the cleaner option; the root config is the safety net.
+   >
+   > Both configs build with `npm ci --include=dev`: Railway sets
+   > `NODE_ENV=production`, and a plain `npm ci` then omits devDependencies —
+   > which includes `typescript`, so the `tsc` build step dies with
+   > *"tsc: not found"*.
 
 ## Deploy the backend (Render — alternative)
 

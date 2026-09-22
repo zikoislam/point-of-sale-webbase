@@ -9,16 +9,29 @@
  * On the desktop the API runs on localhost, and the Electron shell passes its
  * port in through NEXT_PUBLIC_API_URL at server start.
  */
+
+/** Origin of an *absolute* API url: "https://host/api/v1" → "https://host". A relative path (e.g. "/api/v1", which the browser resolves against this same domain) yields null. */
+function apiOrigin(url) {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  return url.replace(/\/api\/v1\/?$/, '') || null;
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
 
   async rewrites() {
+    // A relative NEXT_PUBLIC_API_URL means "same origin, proxy it" — it must not
+    // be used as the proxy target itself. Never fall back to localhost in
+    // production: the host (Vercel) refuses to proxy to a private hostname and
+    // every API call 404s with DNS_HOSTNAME_RESOLVED_PRIVATE.
     const API_ORIGIN =
       process.env.API_PROXY_TARGET ||
-      process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, '') ||
-      'http://localhost:5000';
+      apiOrigin(process.env.NEXT_PUBLIC_API_URL) ||
+      (process.env.NODE_ENV === 'production'
+        ? 'https://pos-api-production-f0f5.up.railway.app'
+        : 'http://localhost:5000');
 
     return [
       { source: '/api/:path*', destination: `${API_ORIGIN}/api/:path*` },

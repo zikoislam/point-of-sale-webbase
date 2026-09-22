@@ -3,6 +3,8 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 export interface ICustomer extends Document {
   _id: Types.ObjectId;
   name: string;
+  /** The person to talk to at the shop — the owner's name, when the account is a business. */
+  contactPerson?: string;
   phone: string; // Unique Index
   email?: string;
   address?: string;
@@ -19,6 +21,10 @@ const CustomerSchema = new Schema<ICustomer>(
     name: {
       type: String,
       required: true,
+      trim: true,
+    },
+    contactPerson: {
+      type: String,
       trim: true,
     },
     phone: {

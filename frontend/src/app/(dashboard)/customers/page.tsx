@@ -38,6 +38,7 @@ const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
 interface Customer {
   _id: string;
   name: string;
+  contactPerson?: string;
   phone: string;
   email?: string;
   address?: string;
@@ -92,6 +93,7 @@ export default function CustomersPage() {
 
   // Form State
   const [formName, setFormName] = useState('');
+  const [formContactPerson, setFormContactPerson] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formAddress, setFormAddress] = useState('');
@@ -136,6 +138,7 @@ export default function CustomersPage() {
 
   const openCreateModal = () => {
     setFormName('');
+    setFormContactPerson('');
     setFormPhone('');
     setFormEmail('');
     setFormAddress('');
@@ -165,6 +168,7 @@ export default function CustomersPage() {
     try {
       const payload = {
         name: formName.trim(),
+        contactPerson: formContactPerson.trim() || undefined,
         phone: formPhone.trim(),
         email: formEmail.trim() || undefined,
         address: formAddress.trim() || undefined,
@@ -362,6 +366,11 @@ export default function CustomersPage() {
                   <tr key={c._id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-white">{c.name}</div>
+                      {c.contactPerson && (
+                        <div className="text-xs text-cyan-300/80 truncate max-w-xs">
+                          Contact: {c.contactPerson}
+                        </div>
+                      )}
                       <div className="text-xs text-slate-400 truncate max-w-xs">{c.address || '—'}</div>
                     </td>
                     <td className="py-3.5 px-4">
@@ -455,11 +464,26 @@ export default function CustomersPage() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Customer / Shop Name *
+                </label>
                 <input
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
+                  placeholder="e.g. Al-Amin Traders"
+                  className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Contact Person / Owner
+                </label>
+                <input
+                  type="text"
+                  value={formContactPerson}
+                  onChange={(e) => setFormContactPerson(e.target.value)}
                   placeholder="e.g. Tanvir Ahmed"
                   className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-500"
                 />

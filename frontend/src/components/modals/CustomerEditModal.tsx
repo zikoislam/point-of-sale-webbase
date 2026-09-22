@@ -24,6 +24,7 @@ import {
 export interface CustomerForEdit {
   _id: string;
   name: string;
+  contactPerson?: string;
   phone: string;
   email?: string;
   address?: string;
@@ -52,6 +53,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
 
   // Form fields
   const [name, setName] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
@@ -66,6 +68,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
   useEffect(() => {
     if (!isOpen || !customer) return;
     setName(customer.name);
+    setContactPerson(customer.contactPerson || '');
     setPhone(customer.phone);
     setEmail(customer.email || '');
     setAddress(customer.address || '');
@@ -94,6 +97,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
     try {
       const payload: Record<string, any> = {
         name: name.trim(),
+        contactPerson: contactPerson.trim() || undefined,
         phone: phone.trim(),
         email: email.trim() || undefined,
         address: address.trim() || undefined,
@@ -171,14 +175,30 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
                 <User className="w-3 h-3 inline mr-1" />
-                Full Name *
+                Customer / Shop Name *
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Customer full name"
+                placeholder="Company / shop name"
                 required
+                className="w-full h-10 px-3.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+
+            {/* Contact person / owner */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                <User className="w-3 h-3 inline mr-1" />
+                Contact Person / Owner{' '}
+                <span className="normal-case font-normal text-slate-500">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={contactPerson}
+                onChange={(e) => setContactPerson(e.target.value)}
+                placeholder="e.g. the owner's name"
                 className="w-full h-10 px-3.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>

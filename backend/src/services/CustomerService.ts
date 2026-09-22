@@ -9,6 +9,7 @@ import { escapeRegex, roundMoney } from '../utils/helpers';
 
 export interface CreateCustomerDto {
   name: string;
+  contactPerson?: string;
   phone: string;
   email?: string;
   address?: string;
@@ -17,6 +18,7 @@ export interface CreateCustomerDto {
 
 export interface UpdateCustomerDto {
   name?: string;
+  contactPerson?: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -78,6 +80,7 @@ class CustomerService {
 
     const customer = await Customer.create({
       name: dto.name,
+      contactPerson: dto.contactPerson,
       phone: dto.phone,
       email: dto.email,
       address: dto.address,
@@ -99,6 +102,7 @@ class CustomerService {
 
     const updates: Record<string, any> = {};
     if (dto.name !== undefined) updates.name = dto.name;
+    if (dto.contactPerson !== undefined) updates.contactPerson = dto.contactPerson;
     if (dto.phone !== undefined) updates.phone = dto.phone;
     if (dto.email !== undefined) updates.email = dto.email;
     if (dto.address !== undefined) updates.address = dto.address;

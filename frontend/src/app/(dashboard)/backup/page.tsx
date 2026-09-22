@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Database,
   Download,
@@ -13,6 +13,7 @@ import {
   Info,
   History,
   AlertTriangle,
+  FolderOpen,
 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { API_BASE_URL } from '../../../lib/constants';
@@ -84,8 +85,10 @@ export default function BackupPage() {
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<BackupMeta | null>(null);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [confirmName, setConfirmName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchBackups = useCallback(async () => {
     setLoading(true);
@@ -163,24 +166,63 @@ export default function BackupPage() {
     }
   };
 
-  const openRestore = (backup: BackupMeta) => {
-    setConfirmName('');
+  const closeRestore = () => {
+    if (restoring) return;
+    setRestoreTarget(null);
+    setRestoreFile(null);
+    setAcknowledged(false);
+  };
+
+  const openRestoreFromBackup = (backup: BackupMeta) => {
+    setRestoreFile(null);
+    setAcknowledged(false);
     setRestoreTarget(backup);
   };
 
+  const handlePickFile = (file: File | undefined) => {
+    if (!file) return;
+    setRestoreTarget(null);
+    setAcknowledged(false);
+    setRestoreFile(file);
+  };
+
   const handleRestore = async () => {
-    if (!restoreTarget) return;
+    if (!restoreTarget && !restoreFile) return;
     setRestoring(true);
     try {
-      const res = await api.post<RestoreResult>(
-        `/backups/${encodeURIComponent(restoreTarget.name)}/restore`
-      );
-      const r = res.data;
+      let result: RestoreResult | undefined;
+
+      if (restoreFile) {
+        // Restore from a snapshot the admin picked off their own machine — the
+        // file never has to sit on the server first.
+        const token = typeof window !== 'undefined' ? sessionStorage.getItem('pos_token') : null;
+        const form = new FormData();
+        form.append('file', restoreFile);
+        const res = await fetch(`${API_BASE_URL}/backups/restore-upload`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body: form,
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.error?.message || 'Restore failed');
+        }
+        result = json.data as RestoreResult;
+      } else if (restoreTarget) {
+        const res = await api.post<RestoreResult>(
+          `/backups/${encodeURIComponent(restoreTarget.name)}/restore`
+        );
+        result = res.data;
+      }
+
       toast.success(
-        `Restored ${r?.inserted ?? 0} missing and updated ${r?.updated ?? 0} changed documents. A safety snapshot "${r?.safetyBackup}" was saved first.`,
+        `Restored ${result?.inserted ?? 0} missing and updated ${result?.updated ?? 0} changed documents. A safety snapshot "${result?.safetyBackup}" was saved first.`,
         'Database restored'
       );
       setRestoreTarget(null);
+      setRestoreFile(null);
+      setAcknowledged(false);
       await fetchBackups();
     } catch (err: any) {
       toast.error(err?.message || 'Restore failed');
@@ -189,7 +231,7 @@ export default function BackupPage() {
     }
   };
 
-  const canConfirmRestore = !!restoreTarget && confirmName.trim() === restoreTarget.name;
+  const restoreOpen = !!restoreTarget || !!restoreFile;
 
   return (
     <div className="space-y-6">
@@ -202,13 +244,34 @@ export default function BackupPage() {
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Database Backup</h1>
             <p className="text-sm text-slate-400">
-              Take a manual snapshot any time, download one, or restore the database from a snapshot — an automatic
-              backup also runs every day.
+              Take a manual snapshot, download one, or restore the database — from a saved backup or from a file on your
+              own computer. An automatic backup also runs every day.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {isSuperAdmin && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={(e) => {
+                  handlePickFile(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+              <Button
+                variant="secondary"
+                onClick={() => fileInputRef.current?.click()}
+                leftIcon={<FolderOpen className="w-4 h-4" />}
+              >
+                Restore from file
+              </Button>
+            </>
+          )}
           <Button
             variant="secondary"
             onClick={fetchBackups}
@@ -240,8 +303,9 @@ export default function BackupPage() {
           {isSuperAdmin && (
             <>
               {' '}
-              Restoring a snapshot is restricted to the{' '}
-              <span className="text-slate-200">Super Admin</span> and always saves a safety snapshot first.
+              Restoring is restricted to the <span className="text-slate-200">Super Admin</span> and always saves a
+              safety snapshot first. You can restore from this list, or from a{' '}
+              <span className="text-slate-200">.json file on your computer</span>.
             </>
           )}
         </div>
@@ -325,7 +389,7 @@ export default function BackupPage() {
                           </button>
                           {isSuperAdmin && (
                             <button
-                              onClick={() => openRestore(b)}
+                              onClick={() => openRestoreFromBackup(b)}
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold transition"
                               title="Restore from this backup"
                             >
@@ -366,11 +430,11 @@ export default function BackupPage() {
         }
       />
 
-      {/* Restore confirmation — Super Admin only, requires typing the file name */}
+      {/* Restore confirmation — Super Admin only */}
       <Modal
-        isOpen={!!restoreTarget}
-        onClose={() => !restoring && setRestoreTarget(null)}
-        title="Restore database from backup"
+        isOpen={restoreOpen}
+        onClose={closeRestore}
+        title={restoreFile ? 'Restore database from file' : 'Restore database from backup'}
         subtitle="This overwrites live data. It cannot be undone without another backup."
         closeOnEsc={!restoring}
         closeOnOverlayClick={!restoring}
@@ -385,20 +449,28 @@ export default function BackupPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3">
-              <p className="text-slate-500">Snapshot taken</p>
-              <p className="text-slate-200 font-semibold mt-0.5">
-                {restoreTarget ? formatDateTime(restoreTarget.takenAt) : '—'}
-              </p>
+          {restoreFile ? (
+            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3 text-xs">
+              <p className="text-slate-500">Selected file</p>
+              <p className="text-slate-200 font-semibold mt-0.5 break-all">{restoreFile.name}</p>
+              <p className="text-slate-500 mt-1">{formatBytes(restoreFile.size)}</p>
             </div>
-            <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3">
-              <p className="text-slate-500">Contents</p>
-              <p className="text-slate-200 font-semibold mt-0.5">
-                {restoreTarget?.documents ?? 0} docs · {restoreTarget?.collections ?? 0} collections
-              </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3">
+                <p className="text-slate-500">Snapshot taken</p>
+                <p className="text-slate-200 font-semibold mt-0.5">
+                  {restoreTarget ? formatDateTime(restoreTarget.takenAt) : '—'}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3">
+                <p className="text-slate-500">Contents</p>
+                <p className="text-slate-200 font-semibold mt-0.5">
+                  {restoreTarget?.documents ?? 0} docs · {restoreTarget?.collections ?? 0} collections
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -408,29 +480,22 @@ export default function BackupPage() {
             </p>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
-              Type the backup file name to confirm
-            </label>
+          <label className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 cursor-pointer">
             <input
-              type="text"
-              value={confirmName}
-              onChange={(e) => setConfirmName(e.target.value)}
-              placeholder={restoreTarget?.name || ''}
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(e) => setAcknowledged(e.target.checked)}
               disabled={restoring}
-              className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 placeholder:text-slate-600"
+              className="mt-0.5 w-4 h-4 shrink-0 accent-rose-500"
             />
-          </div>
+            <span className="text-xs text-slate-300 leading-relaxed">
+              I understand this will overwrite the documents contained in the snapshot.
+            </span>
+          </label>
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={restoring}
-            onClick={() => setRestoreTarget(null)}
-          >
+          <Button type="button" variant="secondary" size="sm" disabled={restoring} onClick={closeRestore}>
             Cancel
           </Button>
           <Button
@@ -438,7 +503,7 @@ export default function BackupPage() {
             variant="danger"
             size="sm"
             loading={restoring}
-            disabled={!canConfirmRestore}
+            disabled={!acknowledged}
             onClick={handleRestore}
             leftIcon={<History className="w-4 h-4" />}
           >

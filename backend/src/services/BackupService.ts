@@ -190,8 +190,28 @@ class BackupService {
     }
   }
 
+  /** Restore from a snapshot stored on the server. */
+  async restoreBackup(name: string): Promise<RestoreResult> {
+    const { abs, name: safe } = this.getBackupFile(name);
+
+    let rawSnapshot: string;
+    try {
+      rawSnapshot = await fs.promises.readFile(abs, 'utf8');
+    } catch {
+      throw new AppError(422, 'BACKUP_FILE_INVALID', `Backup "${safe}" could not be read.`);
+    }
+
+    return this.applySnapshot(rawSnapshot, safe);
+  }
+
+  /** Restore from a snapshot the admin picked from their own machine. */
+  async restoreFromUpload(buffer: Buffer, originalName: string): Promise<RestoreResult> {
+    const label = path.basename(originalName || 'uploaded-backup.json');
+    return this.applySnapshot(buffer.toString('utf8'), label);
+  }
+
   /**
-   * Restore the database from a full snapshot.
+   * Write a full snapshot back into the live database.
    *
    * - Documents are upserted by `_id`, so records that exist only in the live
    *   database (created after the snapshot) are left untouched rather than
@@ -199,23 +219,21 @@ class BackupService {
    * - A safety snapshot of the current state is written first, so even a wrong
    *   restore can be rolled back by restoring that snapshot.
    */
-  async restoreBackup(name: string): Promise<RestoreResult> {
+  private async applySnapshot(rawSnapshot: string, label: string): Promise<RestoreResult> {
     const db = mongoose.connection.db;
     if (!db) {
       throw new AppError(503, 'DATABASE_NOT_CONNECTED', 'Database connection is not ready yet. Try again in a moment.');
     }
 
-    const { abs, name: safe } = this.getBackupFile(name);
-
     let parsed: any;
     try {
-      parsed = JSON.parse(await fs.promises.readFile(abs, 'utf8'));
+      parsed = JSON.parse(rawSnapshot);
     } catch {
-      throw new AppError(422, 'BACKUP_FILE_INVALID', `Backup "${safe}" could not be read as JSON.`);
+      throw new AppError(422, 'BACKUP_FILE_INVALID', `"${label}" could not be read as JSON.`);
     }
 
     if (!parsed || parsed.type !== 'full' || !parsed.data || typeof parsed.data !== 'object') {
-      throw new AppError(422, 'BACKUP_FILE_INVALID', `Backup "${safe}" is not a full POS snapshot.`);
+      throw new AppError(422, 'BACKUP_FILE_INVALID', `"${label}" is not a full POS snapshot.`);
     }
 
     // Snapshot the current state before touching anything.
@@ -228,8 +246,8 @@ class BackupService {
 
     for (const coll of collections) {
       const docs = Array.isArray(parsed.data[coll]) ? parsed.data[coll] : [];
-      for (const raw of docs) {
-        const doc = decode(raw);
+      for (const rawDoc of docs) {
+        const doc = decode(rawDoc);
         if (!doc || doc._id === undefined) {
           skipped++;
           continue;
@@ -241,7 +259,7 @@ class BackupService {
     }
 
     return {
-      restoredFrom: safe,
+      restoredFrom: label,
       restoredAt: new Date().toISOString(),
       safetyBackup: safety.name,
       collections: collections.length,

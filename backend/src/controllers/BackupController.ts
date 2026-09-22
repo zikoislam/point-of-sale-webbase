@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { backupService } from '../services/BackupService';
 import { auditService } from '../services/AuditService';
 import { sendSuccess } from '../utils/api-response';
+import { AppError } from '../utils/app-error';
 
 class BackupController {
   async list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -55,6 +56,42 @@ class BackupController {
             {
               action: 'RESTORE',
               restoredFrom: result.restoredFrom,
+              safetyBackup: result.safetyBackup,
+              collections: result.collections,
+              documents: result.documents,
+              inserted: result.inserted,
+              updated: result.updated,
+              skipped: result.skipped,
+            },
+            req.ip
+          )
+          .catch(() => undefined);
+      }
+
+      sendSuccess(res, 200, 'Database restored successfully', result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** Restore from a snapshot the admin uploaded from their own machine. */
+  async restoreUpload(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.file) {
+        throw new AppError(400, 'NO_FILE', 'No backup file was uploaded');
+      }
+
+      const result = await backupService.restoreFromUpload(req.file.buffer, req.file.originalname);
+
+      if (req.user) {
+        await auditService
+          .logAction(
+            req.user.userId,
+            'UPDATE',
+            'backups',
+            result.restoredFrom,
+            {
+              action: 'RESTORE_FROM_UPLOAD',
               safetyBackup: result.safetyBackup,
               collections: result.collections,
               documents: result.documents,

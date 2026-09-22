@@ -6,6 +6,7 @@ import { uploadImage } from '../../../lib/upload';
 import { invalidateBranding } from '../../../hooks/useBranding';
 import { electronBridge, isElectron, type LicenseInfo } from '../../../lib/electron-bridge';
 import { availablePrinters, printTestSlip } from '../../../lib/receipt-printer';
+import { invalidateMemoPaper, type MemoPrintMode } from '../../../lib/memo-print';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -26,6 +27,9 @@ interface ShopSettings {
   defaultTaxRate: number;
   allowNegativeStock: boolean;
   thermalPrinterType: '58mm' | '80mm';
+  memoPrintMode: MemoPrintMode;
+  memoWidthMm: number;
+  memoHeightMm: number;
   barcodeLabelFormat: string;
   receiptHeader: string;
   receiptFooter: string;
@@ -36,6 +40,7 @@ const defaultSettings: ShopSettings = {
   shopName: '', shopAddress: '', shopPhone: '', shopEmail: '',
   currencySymbol: '৳', defaultTaxRate: 0, allowNegativeStock: false,
   thermalPrinterType: '80mm', barcodeLabelFormat: '38mm_x_25mm_2up',
+  memoPrintMode: 'thermal', memoWidthMm: 210, memoHeightMm: 297,
   receiptHeader: '', receiptFooter: '',
 };
 
@@ -274,6 +279,8 @@ export default function SettingsPage() {
       const j = await res.json();
       if (j.success) {
         invalidateBranding();
+        // Paper settings feed the print layout, so drop the cached copy too.
+        invalidateMemoPaper();
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       }
@@ -429,6 +436,90 @@ export default function SettingsPage() {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Memo / receipt paper */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <h2 className="font-semibold text-white flex items-center gap-2 text-sm">
+          <Printer className="w-4 h-4 text-indigo-400" /> Memo / Receipt Printing
+        </h2>
+        <p className="text-xs text-slate-400 -mt-2">
+          Which paper a sale memo is printed on. Remember to press{' '}
+          <span className="text-slate-200">Save Changes</span>.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {(
+            [
+              { id: 'thermal', title: 'Thermal printer', hint: '58mm / 80mm roll' },
+              { id: 'a4', title: 'Normal printer — A4', hint: 'Full A4 memo sheet' },
+              { id: 'custom', title: 'Custom size memo', hint: 'Your own sheet size' },
+            ] as { id: MemoPrintMode; title: string; hint: string }[]
+          ).map((opt) => {
+            const active = form.memoPrintMode === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, memoPrintMode: opt.id }))}
+                className={`text-left p-3.5 rounded-xl border transition ${
+                  active
+                    ? 'bg-indigo-600/20 border-indigo-500/50 ring-1 ring-indigo-500/40'
+                    : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
+                      active ? 'border-indigo-400 bg-indigo-400' : 'border-slate-500'
+                    }`}
+                  />
+                  <span className="text-sm font-semibold text-white">{opt.title}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">{opt.hint}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        {form.memoPrintMode === 'thermal' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Thermal roll width</label>
+              <select
+                value={form.thermalPrinterType}
+                onChange={(e) => setForm((f) => ({ ...f, thermalPrinterType: e.target.value as any }))}
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+              >
+                <option value="80mm">80mm (Standard)</option>
+                <option value="58mm">58mm (Compact)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {form.memoPrintMode === 'custom' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field
+              label="Memo width (mm)"
+              value={form.memoWidthMm}
+              onChange={(v) => setForm((f) => ({ ...f, memoWidthMm: parseFloat(v) || 0 }))}
+              type="number"
+              placeholder="210"
+            />
+            <Field
+              label="Memo height (mm)"
+              value={form.memoHeightMm}
+              onChange={(v) => setForm((f) => ({ ...f, memoHeightMm: parseFloat(v) || 0 }))}
+              type="number"
+              placeholder="297"
+            />
+            <p className="sm:col-span-2 text-[11px] text-slate-500">
+              The memo is laid out for exactly this sheet — e.g. 210 × 297 for A4, 190 × 130 for a
+              half-letter pad.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Receipt */}

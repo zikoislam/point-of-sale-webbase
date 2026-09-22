@@ -38,6 +38,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { queueOfflineSale } from '../../../lib/offline-queue';
 import { openCashDrawer } from '../../../lib/cash-drawer';
 import { printSaleReceipt } from '../../../lib/receipt-printer';
+import { prepareMemoPrint } from '../../../lib/memo-print';
 import { electronBridge, isElectron } from '../../../lib/electron-bridge';
 import { useBranding } from '../../../hooks/useBranding';
 import { BarcodeRenderer } from '../../../components/BarcodeRenderer';
@@ -931,6 +932,8 @@ export default function POSTerminalPage() {
     setPrintNotice(
       `${result.error || 'No printer available'} — opened the browser print dialog instead.`
     );
+    // Size the page for the paper chosen in Settings before the dialog opens.
+    await prepareMemoPrint();
     window.print();
   };
 

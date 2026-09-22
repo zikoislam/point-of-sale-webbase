@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   FileText,
 } from 'lucide-react';
+import { prepareMemoPrint } from '../../../lib/memo-print';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -671,7 +672,10 @@ export default function SalesHistoryPage() {
               <span className="font-bold text-slate-700">INVOICE PREVIEW</span>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={async () => {
+                    await prepareMemoPrint();
+                    window.print();
+                  }}
                   className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs flex items-center space-x-1"
                 >
                   <Printer className="w-3 h-3" />

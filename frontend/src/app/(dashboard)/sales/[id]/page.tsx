@@ -24,6 +24,7 @@ import { Button } from '../../../../components/ui/Button';
 import { Badge } from '../../../../components/ui/Badge';
 import { useToast } from '../../../../components/ui/Toast';
 import { ReturnModal } from '../../../../components/modals/ReturnModal';
+import { prepareMemoPrint } from '../../../../lib/memo-print';
 
 interface SaleItem {
   variantId: string;
@@ -74,7 +75,9 @@ export default function SaleInvoiceDetailPage() {
     },
   });
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    // Size the page for the paper chosen in Settings before the dialog opens.
+    await prepareMemoPrint();
     window.print();
   };
 

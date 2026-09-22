@@ -11,6 +11,17 @@ export interface ISettings extends Document {
   defaultTaxRate: number; // System-wide fallback VAT %
   allowNegativeStock: boolean; // Toggle: allow POS sales when stock = 0
   thermalPrinterType: '58mm' | '80mm';
+  /**
+   * How sale memos are printed:
+   *  - `thermal` → a narrow receipt on a 58mm/80mm roll (thermalPrinterType)
+   *  - `a4`      → a full page on an ordinary printer
+   *  - `custom`  → an ordinary printer loaded with a non-standard sheet
+   */
+  memoPrintMode: 'thermal' | 'a4' | 'custom';
+  /** Sheet width in millimetres, used when memoPrintMode is `custom`. */
+  memoWidthMm: number;
+  /** Sheet height in millimetres, used when memoPrintMode is `custom`. */
+  memoHeightMm: number;
   barcodeLabelFormat: string; // e.g. "38mm_x_25mm_2up"
   cashDrawerTriggerCode: string; // ESC/POS hex, e.g. "\\x1B\\x70\\x00\\x19\\xFA"
   receiptHeader: string; // Custom text printed at top of receipts
@@ -73,6 +84,24 @@ const SettingsSchema = new Schema<ISettings>(
       enum: ['58mm', '80mm'],
       default: '80mm',
       required: true,
+    },
+    memoPrintMode: {
+      type: String,
+      enum: ['thermal', 'a4', 'custom'],
+      default: 'thermal',
+      required: true,
+    },
+    memoWidthMm: {
+      type: Number,
+      default: 210,
+      min: 20,
+      max: 1000,
+    },
+    memoHeightMm: {
+      type: Number,
+      default: 297,
+      min: 20,
+      max: 1000,
     },
     barcodeLabelFormat: {
       type: String,

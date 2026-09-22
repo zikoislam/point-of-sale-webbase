@@ -10,6 +10,9 @@ export interface ShopSettings {
   defaultTaxRate: number;
   allowNegativeStock: boolean;
   thermalPrinterType: '58mm' | '80mm';
+  memoPrintMode: 'thermal' | 'a4' | 'custom';
+  memoWidthMm: number;
+  memoHeightMm: number;
   barcodeLabelFormat: string;
   receiptHeader: string;
   receiptFooter: string;
@@ -32,6 +35,9 @@ export class SettingsService {
       defaultTaxRate: 0,
       allowNegativeStock: false,
       thermalPrinterType: '80mm',
+      memoPrintMode: 'thermal',
+      memoWidthMm: 210,
+      memoHeightMm: 297,
       barcodeLabelFormat: '38mm_x_25mm_2up',
       cashDrawerTriggerCode: '\\x1B\\x70\\x00\\x19\\xFA',
       receiptHeader: 'Welcome to our store!',
@@ -58,6 +64,12 @@ export class SettingsService {
       currencySymbol: settings.currencySymbol,
       shopAddress: settings.shopAddress,
       shopPhone: settings.shopPhone,
+      // Paper settings ride along with the branding so the POS can size a memo
+      // on any client — a cashier cannot read the full settings document.
+      thermalPrinterType: settings.thermalPrinterType || '80mm',
+      memoPrintMode: settings.memoPrintMode || 'thermal',
+      memoWidthMm: settings.memoWidthMm || 210,
+      memoHeightMm: settings.memoHeightMm || 297,
     };
   }
 }

@@ -1,4 +1,4 @@
-import { ClientSession, Types } from 'mongoose';
+import mongoose, { ClientSession, Types } from 'mongoose';
 import { Account, IAccount, AccountSubType, AccountType } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
 import { JournalEntry, IJournalEntry, JournalSource } from '../models/JournalEntry';
@@ -103,9 +103,20 @@ export interface PostJournalInput {
   lines: JournalLineInput[];
   createdById: string;
   isSystemGenerated?: boolean;
+  /**
+   * `PENDING` records the voucher without moving a single balance — it waits for
+   * an approval. Defaults to `POSTED`, which is what the automated flows need.
+   */
+  status?: 'PENDING' | 'POSTED';
   /** Pass the caller's session so the voucher commits with the document. */
   session?: ClientSession;
 }
+
+/**
+ * Entries that actually count: legacy rows have no `status` and were all posted
+ * by definition, so only the two waiting states are excluded.
+ */
+const EFFECTIVE = { status: { $nin: ['PENDING', 'REJECTED'] } };
 
 export interface LedgerRow {
   entryId: string;
@@ -322,6 +333,7 @@ class AccountingService {
           })),
           totalDebit,
           totalCredit,
+          status: input.status || 'POSTED',
           isSystemGenerated: !!input.isSystemGenerated,
           createdById: new Types.ObjectId(input.createdById),
           postedAt: new Date(),
@@ -332,13 +344,41 @@ class AccountingService {
 
     const entry = created[0];
 
-    // ---- move the balances + mirror cash into the wallet ledger --------
-    for (const l of resolved) {
+    // A voucher waiting for approval records nothing — approveEntry applies it.
+    if ((input.status || 'POSTED') === 'POSTED') {
+      await this.applyMovements(resolved, {
+        source: input.source,
+        referenceId: input.referenceId,
+        narration: input.narration,
+        entryId: entry._id,
+        session,
+      });
+    }
+
+    return entry.toObject() as unknown as IJournalEntry;
+  }
+
+  /**
+   * Moves each head's cached balance, and mirrors cash-equivalent movement into
+   * the wallet ledger. Runs when a voucher is posted, and again when a voucher
+   * that was waiting for approval is approved.
+   */
+  private async applyMovements(
+    lines: Array<{ account: IAccount; debit: number; credit: number }>,
+    opts: {
+      source: JournalSource;
+      referenceId?: string | Types.ObjectId;
+      narration: string;
+      entryId: Types.ObjectId;
+      session?: ClientSession;
+    }
+  ): Promise<void> {
+    for (const l of lines) {
       const delta = signedDelta(l.account.normalBalance, l.debit, l.credit);
       const before = roundMoney(l.account.currentBalance || 0);
       const after = roundMoney(before + delta);
 
-      await Account.updateOne({ _id: l.account._id }, { $set: { currentBalance: after } }, { session });
+      await Account.updateOne({ _id: l.account._id }, { $set: { currentBalance: after } }, { session: opts.session });
 
       if (l.account.isCashEquivalent && Math.abs(delta) > 0.005) {
         await AccountTransaction.create(
@@ -349,19 +389,94 @@ class AccountingService {
               amount: Math.abs(delta),
               balanceBefore: before,
               balanceAfter: after,
-              referenceType: REFERENCE_BY_SOURCE[input.source],
-              referenceId: (input.referenceId && Types.ObjectId.isValid(String(input.referenceId))
-                ? new Types.ObjectId(String(input.referenceId))
-                : entry._id) as Types.ObjectId,
-              description: input.narration.trim().slice(0, 250),
+              referenceType: REFERENCE_BY_SOURCE[opts.source],
+              referenceId: (opts.referenceId && Types.ObjectId.isValid(String(opts.referenceId))
+                ? new Types.ObjectId(String(opts.referenceId))
+                : opts.entryId) as Types.ObjectId,
+              description: opts.narration.trim().slice(0, 250),
             },
           ],
-          { session }
+          { session: opts.session }
         );
       }
     }
+  }
 
-    return entry.toObject() as unknown as IJournalEntry;
+  /**
+   * Approves or rejects a voucher that was waiting.
+   *
+   * Approval is what moves the money: the stored lines are applied inside one
+   * transaction, so a voucher can never be half-posted, and only the approver is
+   * recorded against it.
+   */
+  async approveEntry(entryId: string, userId: string, approve: boolean, reason?: string): Promise<IJournalEntry> {
+    if (!Types.ObjectId.isValid(entryId)) throw new AppError(400, 'INVALID_ID', 'Invalid journal id');
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const entry = await JournalEntry.findById(entryId).session(session);
+      if (!entry) throw new AppError(404, 'JOURNAL_NOT_FOUND', 'Journal voucher not found');
+      if (entry.status !== 'PENDING') {
+        throw new AppError(409, 'NOT_PENDING', `This voucher is already ${entry.status.toLowerCase()}`);
+      }
+
+      if (!approve) {
+        entry.status = 'REJECTED';
+        entry.rejectedReason = reason?.trim() || 'Rejected';
+        entry.approvedById = new Types.ObjectId(userId);
+        entry.approvedAt = new Date();
+        await entry.save({ session });
+        await session.commitTransaction();
+        return entry.toObject() as unknown as IJournalEntry;
+      }
+
+      // A closed year must not be reopened by an approval that arrives late.
+      const settings = await Settings.findOne().select('booksClosedUpTo').session(session).lean();
+      if (settings?.booksClosedUpTo && new Date(entry.date) <= new Date(settings.booksClosedUpTo)) {
+        const closed = new Date(settings.booksClosedUpTo).toISOString().slice(0, 10);
+        throw new AppError(422, 'PERIOD_CLOSED', `The books are closed up to ${closed}; this voucher is dated inside it.`);
+      }
+
+      const accounts = await Account.find({ _id: { $in: entry.lines.map((l) => l.accountId) } })
+        .session(session)
+        .lean();
+      const byId = new Map(accounts.map((a) => [String(a._id), a as unknown as IAccount]));
+
+      const resolved = entry.lines.map((l) => {
+        const account = byId.get(String(l.accountId));
+        if (!account) throw new AppError(400, 'ACCOUNT_NOT_FOUND', `Account missing for line: ${l.accountCode || l.accountName}`);
+        return { account, debit: l.debit, credit: l.credit };
+      });
+
+      await this.applyMovements(resolved, {
+        source: entry.source,
+        referenceId: entry.referenceId,
+        narration: entry.narration,
+        entryId: entry._id,
+        session,
+      });
+
+      entry.status = 'POSTED';
+      entry.approvedById = new Types.ObjectId(userId);
+      entry.approvedAt = new Date();
+      entry.postedAt = new Date();
+      await entry.save({ session });
+
+      await session.commitTransaction();
+      return entry.toObject() as unknown as IJournalEntry;
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /** Vouchers still waiting for an approval. */
+  async listPending() {
+    return JournalEntry.find({ status: 'PENDING' }).sort({ date: -1, createdAt: -1 }).lean();
   }
 
   /** Vouchers are never edited — a wrong one is mirrored and marked reversed. */
@@ -369,6 +484,9 @@ class AccountingService {
     if (!Types.ObjectId.isValid(entryId)) throw new AppError(400, 'INVALID_ID', 'Invalid journal id');
     const original = await JournalEntry.findById(entryId).lean();
     if (!original) throw new AppError(404, 'JOURNAL_NOT_FOUND', 'Journal voucher not found');
+    if (original.status && original.status !== 'POSTED') {
+      throw new AppError(409, 'NOT_POSTED', `Only a posted voucher can be reversed (this one is ${original.status.toLowerCase()})`);
+    }
     if (original.isReversed) throw new AppError(409, 'JOURNAL_ALREADY_REVERSED', 'This voucher has already been reversed');
 
     const mirror = await this.postJournal({
@@ -512,6 +630,8 @@ class AccountingService {
     source?: string;
     accountId?: string;
     referenceId?: string;
+    /** 'PENDING' shows the approval queue; 'POSTED' hides anything rejected. */
+    status?: string;
     page?: number;
     limit?: number;
   }) {
@@ -524,6 +644,8 @@ class AccountingService {
       if (opts.from) query.date.$gte = new Date(opts.from);
       if (opts.to) query.date.$lte = new Date(`${opts.to}T23:59:59.999Z`);
     }
+    if (opts.status === 'POSTED') Object.assign(query, EFFECTIVE);
+    else if (opts.status === 'PENDING' || opts.status === 'REJECTED') query.status = opts.status;
     if (opts.source) query.source = opts.source;
     if (opts.accountId && Types.ObjectId.isValid(opts.accountId)) query['lines.accountId'] = new Types.ObjectId(opts.accountId);
     if (opts.referenceId && Types.ObjectId.isValid(opts.referenceId)) query.referenceId = new Types.ObjectId(opts.referenceId);
@@ -547,14 +669,14 @@ class AccountingService {
     const oid = new Types.ObjectId(accountId);
 
     const [openingAgg] = await JournalEntry.aggregate([
-      { $match: { 'lines.accountId': oid, date: { $lt: from } } },
+      { $match: { 'lines.accountId': oid, date: { $lt: from }, ...EFFECTIVE } },
       { $unwind: '$lines' },
       { $match: { 'lines.accountId': oid } },
       { $group: { _id: null, debit: { $sum: '$lines.debit' }, credit: { $sum: '$lines.credit' } } },
     ]);
     const opening = signedDelta(account.normalBalance, openingAgg?.debit || 0, openingAgg?.credit || 0);
 
-    const entries = await JournalEntry.find({ 'lines.accountId': oid, date: { $gte: from, $lte: to } })
+    const entries = await JournalEntry.find({ 'lines.accountId': oid, date: { $gte: from, $lte: to }, ...EFFECTIVE })
       .sort({ date: 1, createdAt: 1 })
       .limit(Math.min(opts.limit || 500, 2000))
       .lean();
@@ -600,7 +722,8 @@ class AccountingService {
 
   /** Raw debit/credit totals per head over a period — the base for the statements. */
   private async totalsByHead(opts: { from?: Date; to?: Date }) {
-    const match: any = {};
+    // Vouchers waiting for approval must not show up in any statement.
+    const match: any = { ...EFFECTIVE };
     if (opts.from || opts.to) {
       match.date = {};
       if (opts.from) match.date.$gte = opts.from;
@@ -725,7 +848,7 @@ class AccountingService {
     const wallets = await Account.find({ isCashEquivalent: true }).lean();
     const walletIds = new Set(wallets.map((w) => String(w._id)));
 
-    const match: any = {};
+    const match: any = { ...EFFECTIVE };
     if (bounds.from || bounds.to) {
       match.date = {};
       if (bounds.from) match.date.$gte = bounds.from;

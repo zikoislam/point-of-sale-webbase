@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Plus, RefreshCw, ChevronDown, ChevronRight, Ban } from 'lucide-react';
+import { BookOpen, Plus, RefreshCw, ChevronDown, ChevronRight, Ban, Check, X, Clock } from 'lucide-react';
 import { api } from '../../../../lib/api-client';
 import { useToast } from '../../../../components/ui';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -26,6 +26,8 @@ interface JournalEntry {
   lines: JournalLine[];
   totalDebit: number;
   totalCredit: number;
+  status?: 'PENDING' | 'POSTED' | 'REJECTED';
+  rejectedReason?: string;
   isReversed: boolean;
   isSystemGenerated: boolean;
 }
@@ -42,10 +44,20 @@ const SOURCE_COLOR: Record<string, string> = {
   BACKFILL: 'bg-slate-500/10 text-slate-300 border-slate-500/20',
 };
 
+/** A voucher only counts once it is POSTED; rows created before approvals have no status. */
+const statusOf = (entry: JournalEntry) => entry.status || 'POSTED';
+
+const STATUS_STYLE: Record<string, string> = {
+  PENDING: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  POSTED: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25',
+  REJECTED: 'bg-rose-500/10 text-rose-300 border-rose-500/25',
+};
+
 export default function DayBookPage() {
   const toast = useToast();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const canApprove = isSuperAdmin || user?.role === 'ADMIN' || !!user?.permissions?.includes('approvals:manage');
 
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,12 +65,20 @@ export default function DayBookPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [source, setSource] = useState('');
+  const [status, setStatus] = useState('');
+  const [working, setWorking] = useState<string | null>(null);
 
   const fetchBook = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get<JournalEntry[]>('/accounting/journal', {
-        params: { from: from || undefined, to: to || undefined, source: source || undefined, limit: 100 },
+        params: {
+          from: from || undefined,
+          to: to || undefined,
+          source: source || undefined,
+          status: status || undefined,
+          limit: 100,
+        },
       });
       setEntries(res.data || []);
     } catch (err: any) {
@@ -66,7 +86,7 @@ export default function DayBookPage() {
     } finally {
       setLoading(false);
     }
-  }, [from, to, source, toast]);
+  }, [from, to, source, status, toast]);
 
   useEffect(() => {
     fetchBook();
@@ -75,14 +95,46 @@ export default function DayBookPage() {
 
   const reverse = async (entry: JournalEntry) => {
     if (!confirm(`Reverse ${entry.entryNo}? A mirror voucher will be posted.`)) return;
+    setWorking(entry._id);
     try {
       await api.post(`/accounting/journal/${entry._id}/reverse`);
       toast.success(`${entry.entryNo} reversed`);
       await fetchBook();
     } catch (err: any) {
       toast.error(err?.message || 'Could not reverse the voucher');
+    } finally {
+      setWorking(null);
     }
   };
+
+  const decide = async (entry: JournalEntry, approve: boolean) => {
+    let reason: string | undefined;
+    if (!approve) {
+      const asked = prompt(`Why is ${entry.entryNo} being rejected?`);
+      if (asked === null) return;
+      reason = asked || undefined;
+    }
+
+    setWorking(entry._id);
+    try {
+      await api.post(`/accounting/journal/${entry._id}/approve`, { approve, reason });
+      toast.success(
+        approve ? `${entry.entryNo} approved and posted to the books` : `${entry.entryNo} rejected`,
+        approve ? 'Posted' : 'Rejected'
+      );
+      await fetchBook();
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not update the voucher');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const showPending = () => {
+    setStatus('PENDING');
+  };
+
+  const pendingCount = entries.filter((e) => statusOf(e) === 'PENDING').length;
 
   return (
     <div className="space-y-6">
@@ -93,7 +145,9 @@ export default function DayBookPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">Day Book</h1>
-            <p className="text-sm text-slate-400">Every voucher the books have recorded, newest first.</p>
+            <p className="text-sm text-slate-400">
+              Every voucher, newest first. A hand-written voucher waits for approval before it touches the books.
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -113,6 +167,22 @@ export default function DayBookPage() {
           </Link>
         </div>
       </div>
+
+      {pendingCount > 0 && status !== 'PENDING' && (
+        <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-200">
+          <Clock className="w-4 h-4 shrink-0" />
+          <span>
+            <strong>{pendingCount}</strong> voucher{pendingCount > 1 ? 's are' : ' is'} waiting for approval — they do
+            not affect the books until approved.
+          </span>
+          <button
+            onClick={showPending}
+            className="ml-auto px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 font-semibold transition"
+          >
+            Show pending
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3 bg-slate-900/60 border border-slate-800 p-4 rounded-xl text-xs">
@@ -142,13 +212,26 @@ export default function DayBookPage() {
             className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none"
           >
             <option value="">All</option>
-            {['SALE', 'SALE_RETURN', 'PURCHASE', 'EXPENSE', 'WASTAGE', 'TRANSFER', 'DUE_COLLECTION', 'SUPPLIER_PAYMENT', 'MANUAL', 'OPENING', 'ADJUSTMENT', 'BACKFILL'].map(
+            {['SALE', 'SALE_RETURN', 'PURCHASE', 'EXPENSE', 'WASTAGE', 'TRANSFER', 'DUE_COLLECTION', 'SUPPLIER_PAYMENT', 'MANUAL', 'OPENING', 'ADJUSTMENT', 'BACKFILL', 'YEAR_CLOSE'].map(
               (s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
               )
             )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-slate-400 mb-1">Status</label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none"
+          >
+            <option value="">All</option>
+            <option value="PENDING">Pending approval</option>
+            <option value="POSTED">Posted</option>
+            <option value="REJECTED">Rejected</option>
           </select>
         </div>
         <button
@@ -171,6 +254,7 @@ export default function DayBookPage() {
           <div className="divide-y divide-slate-800">
             {entries.map((entry) => {
               const open = !!expanded[entry._id];
+              const st = statusOf(entry);
               return (
                 <div key={entry._id}>
                   <button
@@ -192,6 +276,11 @@ export default function DayBookPage() {
                         >
                           {entry.source}
                         </span>
+                        {st !== 'POSTED' && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[st]}`}>
+                            {st === 'PENDING' ? 'WAITING APPROVAL' : st}
+                          </span>
+                        )}
                         {entry.isReversed && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-rose-500/10 text-rose-300 border-rose-500/20">
                             REVERSED
@@ -241,17 +330,47 @@ export default function DayBookPage() {
                           ))}
                         </tbody>
                       </table>
-                      {isSuperAdmin && !entry.isReversed && (
-                        <div className="flex justify-end mt-3">
+
+                      {st === 'REJECTED' && entry.rejectedReason && (
+                        <p className="mt-3 text-xs text-rose-300">Rejected: {entry.rejectedReason}</p>
+                      )}
+
+                      <div className="flex items-center justify-end gap-2 mt-3">
+                        {st === 'PENDING' && canApprove && (
+                          <>
+                            <button
+                              onClick={() => decide(entry, false)}
+                              disabled={working === entry._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-semibold transition disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Reject
+                            </button>
+                            <button
+                              onClick={() => decide(entry, true)}
+                              disabled={working === entry._id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition disabled:opacity-50"
+                            >
+                              {working === entry._id ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                              Approve &amp; post
+                            </button>
+                          </>
+                        )}
+                        {st === 'POSTED' && isSuperAdmin && !entry.isReversed && (
                           <button
                             onClick={() => reverse(entry)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-semibold transition"
+                            disabled={working === entry._id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-semibold transition disabled:opacity-50"
                           >
                             <Ban className="w-3.5 h-3.5" />
                             Reverse
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

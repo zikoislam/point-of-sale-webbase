@@ -7,6 +7,7 @@ import {
   createAccountHeadSchema,
   updateAccountHeadSchema,
   createJournalSchema,
+  approveJournalSchema,
   openingBalanceSchema,
   dayBookQuerySchema,
   ledgerQuerySchema,
@@ -37,6 +38,9 @@ router.post('/seed-chart', requireSuperAdmin, (req, res, next) => accountingCont
 
 router.post('/journal', requireSuperAdmin, validate(createJournalSchema), (req, res, next) => accountingController.createJournal(req, res, next));
 router.post('/journal/:id/reverse', requireSuperAdmin, (req, res, next) => accountingController.reverseJournal(req, res, next));
+
+// Approval is the administrator's call — this is what posts a waiting voucher.
+router.post('/journal/:id/approve', requirePermissions('approvals:manage'), validate(approveJournalSchema), (req, res, next) => accountingController.approveJournal(req, res, next));
 
 router.post('/opening-balances', requireSuperAdmin, validate(openingBalanceSchema), (req, res, next) => accountingController.postOpening(req, res, next));
 

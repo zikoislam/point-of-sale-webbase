@@ -95,11 +95,29 @@ class AccountingController {
 
   async createJournal(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      // A hand-written voucher waits for approval before it touches the books.
       const entry = await accountingService.postJournal({
         ...req.body,
+        status: 'PENDING',
         createdById: req.user!.userId,
       });
-      sendSuccess(res, 201, `Voucher ${entry.entryNo} posted`, entry);
+      sendSuccess(res, 201, `Voucher ${entry.entryNo} submitted for approval`, entry);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** Approval is what actually posts a waiting voucher. */
+  async approveJournal(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const approve = req.body?.approve !== false;
+      const entry = await accountingService.approveEntry(
+        req.params.id,
+        req.user!.userId,
+        approve,
+        req.body?.reason
+      );
+      sendSuccess(res, 200, approve ? `Voucher ${entry.entryNo} posted` : `Voucher ${entry.entryNo} rejected`, entry);
     } catch (error) {
       next(error);
     }

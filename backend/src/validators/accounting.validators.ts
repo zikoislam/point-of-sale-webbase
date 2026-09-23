@@ -53,10 +53,16 @@ export const dayBookQuerySchema = z.object({
   from: z.string().trim().optional(),
   to: z.string().trim().optional(),
   source: z.enum(JOURNAL_SOURCES).optional(),
+  status: z.enum(['PENDING', 'POSTED', 'REJECTED']).optional(),
   accountId: objectId.optional(),
   referenceId: objectId.optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+});
+
+export const approveJournalSchema = z.object({
+  approve: z.boolean().optional().default(true),
+  reason: z.string().trim().max(200).optional(),
 });
 
 export const ledgerQuerySchema = z.object({

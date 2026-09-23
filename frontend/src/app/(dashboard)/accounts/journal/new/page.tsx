@@ -97,7 +97,10 @@ export default function NewJournalVoucherPage() {
           memo: l.memo.trim() || undefined,
         })),
       });
-      toast.success(`Voucher ${res.data?.entryNo || ''} posted`);
+      toast.success(
+        `Voucher ${res.data?.entryNo || ''} submitted — it posts once an admin approves it`,
+        'Waiting for approval'
+      );
       router.push('/accounts/journal');
     } catch (err: any) {
       setError(err?.message || 'Could not post the voucher');

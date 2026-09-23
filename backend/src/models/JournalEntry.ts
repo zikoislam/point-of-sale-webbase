@@ -42,6 +42,14 @@ export interface IJournalEntry extends Document {
   lines: IJournalLine[];
   totalDebit: number;
   totalCredit: number;
+  /**
+   * A manual voucher waits for approval before it touches the books; everything
+   * the app posts itself (a sale, an expense) goes straight in as POSTED.
+   */
+  status: 'PENDING' | 'POSTED' | 'REJECTED';
+  approvedById?: Types.ObjectId;
+  approvedAt?: Date;
+  rejectedReason?: string;
   /** Anything posted outside the normal flow (backfill, reconciliation). */
   isSystemGenerated: boolean;
   isReversed: boolean;
@@ -99,6 +107,15 @@ const JournalEntrySchema = new Schema<IJournalEntry>(
     },
     totalDebit: { type: Number, required: true, min: 0 },
     totalCredit: { type: Number, required: true, min: 0 },
+    status: {
+      type: String,
+      enum: ['PENDING', 'POSTED', 'REJECTED'],
+      default: 'POSTED',
+      required: true,
+    },
+    approvedById: { type: Schema.Types.ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
+    rejectedReason: { type: String, trim: true },
     isSystemGenerated: { type: Boolean, default: false },
     isReversed: { type: Boolean, default: false },
     reversalOf: { type: Schema.Types.ObjectId, ref: 'JournalEntry' },
@@ -122,5 +139,6 @@ JournalEntrySchema.index({ date: -1 });
 JournalEntrySchema.index({ source: 1, referenceId: 1 });
 JournalEntrySchema.index({ 'lines.accountId': 1, date: -1 });
 JournalEntrySchema.index({ isReversed: 1 });
+JournalEntrySchema.index({ status: 1, date: -1 });
 
 export const JournalEntry = mongoose.model<IJournalEntry>('JournalEntry', JournalEntrySchema);

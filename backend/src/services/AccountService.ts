@@ -24,8 +24,19 @@ export interface TransferFundsDto {
 }
 
 class AccountService {
+  /**
+   * Wallets only — the accounts a payment can settle into. The full chart of
+   * accounts (income, expense, capital …) is served by the accounting routes.
+   *
+   * The `accountType` fallback keeps wallets working before the chart has been
+   * seeded, when `isCashEquivalent` has not been set on them yet.
+   */
   async list() {
-    const accounts = await Account.find().sort({ createdAt: 1 }).lean();
+    const accounts = await Account.find({
+      $or: [{ isCashEquivalent: true }, { accountType: { $in: ['CASH', 'BANK', 'MFS'] } }],
+    })
+      .sort({ createdAt: 1 })
+      .lean();
     return accounts;
   }
 

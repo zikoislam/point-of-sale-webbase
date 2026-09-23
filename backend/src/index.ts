@@ -39,6 +39,7 @@ import syncRoutes from './routes/sync.routes';
 import { syncService } from './sync/SyncService';
 import { getDbMode, isDatabaseReady } from './config/db';
 import backupRoutes from './routes/backup.routes';
+import accountingRoutes from './routes/accounting.routes';
 import './models';
 
 const app = express();
@@ -110,6 +111,7 @@ app.use('/api/v1/audit-logs', auditRoutes);
 app.use('/api/v1/hardware', hardwareRoutes);
 app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/backups', backupRoutes);
+app.use('/api/v1/accounting', accountingRoutes);
 
 // Global Error Boundary Middleware
 app.use(errorHandler);

@@ -18,6 +18,7 @@ export * from './Supplier';
 export * from './SupplierLedger';
 export * from './Account';
 export * from './AccountTransaction';
+export * from './JournalEntry';
 export * from './ExpenseCategory';
 export * from './Expense';
 export * from './DailySalesSummary';

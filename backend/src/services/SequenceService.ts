@@ -31,3 +31,10 @@ export async function generateReturnNo(session?: ClientSession): Promise<string>
   const seq = await nextSequence(`return_seq_${day}`, session);
   return `RET-${day}-${String(seq).padStart(4, '0')}`;
 }
+
+/** Journal voucher number, e.g. JV-20260907-00001. */
+export async function generateJournalNo(session?: ClientSession): Promise<string> {
+  const day = todayKey();
+  const seq = await nextSequence(`journal_seq_${day}`, session);
+  return `JV-${day}-${String(seq).padStart(5, '0')}`;
+}

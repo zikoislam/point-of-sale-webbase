@@ -7,6 +7,7 @@ import { Shift } from '../models/Shift';
 import { StockMovement } from '../models/StockMovement';
 import { Account } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
+import { postSalesReturnJournal, postWastageJournal } from './accounting-postings';
 import { Expense } from '../models/Expense';
 import { ExpenseCategory } from '../models/ExpenseCategory';
 import { User } from '../models/User';
@@ -102,6 +103,7 @@ class SalesReturnService {
       await verifyManagerPin(dto.managerPin, session);
 
       let totalRefundAmount = 0;
+      let restockValue = 0;
       const returnItems: IReturnItem[] = [];
       const netBillValue = Math.max(0, sale.totalAmount - sale.discountAmount);
 
@@ -161,6 +163,9 @@ class SalesReturnService {
             ],
             { session }
           );
+
+          // Goods back on the shelf — the ledger needs the value, not just the count.
+          restockValue = roundMoney(restockValue + quantity * variant.costPrice);
         } else {
           // Rule 5 Step 4: non-resaleable -> wastage expense + account debit
           const lossValuation = roundMoney(quantity * variant.costPrice);
@@ -193,26 +198,15 @@ class SalesReturnService {
               { session }
             );
 
-            const balanceBefore = account.currentBalance;
-            const balanceAfter = roundMoney(balanceBefore - lossValuation);
-            account.currentBalance = balanceAfter;
-            await account.save({ session });
-
-            await AccountTransaction.create(
-              [
-                {
-                  accountId: account._id,
-                  type: 'DEBIT',
-                  amount: lossValuation,
-                  balanceBefore,
-                  balanceAfter,
-                  referenceType: 'WASTAGE_LOSS',
-                  referenceId: sale._id,
-                  description: `Non-resaleable return wastage: ${sale.invoiceNo}`,
-                },
-              ],
-              { session }
-            );
+            // Double-entry: the loss hits inventory shrinkage. The ledger owns
+            // the account balances, so no direct write happens here.
+            await postWastageJournal({
+              amount: lossValuation,
+              note: `Non-resaleable return ${sale.invoiceNo}: ${quantity}x ${product.name}`,
+              referenceId: sale._id,
+              userId: authorizedById,
+              session,
+            });
           }
         }
 
@@ -251,32 +245,34 @@ class SalesReturnService {
         );
 
         voucherId = voucher[0]._id;
+
+        // Double-entry: contra-income against the new store-credit liability.
+        await postSalesReturnJournal({
+          refundAmount: totalRefundAmount,
+          refundType: 'STORE_CREDIT',
+          returnNo,
+          restockValue,
+          referenceId: sale._id,
+          userId: authorizedById,
+          session,
+        });
       } else if (dto.refundType === 'CASH') {
         // Debit the cash account and record a ledger entry
         const account =
           (await Account.findOne({ accountType: 'CASH', isActive: true }).session(session)) ||
           (await Account.findOne({ isActive: true }).session(session));
         if (account) {
-          const balanceBefore = account.currentBalance;
-          const balanceAfter = roundMoney(balanceBefore - totalRefundAmount);
-          account.currentBalance = balanceAfter;
-          await account.save({ session });
-
-          await AccountTransaction.create(
-            [
-              {
-                accountId: account._id,
-                type: 'DEBIT',
-                amount: totalRefundAmount,
-                balanceBefore,
-                balanceAfter,
-                referenceType: 'RETURN',
-                referenceId: sale._id,
-                description: `Cash refund for ${sale.invoiceNo}`,
-              },
-            ],
-            { session }
-          );
+          // Double-entry: the contra-income head is debited, the till credited.
+          await postSalesReturnJournal({
+            refundAmount: totalRefundAmount,
+            refundType: 'CASH',
+            returnNo,
+            restockValue,
+            walletAccountId: String(account._id),
+            referenceId: sale._id,
+            userId: authorizedById,
+            session,
+          });
         }
 
         // Reduce the processing cashier's active drawer

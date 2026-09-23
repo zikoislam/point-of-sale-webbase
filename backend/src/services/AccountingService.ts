@@ -188,6 +188,27 @@ class AccountingService {
     }));
   }
 
+  /**
+   * Rewrites every cached balance from the journal.
+   *
+   * The journal is the source of truth, so this repairs any drift — a crash
+   * mid-posting, a read that missed an uncommitted movement, or a manual edit.
+   */
+  async resyncBalances(): Promise<Array<{ account: string; code?: string; was: number; now: number }>> {
+    const heads = await this.totalsByHead({});
+    const fixes: Array<{ account: string; code?: string; was: number; now: number }> = [];
+
+    for (const h of heads) {
+      const was = roundMoney(h.account.currentBalance || 0);
+      const now = roundMoney(h.balance);
+      if (Math.abs(was - now) < 0.005) continue;
+      await Account.updateOne({ _id: h.account._id }, { $set: { currentBalance: now } });
+      fixes.push({ account: h.account.name, code: h.account.code, was, now });
+    }
+
+    return fixes;
+  }
+
   /** Look up heads by code — used by every posting helper. */
   async headsByCode(): Promise<Record<string, IAccount>> {
     const accounts = await Account.find({ code: { $in: Object.values(HEADS) } }).lean();
@@ -221,9 +242,12 @@ class AccountingService {
     // ---- resolve heads -------------------------------------------------
     const ids = input.lines.map((l) => l.accountId).filter((v): v is string => !!v && Types.ObjectId.isValid(v));
     const codes = input.lines.map((l) => l.accountCode).filter((v): v is string => !!v);
+    // The session matters: a caller inside a transaction must see its own
+    // uncommitted movement, otherwise the cached balance is computed from a
+    // stale value and drifts away from the journal.
     const [byId, byCode] = await Promise.all([
-      ids.length ? Account.find({ _id: { $in: ids } }).lean() : Promise.resolve([]),
-      codes.length ? Account.find({ code: { $in: codes } }).lean() : Promise.resolve([]),
+      ids.length ? Account.find({ _id: { $in: ids } }).session(session || null).lean() : Promise.resolve([]),
+      codes.length ? Account.find({ code: { $in: codes } }).session(session || null).lean() : Promise.resolve([]),
     ]);
     const idMap = new Map(byId.map((a) => [String(a._id), a as unknown as IAccount]));
     const codeMap = new Map(byCode.map((a) => [a.code as string, a as unknown as IAccount]));

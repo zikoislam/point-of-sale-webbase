@@ -77,6 +77,7 @@ class AccountingController {
         from: q.from,
         to: q.to,
         source: q.source,
+        status: q.status,
         accountId: q.accountId,
         referenceId: q.referenceId,
         page: Number(q.page) || 1,

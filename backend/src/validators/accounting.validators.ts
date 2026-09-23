@@ -69,3 +69,7 @@ export const statementQuerySchema = z.object({
   to: z.string().trim().optional(),
   asOf: z.string().trim().optional(),
 });
+
+export const yearCloseSchema = z.object({
+  asOf: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'Closing date must be YYYY-MM-DD'),
+});

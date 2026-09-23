@@ -32,6 +32,8 @@ import {
   Store,
   X,
   Plus,
+  Calculator,
+  CalendarCheck,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SOFTWARE_CREDIT } from '../lib/constants';
@@ -41,6 +43,8 @@ interface SubNavItem {
   href: string;
   permission?: string;
   icon?: React.ElementType;
+  /** Posting to the books stays with the owner — hidden from other admins. */
+  superAdminOnly?: boolean;
 }
 
 interface NavItem {
@@ -120,7 +124,9 @@ const navItems: NavItem[] = [
       { label: 'Wallets & Balances', href: '/accounts', icon: Landmark, permission: 'accounts:view' },
       { label: 'Chart of Accounts', href: '/accounts/chart', icon: Bookmark, permission: 'accounts:view' },
       { label: 'Day Book', href: '/accounts/journal', icon: ScrollText, permission: 'accounts:view' },
-      { label: 'New Journal Voucher', href: '/accounts/journal/new', icon: Plus, permission: 'accounts:manage' },
+      { label: 'Opening Balances', href: '/accounts/opening-balances', icon: Calculator, permission: 'accounts:view', superAdminOnly: true },
+      { label: 'Year End Closing', href: '/accounts/year-close', icon: CalendarCheck, permission: 'accounts:view', superAdminOnly: true },
+      { label: 'New Journal Voucher', href: '/accounts/journal/new', icon: Plus, permission: 'accounts:manage', superAdminOnly: true },
     ],
   },
   {
@@ -282,7 +288,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             // Handle submenu items
             if (item.subItems) {
-              const allowedSubItems = item.subItems.filter((sub) => canAccess(sub.permission));
+              const allowedSubItems = item.subItems.filter(
+                (sub) => canAccess(sub.permission) && (!sub.superAdminOnly || user?.role === 'SUPER_ADMIN')
+              );
               if (allowedSubItems.length === 0) return null;
 
               const isSubActive = allowedSubItems.some(

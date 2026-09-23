@@ -16,6 +16,7 @@ export const JOURNAL_SOURCES = [
   'MANUAL',
   'ADJUSTMENT',
   'BACKFILL',
+  'YEAR_CLOSE',
 ] as const;
 
 export type JournalSource = (typeof JOURNAL_SOURCES)[number];

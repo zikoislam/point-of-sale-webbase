@@ -176,6 +176,39 @@ class AccountingController {
       next(error);
     }
   }
+
+  // ─────────────────────────────────────────────────── year closing ──
+
+  /** Which day the books are locked up to, so the UI can show the state. */
+  async periodStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { Settings } = await import('../models/Settings');
+      const settings = await Settings.findOne().select('booksClosedUpTo').lean();
+      sendSuccess(res, 200, 'Period status retrieved', {
+        booksClosedUpTo: settings?.booksClosedUpTo || null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async yearClose(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await accountingService.closeYear(req.body.asOf, req.user!.userId);
+      sendSuccess(res, 201, `Year closed — voucher ${result.entryNo}`, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reopenBooks(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await accountingService.reopenBooks();
+      sendSuccess(res, 200, `Books reopened up to ${result.reopenedUpTo}`, result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const accountingController = new AccountingController();

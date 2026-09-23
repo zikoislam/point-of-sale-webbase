@@ -45,7 +45,7 @@ const SOURCE_COLOR: Record<string, string> = {
 export default function DayBookPage() {
   const toast = useToast();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,7 +241,7 @@ export default function DayBookPage() {
                           ))}
                         </tbody>
                       </table>
-                      {isAdmin && !entry.isReversed && (
+                      {isSuperAdmin && !entry.isReversed && (
                         <div className="flex justify-end mt-3">
                           <button
                             onClick={() => reverse(entry)}

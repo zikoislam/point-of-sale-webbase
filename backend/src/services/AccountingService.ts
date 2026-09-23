@@ -2,6 +2,7 @@ import { ClientSession, Types } from 'mongoose';
 import { Account, IAccount, AccountSubType, AccountType } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
 import { JournalEntry, IJournalEntry, JournalSource } from '../models/JournalEntry';
+import { Settings } from '../models/Settings';
 import { generateJournalNo } from './SequenceService';
 import { AppError } from '../utils/app-error';
 import { roundMoney } from '../utils/helpers';
@@ -82,6 +83,7 @@ const REFERENCE_BY_SOURCE: Record<
   MANUAL: 'MANUAL',
   ADJUSTMENT: 'ADJUSTMENT',
   BACKFILL: 'MANUAL',
+  YEAR_CLOSE: 'ADJUSTMENT',
 };
 
 export interface JournalLineInput {
@@ -287,6 +289,17 @@ class AccountingService {
     const entryNo = await generateJournalNo(session);
     const date = input.date ? new Date(input.date) : new Date();
 
+    // A closed year is immutable — no back-dated corrections into it.
+    const settings = await Settings.findOne().select('booksClosedUpTo').lean();
+    if (settings?.booksClosedUpTo && date <= new Date(settings.booksClosedUpTo)) {
+      const closed = new Date(settings.booksClosedUpTo).toISOString().slice(0, 10);
+      throw new AppError(
+        422,
+        'PERIOD_CLOSED',
+        `The books are closed up to ${closed}. Use a later date, or reopen the year first.`
+      );
+    }
+
     const created = await JournalEntry.create(
       [
         {
@@ -402,6 +415,93 @@ class AccountingService {
         debitFirst ? { accountCode: HEADS.OPENING_EQUITY, credit: value } : { accountCode: HEADS.OPENING_EQUITY, debit: value },
       ],
     });
+  }
+
+  /**
+   * Closes a financial year.
+   *
+   * Every income and expense head is zeroed into Retained Earnings, so the new
+   * year starts from a clean slate, and the books are locked up to that day.
+   * The closing voucher is the only way a profit or loss reaches equity.
+   */
+  async closeYear(asOf: string, userId: string) {
+    const asOfDate = new Date(`${asOf}T23:59:59.999Z`);
+    if (Number.isNaN(asOfDate.getTime())) throw new AppError(400, 'INVALID_DATE', 'Invalid closing date');
+
+    const already = await JournalEntry.findOne({
+      source: 'YEAR_CLOSE',
+      date: { $gte: new Date(`${asOf}T00:00:00.000Z`), $lte: asOfDate },
+    }).lean();
+    if (already) {
+      throw new AppError(409, 'YEAR_ALREADY_CLOSED', `This year was already closed by ${already.entryNo}`);
+    }
+
+    // Everything up to the closing day: the year's own income and expense.
+    const settings = await Settings.findOne().select('booksClosedUpTo').lean();
+    const heads = await this.totalsByHead({ from: settings?.booksClosedUpTo || undefined, to: asOfDate });
+
+    const income = heads.filter((h) => h.account.type === 'INCOME' && Math.abs(h.balance) > 0.005);
+    const expense = heads.filter((h) => h.account.type === 'EXPENSE' && Math.abs(h.balance) > 0.005);
+
+    if (income.length === 0 && expense.length === 0) {
+      throw new AppError(422, 'NOTHING_TO_CLOSE', 'There is no income or expense to close for this year');
+    }
+
+    const lines: JournalLineInput[] = [];
+    // Income sits on the credit side, so it is debited back to zero.
+    for (const h of income) {
+      const amount = roundMoney(Math.abs(h.balance));
+      lines.push(
+        h.balance > 0
+          ? { accountId: String(h.account._id), debit: amount, memo: 'Year end closing' }
+          : { accountId: String(h.account._id), credit: amount, memo: 'Year end closing' }
+      );
+    }
+    // Expenses sit on the debit side, so they are credited back to zero.
+    for (const h of expense) {
+      const amount = roundMoney(Math.abs(h.balance));
+      lines.push(
+        h.balance > 0
+          ? { accountId: String(h.account._id), credit: amount, memo: 'Year end closing' }
+          : { accountId: String(h.account._id), debit: amount, memo: 'Year end closing' }
+      );
+    }
+
+    const debitSum = roundMoney(lines.reduce((n, l) => n + (Number(l.debit) || 0), 0));
+    const creditSum = roundMoney(lines.reduce((n, l) => n + (Number(l.credit) || 0), 0));
+    const netProfit = roundMoney(debitSum - creditSum); // > 0 means a profit
+
+    if (netProfit > 0) lines.push({ accountCode: HEADS.RETAINED, credit: netProfit, memo: 'Profit for the year' });
+    else if (netProfit < 0) lines.push({ accountCode: HEADS.RETAINED, debit: -netProfit, memo: 'Loss for the year' });
+
+    const entry = await this.postJournal({
+      date: asOfDate,
+      narration: `Year end closing as at ${asOf}`,
+      source: 'YEAR_CLOSE',
+      createdById: userId,
+      isSystemGenerated: true,
+      lines,
+    });
+
+    // Lock the closed period only once the voucher is safely in.
+    await Settings.updateOne({}, { $set: { booksClosedUpTo: asOfDate } }, { upsert: true });
+
+    return {
+      entryNo: entry.entryNo,
+      netProfit,
+      incomeClosed: income.length,
+      expenseClosed: expense.length,
+      closedUpTo: asOf,
+    };
+  }
+
+  /** Removes the lock so a closed year can be corrected, then closed again. */
+  async reopenBooks() {
+    const settings = await Settings.findOne().select('booksClosedUpTo').lean();
+    if (!settings?.booksClosedUpTo) throw new AppError(422, 'NOT_CLOSED', 'The books are not closed');
+    const was = new Date(settings.booksClosedUpTo).toISOString().slice(0, 10);
+    await Settings.updateOne({}, { $unset: { booksClosedUpTo: '' } });
+    return { reopenedUpTo: was };
   }
 
   // ───────────────────────────────────────────────────────── reading ──

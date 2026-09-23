@@ -27,6 +27,11 @@ export interface ISettings extends Document {
   receiptHeader: string; // Custom text printed at top of receipts
   receiptFooter: string; // e.g. "Thank you! Return policy: 7 days"
   logoUrl?: string;
+  /**
+   * Books are closed up to and including this day. Posting a voucher dated on or
+   * before it is refused, so a closed year cannot be altered by accident.
+   */
+  booksClosedUpTo?: Date;
   updatedAt: Date;
 }
 
@@ -126,6 +131,9 @@ const SettingsSchema = new Schema<ISettings>(
     logoUrl: {
       type: String,
       trim: true,
+    },
+    booksClosedUpTo: {
+      type: Date,
     },
   },
   {

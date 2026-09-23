@@ -120,6 +120,16 @@ app.use(errorHandler);
 const startServer = async (): Promise<void> => {
   await connectDB();
 
+  // Make sure the chart of accounts exists before anything can post to it —
+  // every money movement writes a balanced voucher, so a missing head would
+  // otherwise fail the first sale.
+  try {
+    const { accountingService } = await import('./services/AccountingService');
+    await accountingService.seedChart();
+  } catch (e) {
+    console.error('❌ Could not prepare the chart of accounts:', e);
+  }
+
   // Initialize Background Cron Jobs
   initJobs();
 

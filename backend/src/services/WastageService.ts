@@ -5,6 +5,7 @@ import { Expense } from '../models/Expense';
 import { ExpenseCategory } from '../models/ExpenseCategory';
 import { Account } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
+import { postWastageJournal } from './accounting-postings';
 import { AppError } from '../utils/app-error';
 
 export interface RecordWastageDto {
@@ -104,28 +105,15 @@ class WastageService {
         { session }
       );
 
-      // 5. Debit the account balance
-      const balanceBefore = account.currentBalance;
-      const balanceAfter = Math.round((balanceBefore - lossValuation + Number.EPSILON) * 100) / 100;
-      account.currentBalance = balanceAfter;
-      await account.save({ session });
-
-      // 6. Record the account ledger entry
-      await AccountTransaction.create(
-        [
-          {
-            accountId: account._id,
-            type: 'DEBIT',
-            amount: lossValuation,
-            balanceBefore,
-            balanceAfter,
-            referenceType: 'WASTAGE_LOSS',
-            referenceId: movement[0]._id,
-            description: `Wastage loss: ${qty}x ${product.name} (${variant.attributeName})`,
-          },
-        ],
-        { session }
-      );
+      // 5. Double-entry: shrinkage against inventory. The ledger owns the
+      // balances, so the expense document above is informational only.
+      await postWastageJournal({
+        amount: lossValuation,
+        note: `${qty}x ${product.name} (${variant.attributeName}) — ${dto.reason}`,
+        referenceId: movement[0]._id,
+        userId,
+        session,
+      });
 
       await session.commitTransaction();
       return movement[0].toObject() as unknown as IStockMovement;

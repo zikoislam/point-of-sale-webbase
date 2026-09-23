@@ -1,5 +1,6 @@
 import { ClientSession, Types } from 'mongoose';
 import { Account } from '../models/Account';
+import { ExpenseCategory } from '../models/ExpenseCategory';
 import { accountingService, HEADS, JournalLineInput } from './AccountingService';
 import { roundMoney } from '../utils/helpers';
 
@@ -18,8 +19,8 @@ const line = (accountId: string, debit: number, credit: number, memo?: string): 
   memo,
 });
 
-/** Wallet a payment settles into when the POS did not name one. */
-async function defaultWalletFor(method: string): Promise<string> {
+/** Wallet a payment settles into when the caller did not name one. */
+export async function defaultWalletFor(method: string): Promise<string> {
   const code = method === 'CARD' ? HEADS.BANK : method.startsWith('MFS') ? HEADS.MFS : HEADS.CASH;
   const account = await Account.findOne({ code }).lean();
   if (!account) {
@@ -117,15 +118,58 @@ export async function postSaleJournals(sale: any, userId: string, session?: Clie
   return { posted: true, entryNo: entry.entryNo };
 }
 
-/** One expense head debited, the paying wallet credited. */
+/**
+ * Chart head for an expense category — created on first use, then reused.
+ * The owner can re-point a category at another head by setting its accountId.
+ */
+export async function resolveExpenseHead(category: any, session?: ClientSession): Promise<string> {
+  if (category?.accountId && Types.ObjectId.isValid(String(category.accountId))) {
+    const existing = await Account.findById(category.accountId).lean();
+    if (existing) return String(existing._id);
+  }
+
+  const name = String(category?.name || 'Other Expense').trim();
+  const found = await Account.findOne({ type: 'EXPENSE', name }).lean();
+
+  let headId: string;
+  if (found) {
+    headId = String(found._id);
+  } else {
+    // Next free code in the operating range; 5010/5020 belong to COGS/wastage.
+    const used = new Set(
+      (await Account.find({ code: { $regex: '^51\\d\\d$' } }).lean()).map((a) => Number(a.code))
+    );
+    let code = 5100;
+    while (used.has(code)) code += 1;
+
+    const created = await Account.create(
+      [{ code: String(code), name, type: 'EXPENSE', subType: 'OPERATING', normalBalance: 'DEBIT', isSystem: false }],
+      { session }
+    );
+    headId = String(created[0]._id);
+  }
+
+  if (category?._id) {
+    await ExpenseCategory.updateOne(
+      { _id: category._id },
+      { $set: { accountId: new Types.ObjectId(headId) } },
+      { session }
+    );
+  }
+  return headId;
+}
+
+/** The expense head debited, the paying wallet credited. */
 export async function postExpenseJournal(
   expense: any,
-  accountCode: string,
+  category: any,
   userId: string,
   session?: ClientSession
 ): Promise<PostResult> {
   const amount = roundMoney(Number(expense.amount) || 0);
   if (amount <= 0) return { posted: false };
+
+  const accountId = await resolveExpenseHead(category, session);
 
   const entry = await accountingService.postJournal({
     date: expense.createdAt || new Date(),
@@ -136,7 +180,7 @@ export async function postExpenseJournal(
     createdById: userId,
     session,
     lines: [
-      { accountCode, debit: amount, memo: expense.description },
+      line(accountId, amount, 0, expense.description),
       line(String(expense.accountId), 0, amount, 'Paid'),
     ],
   });

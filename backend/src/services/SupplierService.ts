@@ -3,6 +3,7 @@ import { Supplier } from '../models/Supplier';
 import { SupplierLedger } from '../models/SupplierLedger';
 import { Account } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
+import { postSupplierPaymentJournal } from './accounting-postings';
 import { Shift } from '../models/Shift';
 import { AppError } from '../utils/app-error';
 
@@ -181,12 +182,6 @@ class SupplierService {
       supplier.currentPayableBalance = balanceAfter;
       await supplier.save({ session });
 
-      // 2. Debit payment account
-      const accBalanceBefore = account.currentBalance;
-      const accBalanceAfter = accBalanceBefore - amount;
-      account.currentBalance = accBalanceAfter;
-      await account.save({ session });
-
       // 3. Create SupplierLedger entry
       const ledger = await SupplierLedger.create(
         [
@@ -205,22 +200,15 @@ class SupplierService {
         { session }
       );
 
-      // 4. Create AccountTransaction entry
-      await AccountTransaction.create(
-        [
-          {
-            accountId: account._id,
-            type: 'DEBIT',
-            amount,
-            balanceBefore: accBalanceBefore,
-            balanceAfter: accBalanceAfter,
-            referenceType: 'SUPPLIER_PAYMENT',
-            referenceId: supplier._id,
-            description: `Payment to supplier ${supplier.companyName}`,
-          },
-        ],
-        { session }
-      );
+      // 4. Double-entry: the payable is cleared, the wallet credited.
+      await postSupplierPaymentJournal({
+        amount,
+        supplierName: supplier.companyName,
+        walletAccountId: String(account._id),
+        referenceId: ledger[0]._id,
+        userId: recordedById,
+        session,
+      });
 
       // 5. If paid from cash account, also track against active cashier shift if applicable
       if (account.accountType === 'CASH') {

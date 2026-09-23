@@ -9,6 +9,7 @@ import { StockMovement } from '../models/StockMovement';
 import { StoreCreditVoucher } from '../models/StoreCreditVoucher';
 import { Account } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
+import { postSaleJournals } from './accounting-postings';
 import { User } from '../models/User';
 import { Role } from '../models/Role';
 import { AppError } from '../utils/app-error';
@@ -358,34 +359,10 @@ class SaleService {
         }
       }
 
-      // Account postings for tendered payments (Rule 3 Step 9)
-      for (const p of payments) {
-        if (!p.accountId) continue;
-        const account = await Account.findById(p.accountId).session(session);
-        if (!account) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Payment account not found');
-        if (!account.isActive) throw new AppError(422, 'ACCOUNT_NOT_ACTIVE', `Account ${account.name} is inactive`);
-
-        const balanceBefore = account.currentBalance;
-        const balanceAfter = roundMoney(balanceBefore + p.amount);
-        account.currentBalance = balanceAfter;
-        await account.save({ session });
-
-        await AccountTransaction.create(
-          [
-            {
-              accountId: account._id,
-              type: 'CREDIT',
-              amount: p.amount,
-              balanceBefore,
-              balanceAfter,
-              referenceType: 'SALE',
-              referenceId: createdSale._id,
-              description: `POS sale ${createdSale.invoiceNo} via ${p.method}`,
-            },
-          ],
-          { session }
-        );
-      }
+      // Double-entry: revenue, VAT, COGS and the wallet side of every payment.
+      // The accounting ledger owns Account.currentBalance and mirrors cash
+      // movements into account_transactions, so nothing is written by hand here.
+      await postSaleJournals(typeof (createdSale as any).toObject === 'function' ? (createdSale as any).toObject() : createdSale, cashierId, session);
 
       // Accumulate cash in shift
       const cashTendered = roundMoney(

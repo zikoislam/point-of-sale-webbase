@@ -3,6 +3,7 @@ import { PurchaseOrder, IPOItem } from '../models/PurchaseOrder';
 import { Product } from '../models/Product';
 import { Supplier } from '../models/Supplier';
 import { SupplierLedger } from '../models/SupplierLedger';
+import { postPurchaseReceiveJournal, postSupplierPaymentJournal, defaultWalletFor } from './accounting-postings';
 import { StockMovement } from '../models/StockMovement';
 import { AppError } from '../utils/app-error';
 import { generatePONumber } from './SequenceService';
@@ -240,6 +241,29 @@ class PurchaseOrderService {
         narration: `GRN received for PO ${po.poNumber}. Paid: ${paidNow}`,
         recordedById: userId,
       }], { session });
+
+      // Double-entry: stock in, supplier owed; any amount paid now clears part
+      // of the payable against the till.
+      await postPurchaseReceiveJournal({
+        amount: totalReceivedValue,
+        supplierName: supplier.companyName,
+        poNumber: po.poNumber,
+        referenceId: po._id,
+        userId,
+        session,
+      });
+
+      if (paidNow > 0) {
+        await postSupplierPaymentJournal({
+          amount: paidNow,
+          supplierName: supplier.companyName,
+          walletAccountId: await defaultWalletFor('CASH'),
+          date: po.actualReceivedDate,
+          referenceId: po._id,
+          userId,
+          session,
+        });
+      }
 
       await session.commitTransaction();
       return po.toObject();

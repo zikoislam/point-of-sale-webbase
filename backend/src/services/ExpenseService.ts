@@ -3,6 +3,7 @@ import { Expense, IExpense } from '../models/Expense';
 import { ExpenseCategory, IExpenseCategory } from '../models/ExpenseCategory';
 import { Account } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
+import { postExpenseJournal } from './accounting-postings';
 import { Shift } from '../models/Shift';
 import { AppError } from '../utils/app-error';
 
@@ -94,16 +95,12 @@ class ExpenseService {
       const isAutoApproved = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
       const status = isAutoApproved ? 'APPROVED' : 'PENDING';
 
-      if (isAutoApproved) {
-        if (account.currentBalance < amount) {
-          throw new AppError(
-            400,
-            'INSUFFICIENT_BALANCE',
-            `Insufficient balance in ${account.name}. Available: ৳${account.currentBalance.toFixed(2)}`
-          );
-        }
-        account.currentBalance -= amount;
-        await account.save({ session });
+      if (isAutoApproved && account.currentBalance < amount) {
+        throw new AppError(
+          400,
+          'INSUFFICIENT_BALANCE',
+          `Insufficient balance in ${account.name}. Available: ৳${account.currentBalance.toFixed(2)}`
+        );
       }
 
       const expense = await Expense.create(
@@ -123,21 +120,9 @@ class ExpenseService {
       );
 
       if (isAutoApproved) {
-        await AccountTransaction.create(
-          [
-            {
-              accountId: account._id,
-              type: 'DEBIT',
-              amount,
-              balanceBefore: account.currentBalance + amount,
-              balanceAfter: account.currentBalance,
-              referenceType: 'EXPENSE',
-              referenceId: expense[0]._id,
-              description: `Expense: ${dto.description}`,
-            },
-          ],
-          { session }
-        );
+        // Double-entry: the expense head takes the debit, the wallet the credit.
+        const category = await ExpenseCategory.findById(dto.categoryId).session(session).lean();
+        await postExpenseJournal(expense[0].toObject(), category, userId, session);
 
         if (account.accountType === 'CASH') {
           const activeShift = await Shift.findOne({
@@ -193,30 +178,13 @@ class ExpenseService {
         );
       }
 
-      const balanceBefore = account.currentBalance;
-      const balanceAfter = balanceBefore - expense.amount;
-      account.currentBalance = balanceAfter;
-      await account.save({ session });
-
       expense.status = 'APPROVED';
       expense.approvedById = new Types.ObjectId(adminUserId);
       await expense.save({ session });
 
-      await AccountTransaction.create(
-        [
-          {
-            accountId: account._id,
-            type: 'DEBIT',
-            amount: expense.amount,
-            balanceBefore,
-            balanceAfter,
-            referenceType: 'EXPENSE',
-            referenceId: expense._id,
-            description: `Expense: ${expense.description}`,
-          },
-        ],
-        { session }
-      );
+      // Double-entry: the expense head takes the debit, the wallet the credit.
+      const category = await ExpenseCategory.findById(expense.categoryId).session(session).lean();
+      await postExpenseJournal(expense.toObject(), category, adminUserId, session);
 
       // If paid from cash account, find the active shift of the creator (if any) and update
       if (account.accountType === 'CASH') {

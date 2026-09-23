@@ -4,6 +4,7 @@ import { CustomerLedger } from '../models/CustomerLedger';
 import { Shift } from '../models/Shift';
 import { Account } from '../models/Account';
 import { AccountTransaction } from '../models/AccountTransaction';
+import { postDueCollectionJournal, defaultWalletFor } from './accounting-postings';
 import { AppError } from '../utils/app-error';
 import { escapeRegex, roundMoney } from '../utils/helpers';
 
@@ -185,33 +186,23 @@ class CustomerService {
         { session }
       );
 
-      // Credit the receiving financial account (Rule: due collection credits account)
-      if (dto.paymentAccountId && Types.ObjectId.isValid(dto.paymentAccountId)) {
-        const account = await Account.findById(dto.paymentAccountId).session(session);
-        if (!account) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Payment account not found');
-        if (!account.isActive) throw new AppError(422, 'ACCOUNT_NOT_ACTIVE', `Account ${account.name} is inactive`);
+      // Double-entry: the wallet takes the debit, the receivable the credit.
+      const wallet =
+        dto.paymentAccountId && Types.ObjectId.isValid(dto.paymentAccountId)
+          ? await Account.findById(dto.paymentAccountId).session(session)
+          : null;
+      if (dto.paymentAccountId && !wallet) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Payment account not found');
+      if (wallet && !wallet.isActive) throw new AppError(422, 'ACCOUNT_NOT_ACTIVE', `Account ${wallet.name} is inactive`);
 
-        const acctBefore = account.currentBalance;
-        const acctAfter = roundMoney(acctBefore + amount);
-        account.currentBalance = acctAfter;
-        await account.save({ session });
-
-        await AccountTransaction.create(
-          [
-            {
-              accountId: account._id,
-              type: 'CREDIT',
-              amount,
-              balanceBefore: acctBefore,
-              balanceAfter: acctAfter,
-              referenceType: 'DUE_COLLECTION',
-              referenceId: customer._id,
-              description: `Customer due collection from ${customer.name}`,
-            },
-          ],
-          { session }
-        );
-      }
+      await postDueCollectionJournal({
+        customerName: customer.name,
+        amount,
+        walletAccountId: wallet ? String(wallet._id) : await defaultWalletFor(dto.paymentMethod),
+        date: dto.date ? new Date(`${dto.date}T12:00:00.000Z`) : new Date(),
+        referenceId: ledger[0]._id,
+        userId: recordedById,
+        session,
+      });
 
       // If payment is CASH, accumulate into the cashier's active shift
       if (dto.paymentMethod === 'CASH') {

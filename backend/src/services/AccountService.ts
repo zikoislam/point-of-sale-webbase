@@ -1,6 +1,8 @@
 import mongoose, { Types } from 'mongoose';
 import { Account, IAccount } from '../models/Account';
 import { AccountTransaction, IAccountTransaction } from '../models/AccountTransaction';
+import { postTransferJournal } from './accounting-postings';
+import { accountingService } from './AccountingService';
 import { AppError } from '../utils/app-error';
 
 export interface CreateAccountDto {
@@ -47,26 +49,38 @@ class AccountService {
     return account as unknown as IAccount;
   }
 
-  async create(dto: CreateAccountDto): Promise<IAccount> {
+  async create(dto: CreateAccountDto, userId?: string): Promise<IAccount> {
     const initialBalance = Number(dto.initialBalance) || 0;
+
+    // A new wallet joins the chart of accounts; its opening balance is a voucher.
+    const head =
+      dto.accountType === 'BANK'
+        ? { type: 'ASSET' as const, subType: 'BANK' as const, normalBalance: 'DEBIT' as const, base: 1020 }
+        : dto.accountType === 'MFS'
+        ? { type: 'ASSET' as const, subType: 'MFS' as const, normalBalance: 'DEBIT' as const, base: 1030 }
+        : { type: 'ASSET' as const, subType: 'CASH' as const, normalBalance: 'DEBIT' as const, base: 1010 };
+
+    const taken = new Set((await Account.find({ code: { $regex: `^${head.base}\\d*$` } }).lean()).map((a) => Number(a.code)));
+    let code = head.base;
+    while (taken.has(code)) code += 1;
+
     const account = await Account.create({
       name: dto.name.trim(),
       accountType: dto.accountType,
       accountNumber: dto.accountNumber?.trim() || undefined,
-      currentBalance: initialBalance,
+      code: String(code),
+      type: head.type,
+      subType: head.subType,
+      normalBalance: head.normalBalance,
+      isCashEquivalent: true,
+      // The opening voucher below is what sets the balance.
+      currentBalance: 0,
     });
 
-    if (initialBalance > 0) {
-      await AccountTransaction.create({
-        accountId: account._id,
-        type: 'CREDIT',
-        amount: initialBalance,
-        balanceBefore: 0,
-        balanceAfter: initialBalance,
-        referenceType: 'TRANSFER',
-        referenceId: account._id,
-        description: 'Initial opening balance',
-      });
+    if (initialBalance > 0 && userId) {
+      await accountingService.postOpeningVoucher(String(account._id), initialBalance, userId);
+      const fresh = await Account.findById(account._id).lean();
+      return fresh as unknown as IAccount;
     }
 
     return account.toObject() as unknown as IAccount;
@@ -113,52 +127,27 @@ class AccountService {
       if (!dest) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Destination account not found');
       if (!dest.isActive) throw new AppError(422, 'ACCOUNT_NOT_ACTIVE', `Destination account ${dest.name} is inactive`);
 
-      // 1. Debit Source
-      const srcBefore = source.currentBalance;
-      const srcAfter = srcBefore - amount;
-      source.currentBalance = srcAfter;
-      await source.save({ session });
+      const [fromAccount, toAccount] = await Promise.all([
+        Account.findById(source._id).session(session).lean(),
+        Account.findById(dest._id).session(session).lean(),
+      ]);
 
-      await AccountTransaction.create(
-        [
-          {
-            accountId: source._id,
-            type: 'DEBIT',
-            amount,
-            balanceBefore: srcBefore,
-            balanceAfter: srcAfter,
-            referenceType: 'TRANSFER',
-            referenceId: dest._id,
-            description: `Transfer to ${dest.name}: ${dto.description}`,
-          },
-        ],
-        { session }
-      );
+      if (!fromAccount || !toAccount) throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'Account not found');
 
-      // 2. Credit Destination
-      const dstBefore = dest.currentBalance;
-      const dstAfter = dstBefore + amount;
-      dest.currentBalance = dstAfter;
-      await dest.save({ session });
-
-      await AccountTransaction.create(
-        [
-          {
-            accountId: dest._id,
-            type: 'CREDIT',
-            amount,
-            balanceBefore: dstBefore,
-            balanceAfter: dstAfter,
-            referenceType: 'TRANSFER',
-            referenceId: source._id,
-            description: `Transfer from ${source.name}: ${dto.description}`,
-          },
-        ],
-        { session }
-      );
+      // One balanced voucher — the ledger owns both balances.
+      await postTransferJournal({
+        fromAccountId: String(source._id),
+        toAccountId: String(dest._id),
+        fromName: source.name,
+        toName: dest.name,
+        amount,
+        description: dto.description,
+        userId,
+        session,
+      });
 
       await session.commitTransaction();
-      return { source, dest, amount };
+      return { source: fromAccount, dest: toAccount, amount };
     } catch (err) {
       await session.abortTransaction();
       throw err;

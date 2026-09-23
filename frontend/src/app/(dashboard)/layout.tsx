@@ -23,6 +23,10 @@ const ROUTE_PERMISSIONS: Array<[string, string]> = [
   ['/expenses', 'expenses:view'],
   ['/accounts', 'accounts:view'],
   ['/reports', 'reports:dashboard'],
+  // Accounting statements need the books permission, not just reports.
+  ['/reports/trial-balance', 'accounts:view'],
+  ['/reports/balance-sheet', 'accounts:view'],
+  ['/reports/cash-flow', 'accounts:view'],
   ['/users', 'users:manage'],
   ['/roles', 'roles:view'],
   ['/audit-logs', 'audit:view'],

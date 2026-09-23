@@ -31,6 +31,7 @@ import {
   ChevronRight,
   Store,
   X,
+  Plus,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SOFTWARE_CREDIT } from '../lib/constants';
@@ -114,8 +115,13 @@ const navItems: NavItem[] = [
   {
     label: 'Accounts',
     icon: Landmark,
-    href: '/accounts',
     permission: 'accounts:view',
+    subItems: [
+      { label: 'Wallets & Balances', href: '/accounts', icon: Landmark, permission: 'accounts:view' },
+      { label: 'Chart of Accounts', href: '/accounts/chart', icon: Bookmark, permission: 'accounts:view' },
+      { label: 'Day Book', href: '/accounts/journal', icon: ScrollText, permission: 'accounts:view' },
+      { label: 'New Journal Voucher', href: '/accounts/journal/new', icon: Plus, permission: 'accounts:manage' },
+    ],
   },
   {
     label: 'Reports',
@@ -130,6 +136,9 @@ const navItems: NavItem[] = [
       { label: 'Supplier Payable', href: '/reports/supplier-payable', permission: 'reports:dashboard' },
       { label: 'Purchases Summary', href: '/reports/purchases', permission: 'reports:dashboard' },
       { label: 'Wastage Report', href: '/reports/wastage', permission: 'reports:dashboard' },
+      { label: 'Trial Balance', href: '/reports/trial-balance', permission: 'accounts:view' },
+      { label: 'Balance Sheet', href: '/reports/balance-sheet', permission: 'accounts:view' },
+      { label: 'Cash Flow', href: '/reports/cash-flow', permission: 'accounts:view' },
     ],
   },
   {

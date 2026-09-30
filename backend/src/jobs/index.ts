@@ -3,9 +3,13 @@ import { runDailySummaryJob } from './daily-summary.job';
 import { cleanupExpiredHoldCarts } from './expired-cart-cleanup';
 import { scanFefoExpiryAlerts } from './fefo-expiry-scan';
 import { runAutoBackup } from './backup.job';
+import { initScheduledReportJob } from './scheduled-reports.job';
+import { runLoyaltyExpirySweep } from './loyalty-expiry.job';
 import { env } from '../config/env';
 
 export const initJobs = (): void => {
+  // 0. Emailed scheduled reports (Phase 11): checked every minute
+  initScheduledReportJob();
   // 1. Daily Materialized Sales Summary: Midnight 00:05 AM
   cron.schedule('5 0 * * *', async () => {
     try {
@@ -34,7 +38,16 @@ export const initJobs = (): void => {
     }
   });
 
-  // 4. Automatic database backup: daily at 02:00 AM (configurable)
+  // 4. Loyalty points expiry: daily at 03:00 AM (no-op unless expiry is on)
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      await runLoyaltyExpirySweep();
+    } catch (e) {
+      console.error('❌ [CRON] Loyalty expiry job failed:', e);
+    }
+  });
+
+  // 5. Automatic database backup: daily at 02:00 AM (configurable)
   if (env.BACKUP_AUTO_ENABLED) {
     cron.schedule(env.BACKUP_CRON, async () => {
       try {

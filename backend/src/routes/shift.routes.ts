@@ -7,7 +7,7 @@ import { openShiftSchema, pettyCashSchema, closeShiftSchema } from '../validator
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/active', requirePermissions('shifts:operate'), (req, res, next) => shiftController.getActive(req, res, next));
 router.get('/current', requirePermissions('shifts:operate'), (req, res, next) => shiftController.getActive(req, res, next)); // alias for /active

@@ -10,9 +10,14 @@ import '../print.css';
 /** Path-prefix → required permission (longest prefix wins). */
 const ROUTE_PERMISSIONS: Array<[string, string]> = [
   ['/dashboard', 'reports:dashboard'],
+  // The Trade & Inventory hub is deliberately open to any signed-in user: it is
+  // the entry point for the five trading modules and only shows the links that
+  // the signed-in role can actually open (each card is permission filtered).
+  // '/trade' therefore has no entry here.
   ['/categories', 'inv:view'],
   ['/brands', 'inv:view'],
   ['/products', 'inv:view'],
+  ['/product-groups', 'inv:view'],
   ['/inventory', 'inv:view'],
   ['/barcode-labels', 'inv:labels'],
   ['/purchase-orders', 'procurement:view'],

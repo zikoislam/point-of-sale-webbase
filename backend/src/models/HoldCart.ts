@@ -16,6 +16,7 @@ export interface IHoldCartItem {
 
 export interface IHoldCart extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   cartLabel?: string; // Optional user label, e.g. "Customer: Rahim"
   userId: Types.ObjectId; // Ref: users (Cashier who parked cart)
   shiftId: Types.ObjectId; // Ref: shifts (Active shift at hold time)
@@ -94,6 +95,11 @@ const HoldCartItemSchema = new Schema<IHoldCartItem>(
 
 const HoldCartSchema = new Schema<IHoldCart>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     cartLabel: {
       type: String,
       trim: true,

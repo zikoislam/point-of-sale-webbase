@@ -22,6 +22,10 @@ export interface ProductInput {
   categoryId: string;
   brandId?: string;
   supplierId?: string;
+  /** Product groups this item belongs to. */
+  groups?: string[];
+  /** Listed on the public storefront when true. */
+  isWebVisible?: boolean;
   unit: string;
   taxType: 'INCLUSIVE' | 'EXCLUSIVE' | 'EXEMPT';
   taxRate: number;
@@ -198,6 +202,8 @@ export class ProductService {
       categoryId: data.categoryId,
       brandId: data.brandId || null,
       supplierId: data.supplierId || null,
+      groups: (data.groups || []).filter((g) => Types.ObjectId.isValid(g)).map((g) => new Types.ObjectId(g)),
+      isWebVisible: !!data.isWebVisible,
       unit: data.unit,
       taxType: data.taxType,
       taxRate,
@@ -214,7 +220,13 @@ export class ProductService {
     const product = await Product.findById(id);
     if (!product || !product.isActive) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
 
-    Object.assign(product, data);
+    const { groups, ...rest } = data;
+    Object.assign(product, rest);
+    if (groups !== undefined) {
+      product.groups = groups
+        .filter((g) => Types.ObjectId.isValid(g))
+        .map((g) => new Types.ObjectId(g));
+    }
     await product.save();
     return product;
   }
@@ -223,6 +235,59 @@ export class ProductService {
     if (!Types.ObjectId.isValid(id)) throw new AppError(400, 'INVALID_ID', 'Invalid product ID');
     const result = await Product.findByIdAndUpdate(id, { isActive: false });
     if (!result) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  }
+  /**
+   * The trade catalogue: every active product with its wholesale price,
+   * grouped by category — what an SR hands to a dealer.
+   */
+  async getWholesalePriceList(categoryId?: string) {
+    const filter: Record<string, any> = { isActive: true };
+    if (categoryId && Types.ObjectId.isValid(categoryId)) filter.categoryId = new Types.ObjectId(categoryId);
+
+    const products: any[] = await Product.find(filter)
+      .populate('categoryId', 'name')
+      .sort({ name: 1 })
+      .lean();
+
+    const groups = new Map<string, any[]>();
+    for (const product of products) {
+      const variants = (product.variants || []).filter((v: any) => v.isAvailable !== false);
+      if (variants.length === 0) continue;
+      const category = product.categoryId?.name || 'Uncategorised';
+      const rows = groups.get(category) || [];
+      for (const variant of variants) {
+        rows.push({
+          productId: String(product._id),
+          productName: product.name,
+          variantName: variant.attributeName || '',
+          sku: variant.sku || '',
+          unit: product.unit || '',
+          retailPrice: variant.retailSellingPrice ?? null,
+          wholesalePrice: variant.wholesaleSellingPrice ?? variant.retailSellingPrice ?? 0,
+          stock: variant.currentStock ?? 0,
+        });
+      }
+      groups.set(category, rows);
+    }
+
+    const data = [...groups.entries()]
+      .map(([category, rows]) => ({ category, rows }))
+      .sort((a, b) => a.category.localeCompare(b.category));
+
+    return {
+      summary: { categories: data.length, items: data.reduce((s, g) => s + g.rows.length, 0) },
+      data,
+    };
+  }
+
+  /** The same catalogue as a printable A4 PDF. */
+  async generateWholesalePriceListPdf(): Promise<{ buffer: Buffer; items: number }> {
+    const list = await this.getWholesalePriceList();
+    const { settingsService } = await import('./SettingsService');
+    const { exportService } = await import('./ExportService');
+    const shop = await settingsService.getSettings();
+    const buffer = await exportService.renderWholesalePriceList(list.data, shop);
+    return { buffer, items: list.summary.items };
   }
 }
 

@@ -9,7 +9,7 @@ import { checkoutSchema, offlineSyncSchema } from '../validators/sale.validators
 
 const router = Router();
 
-router.use(authenticate);
+
 
 // Hold Carts (must be before /:invoiceNo)
 router.get('/hold-carts', requirePermissions('pos:checkout'), (req, res, next) => saleController.listHoldCarts(req, res, next));
@@ -33,6 +33,7 @@ router.post('/sync-offline', requirePermissions('pos:checkout'), validate(offlin
 
 // Lookup & Receipts
 router.get('/', requirePermissions('sales:view'), (req, res, next) => saleController.list(req, res, next));
+router.get('/:id/wholesale-invoice', requirePermissions('sales:view'), (req, res, next) => saleController.wholesaleInvoice(req, res, next));
 router.get('/:invoiceNo/receipt', requirePermissions('sales:view'), (req, res, next) => saleController.getReceipt(req, res, next));
 router.get('/:invoiceNo', requirePermissions('sales:view'), (req, res, next) => saleController.getByInvoice(req, res, next));
 

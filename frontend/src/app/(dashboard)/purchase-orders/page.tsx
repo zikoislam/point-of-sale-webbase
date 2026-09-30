@@ -10,6 +10,8 @@ import { Pagination } from '@/components/ui/Pagination';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { GRNModal } from '@/components/modals/GRNModal';
 import { useToast } from '@/components/ui/Toast';
+import { Modal } from '@/components/ui/Modal';
+import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api-client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
@@ -18,6 +20,8 @@ import {
   Eye,
   Edit,
   PackageCheck,
+  Check,
+  X,
 } from 'lucide-react';
 
 interface POItem {
@@ -39,6 +43,12 @@ interface PurchaseOrder {
     phone?: string;
   };
   status: 'DRAFT' | 'ORDERED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED';
+  /** Approval workflow (Phase 6.3) */
+  approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'AUTO_APPROVED';
+  approvedBy?: { fullName?: string; username?: string };
+  approvedAt?: string;
+  rejectionReason?: string;
+  requestedBy?: { fullName?: string; username?: string };
   items: POItem[];
   subtotal: number;
   taxAmount: number;
@@ -55,6 +65,7 @@ interface PurchaseOrder {
 
 const STATUS_TABS = [
   { label: 'All', value: '' },
+  { label: 'Pending Approval', value: 'PENDING_APPROVAL' },
   { label: 'Draft', value: 'DRAFT' },
   { label: 'Ordered', value: 'ORDERED' },
   { label: 'Partial', value: 'PARTIAL' },
@@ -82,6 +93,11 @@ export default function PurchaseOrdersPage() {
   const [targetCancelPO, setTargetCancelPO] = useState<PurchaseOrder | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Reject PO dialog (approval workflow)
+  const [targetRejectPO, setTargetRejectPO] = useState<PurchaseOrder | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
@@ -89,7 +105,9 @@ export default function PurchaseOrdersPage() {
         page,
         limit: 15,
       };
-      if (selectedStatus) params.status = selectedStatus;
+      // The approval tab filters by approvalStatus, the rest by PO status
+      if (selectedStatus === 'PENDING_APPROVAL') params.approvalStatus = 'PENDING_APPROVAL';
+      else if (selectedStatus) params.status = selectedStatus;
 
       const res = await api.get('/purchase-orders', { params });
       const data = res.data;
@@ -146,6 +164,57 @@ export default function PurchaseOrdersPage() {
         return <Badge variant="danger">Cancelled</Badge>;
       default:
         return <Badge variant="neutral">{status}</Badge>;
+    }
+  };
+
+  /** Approval chip — only shown when the order actually went through approval. */
+  const getApprovalBadge = (approval?: string, rejectionReason?: string) => {
+    switch (approval) {
+      case 'PENDING_APPROVAL':
+        return <Badge variant="warning">Awaiting approval</Badge>;
+      case 'APPROVED':
+        return <Badge variant="success">Approved</Badge>;
+      case 'REJECTED':
+        return (
+          <span title={rejectionReason || undefined}>
+            <Badge variant="danger">Rejected</Badge>
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Manager / admin only — same rule the API enforces
+  const { user } = useAuth();
+  const canApprove =
+    !!user?.isPlatformSuperAdmin ||
+    (user?.permissions || []).includes('approvals:manage') ||
+    (user?.permissions || []).includes('procurement:manage');
+
+  const approvePO = async (po: PurchaseOrder) => {
+    try {
+      await api.put(`/purchase-orders/${po._id}/approve`);
+      toast.success('PO approved', `${po.poNumber} can be sent to the supplier now.`);
+      fetchOrders();
+    } catch (err: any) {
+      toast.error('Approval failed', err?.message || 'Could not approve this purchase order');
+    }
+  };
+
+  const submitRejection = async () => {
+    if (!targetRejectPO || !rejectReason.trim()) return;
+    try {
+      setIsRejecting(true);
+      await api.put(`/purchase-orders/${targetRejectPO._id}/reject`, { reason: rejectReason.trim() });
+      toast.success('PO rejected', `${targetRejectPO.poNumber} was rejected.`);
+      setTargetRejectPO(null);
+      setRejectReason('');
+      fetchOrders();
+    } catch (err: any) {
+      toast.error('Rejection failed', err?.message || 'Could not reject this purchase order');
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -233,6 +302,7 @@ export default function PurchaseOrdersPage() {
                   <th className="p-3.5 text-center">Items</th>
                   <th className="p-3.5 text-right">Total Amount</th>
                   <th className="p-3.5 text-center">Status</th>
+                  <th className="p-3.5 text-center">Approval</th>
                   <th className="p-3.5">Created Date</th>
                   <th className="p-3.5">Expected Delivery</th>
                   <th className="p-3.5 text-right">Actions</th>
@@ -241,14 +311,14 @@ export default function PurchaseOrdersPage() {
               <tbody className="divide-y divide-slate-800/60">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-slate-400">
+                    <td colSpan={9} className="p-8 text-center text-slate-400">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                       Loading purchase orders...
                     </td>
                   </tr>
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-12 text-center">
+                    <td colSpan={9} className="p-12 text-center">
                       <FileSpreadsheet className="w-10 h-10 text-slate-600 mx-auto mb-2" />
                       <p className="text-sm font-medium text-slate-300">
                         No purchase orders found
@@ -286,6 +356,11 @@ export default function PurchaseOrdersPage() {
                         <td className="p-3.5 text-center">
                           {getStatusBadge(po.status)}
                         </td>
+                        <td className="p-3.5 text-center">
+                          {getApprovalBadge(po.approvalStatus, po.rejectionReason) || (
+                            <span className="text-xs text-slate-600">—</span>
+                          )}
+                        </td>
                         <td className="p-3.5 text-slate-400 text-xs">
                           {formatDate(po.createdAt)}
                         </td>
@@ -297,6 +372,32 @@ export default function PurchaseOrdersPage() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Approval actions — managers / admins only */}
+                            {canApprove && po.approvalStatus === 'PENDING_APPROVAL' && (
+                              <>
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={() => approvePO(po)}
+                                  className="text-xs h-7 px-2.5"
+                                  title="Approve this purchase order"
+                                >
+                                  <Check className="w-3.5 h-3.5 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => { setTargetRejectPO(po); setRejectReason(''); }}
+                                  className="text-xs h-7 px-2.5 text-rose-400 hover:text-rose-300"
+                                  title="Reject this purchase order"
+                                >
+                                  <X className="w-3.5 h-3.5 mr-1" />
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+
                             <Button
                               variant="ghost"
                               size="sm"
@@ -376,6 +477,46 @@ export default function PurchaseOrdersPage() {
         variant="danger"
         loading={isCancelling}
       />
+
+      {/* Reject PO (approval workflow) */}
+      <Modal
+        isOpen={Boolean(targetRejectPO)}
+        onClose={() => setTargetRejectPO(null)}
+        title="Reject Purchase Order"
+        subtitle={targetRejectPO?.poNumber}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-xs text-rose-300">
+            {targetRejectPO?.supplierId?.companyName} · {formatCurrency(targetRejectPO?.totalAmount || 0)}
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              Reason for rejection *
+            </label>
+            <textarea
+              rows={3}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Price too high, supplier terms not agreed…"
+              className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <Button variant="ghost" onClick={() => setTargetRejectPO(null)} disabled={isRejecting}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={isRejecting}
+              disabled={!rejectReason.trim()}
+              onClick={submitRejection}
+            >
+              Reject Order
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

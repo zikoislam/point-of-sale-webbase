@@ -11,7 +11,7 @@ import { createExpenseSchema, queryExpenseSchema } from '../validators/expense.v
 
 const router = Router();
 
-router.use(authenticate);
+
 
 // Expense Categories (Phase 19)
 router.get('/categories', requirePermissions('expenses:view'), (req, res, next) => expenseController.listCategories(req, res, next));

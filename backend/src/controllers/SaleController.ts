@@ -47,10 +47,13 @@ class SaleController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
+      // mine=true → a user sees only the sales they made themselves
+      const mine = req.query.mine === 'true';
       const result = await saleService.listSales(page, limit, {
         shiftId: req.query.shiftId as string | undefined,
         customerId: req.query.customerId as string | undefined,
         search: req.query.search as string | undefined,
+        cashierId: mine ? req.user!.userId : (req.query.cashierId as string | undefined),
       });
       sendSuccess(res, 200, 'Sales fetched', result.data, {
         page: result.page,
@@ -65,6 +68,18 @@ class SaleController {
     try {
       const sale = await saleService.getSaleByInvoice(req.params.invoiceNo);
       sendSuccess(res, 200, 'Sale invoice fetched', sale);
+    } catch (err) { next(err); }
+  }
+
+  /** A4 wholesale invoice (PDF) for one sale. */
+  async wholesaleInvoice(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { buffer, invoiceNo } = await saleService.generateWholesaleInvoice(req.params.id);
+      // Content-Type is set before the body so the compression layer keeps it.
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="wholesale-invoice-${invoiceNo}.pdf"`);
+      res.setHeader('Content-Length', String(buffer.length));
+      return res.send(buffer);
     } catch (err) { next(err); }
   }
 

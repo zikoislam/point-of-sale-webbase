@@ -1,10 +1,9 @@
 import { Settings } from '../models/Settings';
 
 export const seedSettings = async (): Promise<void> => {
-  const existingSettings = await Settings.findOne({ isDefault: true });
+  const existingSettings = await Settings.findOne();
   if (!existingSettings) {
     const settings = new Settings({
-      isDefault: true,
       shopName: 'Smart Retail POS',
       shopAddress: 'Dhaka, Bangladesh',
       shopPhone: '+8801700000000',
@@ -19,7 +18,7 @@ export const seedSettings = async (): Promise<void> => {
       receiptFooter: 'Thank you for shopping with us! Please come again.',
     });
     await settings.save();
-    console.log('✅ Default shop settings created');
+    console.log('✅ Default shop settings created (orgId comes from the seed scope)');
   } else {
     console.log('ℹ️ Default shop settings already exist');
   }

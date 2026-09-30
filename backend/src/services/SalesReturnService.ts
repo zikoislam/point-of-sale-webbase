@@ -52,9 +52,23 @@ function generateVoucherCode(): string {
 }
 
 class SalesReturnService {
-  async list(page = 1, limit = 20) {
+  async list(page = 1, limit = 20, mineUserId?: string) {
+    // mine=true → returns tied to the caller: either returns of sales they
+    // made, or returns they authorized themselves.
+    let query: any = {};
+    if (mineUserId && Types.ObjectId.isValid(mineUserId)) {
+      const me = new Types.ObjectId(mineUserId);
+      const mySales = await Sale.find({ cashierId: me }).select('_id').limit(5000).lean();
+      query = {
+        $or: [
+          { authorizedById: me },
+          { saleId: { $in: mySales.map((s: any) => s._id) } },
+        ],
+      };
+    }
+
     const [returns, total] = await Promise.all([
-      SalesReturn.find()
+      SalesReturn.find(query)
         .populate('saleId', 'invoiceNo totalAmount')
         .populate('customerId', 'name phone')
         .populate('authorizedById', 'name')
@@ -63,7 +77,7 @@ class SalesReturnService {
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
-      SalesReturn.countDocuments(),
+      SalesReturn.countDocuments(query),
     ]);
 
     return { data: returns, total, page, totalPages: Math.ceil(total / limit) };

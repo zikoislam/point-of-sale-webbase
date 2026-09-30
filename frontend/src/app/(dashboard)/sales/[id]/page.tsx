@@ -133,6 +133,12 @@ export default function SaleInvoiceDetailPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <Link href={`/sales/${id}/wholesale-invoice`}>
+            <Button variant="outline" leftIcon={<Receipt className="w-4 h-4" />}>
+              Wholesale Invoice
+            </Button>
+          </Link>
+
           <Button
             variant="outline"
             leftIcon={<Printer className="w-4 h-4" />}

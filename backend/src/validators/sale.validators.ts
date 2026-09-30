@@ -20,8 +20,12 @@ export const paymentSchema = z.object({
 export const checkoutSchema = z.object({
   customerId: z.string().optional(),
   pricingTier: z.enum(['RETAIL', 'WHOLESALE']).default('RETAIL'),
+  salesRepId: z.string().optional(),
+  /** Attach this revenue to a project for job-costing (Module 7). */
+  projectId: z.string().optional(),
   items: z.array(cartItemSchema).min(1, 'Cart cannot be empty'),
   discountAmount: z.coerce.number().min(0).optional().default(0),
+  loyaltyPointsToRedeem: z.coerce.number().min(0).optional(),
   payments: z.array(paymentSchema).min(1, 'At least one payment is required'),
   changeReturned: z.coerce.number().min(0).optional().default(0),
   managerPin: z.string().optional(),

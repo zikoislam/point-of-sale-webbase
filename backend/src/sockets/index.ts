@@ -36,13 +36,14 @@ export const initSocket = (httpServer: HttpServer): Server => {
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       if (await TokenBlacklist.findOne({ tokenHash })) return next(new Error('Session invalidated'));
 
-      const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string };
+      const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; activeOrgId?: string };
       const user = await User.findById(decoded.userId).populate<{ roleId: any }>('roleId');
       if (!user || !user.isActive) return next(new Error('User inactive'));
 
       socket.data.user = {
         userId: user._id.toString(),
         role: user.roleId?.name || 'CASHIER',
+        orgId: decoded.activeOrgId,
       };
       next();
     } catch {
@@ -51,10 +52,12 @@ export const initSocket = (httpServer: HttpServer): Server => {
   });
 
   io.on('connection', (socket: Socket) => {
-    const user = socket.data.user as { userId: string; role: string } | undefined;
+    const user = socket.data.user as { userId: string; role: string; orgId?: string } | undefined;
     if (user) {
       socket.join(`role:${user.role}`);
       socket.join(`user:${user.userId}`);
+      // Organization room — notifications never cross tenants
+      if (user.orgId) socket.join(`org:${user.orgId}`);
     }
 
     socket.on('join:terminal', (terminalId: string) => {

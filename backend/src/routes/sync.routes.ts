@@ -5,7 +5,7 @@ import { requirePermissions } from '../middlewares/rbac.middleware';
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/status', requirePermissions('settings:manage'), (req, res, next) =>
   syncController.status(req, res, next)

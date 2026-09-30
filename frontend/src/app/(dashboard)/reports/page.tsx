@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   BarChart3,
   Calendar,
@@ -20,6 +21,9 @@ import {
   PieChart,
   FileDown,
 } from 'lucide-react';
+import { useAuth } from '../../../hooks/useAuth';
+import { useI18n } from '../../../lib/i18n';
+import { MODULE_DEFS } from '../../../lib/modules';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -33,10 +37,180 @@ const fetchOpts = (opts: RequestInit = {}): RequestInit => ({
 
 type ReportTab = 'SALES' | 'PRODUCTS' | 'INVENTORY' | 'PNL' | 'DUES' | 'PAYABLES';
 
+/** Which department each report tab belongs to, and the permission it needs. */
+const TAB_META: Record<ReportTab, { dept: string; permission: string }> = {
+  SALES: { dept: 'SALES_MGMT', permission: 'reports:sales' },
+  PRODUCTS: { dept: 'SALES_MGMT', permission: 'reports:sales' },
+  INVENTORY: { dept: 'INVENTORY_MGMT', permission: 'reports:inventory' },
+  PNL: { dept: 'FINANCE', permission: 'reports:pnl' },
+  DUES: { dept: 'FINANCE', permission: 'reports:dues' },
+  PAYABLES: { dept: 'PURCHASE_MGMT', permission: 'reports:payables' },
+};
+
+/** Department groups — colors mirror the opening page departments. */
+const DEPARTMENTS = [
+  { id: 'SALES_MGMT', no: '01', label: 'Sales Management', dot: 'bg-amber-400', chipOn: 'bg-amber-400 text-slate-950 border-amber-400', chipOff: 'border-amber-400/40 text-amber-300', tile: 'bg-amber-400/20 text-amber-300', borderL: 'border-l-4 border-l-amber-400' },
+  { id: 'PURCHASE_MGMT', no: '02', label: 'Purchase Management', dot: 'bg-orange-500', chipOn: 'bg-orange-500 text-white border-orange-500', chipOff: 'border-orange-400/40 text-orange-300', tile: 'bg-orange-500/20 text-orange-300', borderL: 'border-l-4 border-l-orange-500' },
+  { id: 'INVENTORY_MGMT', no: '03', label: 'Inventory Management', dot: 'bg-fuchsia-500', chipOn: 'bg-fuchsia-500 text-white border-fuchsia-500', chipOff: 'border-fuchsia-400/40 text-fuchsia-300', tile: 'bg-fuchsia-500/20 text-fuchsia-300', borderL: 'border-l-4 border-l-fuchsia-500' },
+  { id: 'FINANCE', no: '06', label: 'Accounts & Finance', dot: 'bg-violet-500', chipOn: 'bg-violet-500 text-white border-violet-500', chipOff: 'border-violet-400/40 text-violet-300', tile: 'bg-violet-500/20 text-violet-300', borderL: 'border-l-4 border-l-violet-500' },
+];
+
+/**
+ * The Sales & Commerce group — five departments, their reports together in
+ * one place (Sales, Purchase, Inventory, Smart POS, Wholesale & Retail).
+ */
+const SALES_COMMERCE_GROUP = [
+  {
+    no: '01',
+    label: 'Sales Management',
+    gradient: 'from-amber-400 to-yellow-500',
+    permission: 'reports:sales',
+    links: [
+      { label: 'Sales Summary', tab: 'SALES' as ReportTab },
+      { label: 'Product Performance', tab: 'PRODUCTS' as ReportTab },
+      { label: 'Category / Brand / Group Analysis', href: '/reports/category-analysis' },
+      { label: 'Daily Register & Top Products', href: '/reports/sales-insights' },
+    ],
+  },
+  {
+    no: '02',
+    label: 'Purchase Management',
+    gradient: 'from-orange-500 to-amber-600',
+    permission: 'reports:payables',
+    links: [
+      { label: 'Purchases Summary', href: '/reports/purchases' },
+      { label: 'Supplier Payables', tab: 'PAYABLES' as ReportTab },
+      { label: 'Supplier Price Comparison', href: '/reports/inventory-suite' },
+      { label: 'Purchase vs Sales Turnover', href: '/reports/inventory-suite' },
+      { label: 'LC Status Report', href: '/import-export' },
+      { label: 'Landed Cost Analysis', href: '/import-export' },
+      { label: 'C&F Agent Payables', href: '/import-export' },
+      { label: 'Pending Approvals', href: '/approvals' },
+      { label: 'Project-wise P&L', href: '/projects' },
+      { label: 'Scheduled Auto-Reports (email)', href: '/scheduled-reports' },
+      { label: 'Online vs Offline Sales', href: '/reports/business-ops' },
+      { label: 'eCommerce Fulfilment Rate', href: '/reports/business-ops' },
+      { label: 'Lead Conversion', href: '/reports/business-ops' },
+      { label: 'Support Ticket SLA', href: '/reports/business-ops' },
+      { label: 'Leave Summary', href: '/reports/business-ops' },
+    ],
+  },
+  {
+    no: '03',
+    label: 'Inventory Management',
+    gradient: 'from-fuchsia-500 to-pink-600',
+    permission: 'reports:inventory',
+    links: [
+      { label: 'Stock Valuation', tab: 'INVENTORY' as ReportTab },
+      { label: 'Inventory Suite (Ledger / Movements / Expiry)', href: '/reports/inventory-suite' },
+      { label: 'Low Stock Alert', href: '/reports/low-stock' },
+      { label: 'Dead / Slow-moving Stock', href: '/reports/dead-stock' },
+      { label: 'Reorder Points', href: '/reports/reorder-point' },
+      { label: 'Auto Reorder (sales velocity)', href: '/reports/inventory-suite' },
+      { label: 'Barcode Tracker', href: '/reports/barcode-tracker' },
+    ],
+  },
+  {
+    no: '04',
+    label: 'Smart POS',
+    gradient: 'from-violet-600 to-indigo-700',
+    permission: 'sales:view',
+    links: [{ label: 'Shift & Z-Report', href: '/shifts' }],
+  },
+  {
+    no: '05',
+    label: 'Wholesale & Retail',
+    gradient: 'from-pink-500 to-rose-600',
+    permission: 'reports:sales',
+    links: [{ label: 'Retail vs Wholesale Split', href: '/reports/sales' }],
+  },
+];
+
+/** Reports that live on their own pages (accounts statements) or inside modules. */
+const EXTRA_REPORTS: Array<{
+  id: string;
+  no: string;
+  label: string;
+  dot: string;
+  tile: string;
+  borderL: string;
+  permission: string;
+  links: Array<{ label: string; href: string }>;
+}> = [
+  {
+    id: 'HR',
+    no: '05',
+    label: 'HR & Payroll',
+    dot: 'bg-cyan-500',
+    tile: 'bg-cyan-500/20 text-cyan-300',
+    borderL: 'border-l-4 border-l-cyan-500',
+    permission: 'hr:view',
+    links: [{ label: 'Employees, Attendance & Payroll', href: '/hr' }],
+  },
+  {
+    id: 'PRODUCTION',
+    no: '06',
+    label: 'Production',
+    dot: 'bg-lime-500',
+    tile: 'bg-lime-500/20 text-lime-300',
+    borderL: 'border-l-4 border-l-lime-500',
+    permission: 'production:view',
+    links: [{ label: 'Production Runs & Material Usage', href: '/production' }],
+  },
+  {
+    id: 'CRM_ECOM',
+    no: '07',
+    label: 'CRM & eCommerce',
+    dot: 'bg-emerald-500',
+    tile: 'bg-emerald-500/20 text-emerald-300',
+    borderL: 'border-l-4 border-l-emerald-500',
+    permission: 'crm:view',
+    links: [
+      { label: 'Loyalty Points Report', href: '/crm' },
+      { label: 'Online Orders Report', href: '/ecommerce/orders' },
+    ],
+  },
+  {
+    id: 'DISTRIBUTION',
+    no: '08',
+    label: 'Distribution & SR',
+    dot: 'bg-sky-500',
+    tile: 'bg-sky-500/20 text-sky-300',
+    borderL: 'border-l-4 border-l-sky-500',
+    permission: 'sr:view',
+    links: [{ label: 'SR Target vs Achievement', href: '/distribution' }],
+  },
+];
+
 export default function ReportsPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<ReportTab>('SALES');
   const [loading, setLoading] = useState(true);
+
+  // ── privilege-based visibility: যার যা permission, সে তাই দেখবে ──────────
+  const perms = user?.permissions || [];
+  const isSuper = !!user?.isPlatformSuperAdmin;
+  const has = (p: string) => isSuper || perms.includes(p);
+
+  // Department filter chips — pick a department to see only its reports
+  const [deptFilter, setDeptFilter] = useState<string>('ALL');
+
+  const allTabs: ReportTab[] = ['SALES', 'PRODUCTS', 'INVENTORY', 'PNL', 'DUES', 'PAYABLES'];
+  const visibleTabs = allTabs.filter(
+    (t) => has(TAB_META[t].permission) && (deptFilter === 'ALL' || TAB_META[t].dept === deptFilter)
+  );
+
+  // If the selected tab is hidden by the department filter, fall back to the first visible one
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deptFilter, user?.id]);
+
+  const deptHasReports = (deptId: string) => allTabs.some((t) => TAB_META[t].dept === deptId && has(TAB_META[t].permission));
 
   // Customer picker for the per-customer due detail report
   const [dueCustomerId, setDueCustomerId] = useState('');
@@ -202,6 +376,190 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      {/* ── Reports by module — reporting lives inside its own module ── */}
+      <div className="space-y-3 print:hidden">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-sm font-bold text-white uppercase tracking-wide">{t('reports.byModule')}</h2>
+          <span className="text-[10px] text-slate-500">{t('reports.byModuleHint')}</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {MODULE_DEFS.filter((mod) => mod.reports.length > 0 && (!mod.permission || has(mod.permission))).map(
+            (mod) => {
+              const reports = mod.reports.filter((r) => !r.permission || has(r.permission));
+              if (reports.length === 0) return null;
+              return (
+                <div key={mod.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-8 h-8 rounded-lg bg-gradient-to-br ${mod.accent} flex items-center justify-center shrink-0`}
+                    >
+                      <mod.icon className="w-4 h-4 text-white" />
+                    </span>
+                    <p className="text-xs font-bold text-white truncate flex-1">{t(mod.labelKey)}</p>
+                    <Link
+                      href={mod.hub}
+                      className="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                    >
+                      {t('reports.openModule')} <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {reports.map((report) => (
+                      <Link
+                        key={`${mod.id}-${report.href}-${report.labelKey}`}
+                        href={report.href}
+                        className="px-2 py-1 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-800 text-[10px] text-slate-300 hover:text-white transition"
+                      >
+                        {t(report.labelKey)}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+          )}
+        </div>
+      </div>
+
+      {/* ── Trade & Inventory: the five trading modules, one department ── */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-sm font-bold text-white uppercase tracking-wide">Trade &amp; Inventory Management</h2>
+          <span className="text-[10px] text-slate-500">5 modules · one department</span>
+          <Link
+            href="/trade"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-200"
+          >
+            <ArrowRight className="w-3 h-3" /> Open the trade dashboard
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          {SALES_COMMERCE_GROUP.filter((g) => has(g.permission)).map((g) => (
+            <div key={g.no} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+              <div className="flex items-center gap-2.5 mb-3">
+                <span
+                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g.gradient} flex items-center justify-center font-extrabold text-sm text-white shadow`}
+                >
+                  {g.no}
+                </span>
+                <p className="text-xs font-bold text-white truncate">{g.label}</p>
+              </div>
+              <div className="space-y-1.5">
+                {g.links.map((l: any) =>
+                  l.href ? (
+                    <Link
+                      key={l.label}
+                      href={l.href}
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-[11px] text-slate-300 hover:text-white transition group"
+                    >
+                      <span>{l.label}</span>
+                      <ArrowRight className="w-3 h-3 text-slate-600 group-hover:text-white" />
+                    </Link>
+                  ) : (
+                    <button
+                      key={l.label}
+                      onClick={() => {
+                        setDeptFilter('ALL');
+                        setActiveTab(l.tab);
+                      }}
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-[11px] text-slate-300 hover:text-white transition group text-left"
+                    >
+                      <span>{l.label}</span>
+                      <ArrowRight className="w-3 h-3 text-slate-600 group-hover:text-white" />
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Other department reports ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {DEPARTMENTS.filter((d) => deptHasReports(d.id) || (d.id === 'FINANCE' && has('accounts:view'))).map((d) => {
+          const tabLinks = allTabs
+            .filter((t) => TAB_META[t].dept === d.id && has(TAB_META[t].permission))
+            .map((t) => ({
+              label: { SALES: 'Sales Summary', PRODUCTS: 'Product Performance', INVENTORY: 'Stock Valuation', PNL: 'Profit & Loss', DUES: 'Customer Dues', PAYABLES: 'Supplier Payables' }[t as ReportTab] || t,
+              onClick: () => { setDeptFilter(d.id); setActiveTab(t); },
+            }));
+          const statementLinks = d.id === 'FINANCE' && has('accounts:view')
+            ? [
+                { label: 'Trial Balance', href: '/reports/trial-balance' },
+                { label: 'Balance Sheet', href: '/reports/balance-sheet' },
+                { label: 'Cash Flow', href: '/reports/cash-flow' },
+              ]
+            : [];
+          const links = [...tabLinks, ...statementLinks];
+          if (links.length === 0) return null;
+
+          return (
+            <div key={d.id} className={`bg-slate-900 border border-slate-800 ${d.borderL} rounded-2xl p-4 shadow-lg`}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className={`w-10 h-10 rounded-xl ${d.tile} flex items-center justify-center font-extrabold text-sm shadow-inner`}>
+                  {d.no}
+                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`w-2 h-2 rounded-full ${d.dot}`} />
+                  <p className="text-xs font-bold text-white truncate">{d.label}</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {links.map((l: any) =>
+                  l.href ? (
+                    <Link
+                      key={l.label}
+                      href={l.href}
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-[11px] text-slate-300 hover:text-white transition group"
+                    >
+                      <span>{l.label}</span>
+                      <ArrowRight className="w-3 h-3 text-slate-600 group-hover:text-white" />
+                    </Link>
+                  ) : (
+                    <button
+                      key={l.label}
+                      onClick={l.onClick}
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-[11px] text-slate-300 hover:text-white transition group text-left"
+                    >
+                      <span>{l.label}</span>
+                      <ArrowRight className="w-3 h-3 text-slate-600 group-hover:text-white" />
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Departments whose reports live inside their module pages */}
+        {EXTRA_REPORTS.filter((e) => has(e.permission)).map((e) => (
+          <div key={e.id} className={`bg-slate-900 border border-slate-800 ${e.borderL} rounded-2xl p-4 shadow-lg`}>
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className={`w-10 h-10 rounded-xl ${e.tile} flex items-center justify-center font-extrabold text-sm shadow-inner`}>
+                {e.no}
+              </span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className={`w-2 h-2 rounded-full ${e.dot}`} />
+                <p className="text-xs font-bold text-white truncate">{e.label}</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {e.links.map((l) => (
+                <Link
+                  key={l.label}
+                  href={l.href}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-[11px] text-slate-300 hover:text-white transition group"
+                >
+                  <span>{l.label}</span>
+                  <ArrowRight className="w-3 h-3 text-slate-600 group-hover:text-white" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Customer due detail report picker */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-xl">
         <div className="flex items-center gap-3 min-w-0">
@@ -243,32 +601,66 @@ export default function ReportsPage() {
 
       {/* Date Filter & Tab Switcher Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800 p-4 rounded-xl">
-        {/* Tabs */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto text-xs font-bold scrollbar-none pb-1 lg:pb-0">
-          {[
-            { id: 'SALES', label: 'Sales Summary', icon: TrendingUp },
-            { id: 'PRODUCTS', label: 'Product Performance', icon: Package },
-            { id: 'INVENTORY', label: 'Stock Valuation', icon: Boxes },
-            { id: 'PNL', label: 'Profit & Loss (P&L)', icon: PieChart },
-            { id: 'DUES', label: 'Customer Dues', icon: Users },
-            { id: 'PAYABLES', label: 'Supplier Payables', icon: Building },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
+        <div className="space-y-2 min-w-0">
+          {/* Department filter chips */}
+          <div className="flex items-center flex-wrap gap-1.5">
+            <button
+              onClick={() => setDeptFilter('ALL')}
+              className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition ${
+                deptFilter === 'ALL'
+                  ? 'bg-white text-slate-950 border-white'
+                  : 'border-slate-700 text-slate-400 hover:text-white'
+              }`}
+            >
+              All Departments
+            </button>
+            {DEPARTMENTS.filter((d) => deptHasReports(d.id)).map((d) => (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as ReportTab)}
-                className={`px-3 py-2 rounded-xl transition flex items-center space-x-1.5 whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700/60'
+                key={d.id}
+                onClick={() => setDeptFilter(deptFilter === d.id ? 'ALL' : d.id)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition ${
+                  deptFilter === d.id ? d.chipOn : `${d.chipOff} hover:brightness-125`
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${d.dot}`} />
+                {d.label}
               </button>
-            );
-          })}
+            ))}
+          </div>
+
+          {/* Report tabs (only what this user's privileges allow) */}
+          <div className="flex items-center space-x-1.5 overflow-x-auto text-xs font-bold scrollbar-none pb-1 lg:pb-0">
+            {visibleTabs.map((tab) => {
+              const meta: any = {
+                SALES: { label: 'Sales Summary', icon: TrendingUp },
+                PRODUCTS: { label: 'Product Performance', icon: Package },
+                INVENTORY: { label: 'Stock Valuation', icon: Boxes },
+                PNL: { label: 'Profit & Loss (P&L)', icon: PieChart },
+                DUES: { label: 'Customer Dues', icon: Users },
+                PAYABLES: { label: 'Supplier Payables', icon: Building },
+              }[tab];
+              const Icon = meta.icon;
+              const dept = DEPARTMENTS.find((d) => d.id === TAB_META[tab].dept);
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-2 rounded-xl transition flex items-center space-x-1.5 whitespace-nowrap ${
+                    activeTab === tab
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700/60'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${dept?.dot || 'bg-slate-500'}`} />
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{meta.label}</span>
+                </button>
+              );
+            })}
+            {visibleTabs.length === 0 && (
+              <span className="text-slate-500 text-xs">You do not have permission for any report.</span>
+            )}
+          </div>
         </div>
 
         {/* Date Filters */}

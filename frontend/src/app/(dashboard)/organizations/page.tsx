@@ -1,0 +1,480 @@
+'use client';
+
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Building2,
+  Plus,
+  RefreshCw,
+  Shield,
+  LogIn,
+  Ban,
+  CheckCircle2,
+  Users as UsersIcon,
+  Package,
+  Receipt,
+  Trash2,
+} from 'lucide-react';
+import { api } from '../../../lib/api-client';
+import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
+import { Modal } from '../../../components/ui/Modal';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { Spinner } from '../../../components/ui/Spinner';
+import { Input } from '../../../components/ui/Input';
+import { useToast } from '../../../components/ui/Toast';
+import { useAuth } from '../../../hooks/useAuth';
+import { PERMISSION_GROUPS } from '../../../lib/permissions';
+
+interface Org {
+  id: string;
+  name: string;
+  slug: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  contactPhone?: string;
+  contactEmail?: string;
+  address?: string;
+  adminPermissionSet: string[];
+  memberCount: number;
+  createdAt: string;
+}
+
+interface OrgSummaryData {
+  org: Org;
+  counts: {
+    users: number;
+    products: number;
+    customers: number;
+    suppliers: number;
+    sales: number;
+    purchaseOrders: number;
+    expenses: number;
+  };
+}
+
+const PermissionChecklist: React.FC<{
+  selected: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+}> = ({ selected, onChange, disabled }) => (
+  <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
+    {Object.entries(PERMISSION_GROUPS).map(([group, perms]) => (
+      <div key={group}>
+        <div className="flex items-center justify-between mb-1.5">
+          <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{group}</h4>
+          <button
+            type="button"
+            disabled={disabled}
+            className="text-[10px] text-blue-400 hover:text-blue-300 disabled:opacity-40"
+            onClick={() => {
+              const allOn = perms.every((p) => selected.includes(p));
+              onChange(allOn ? selected.filter((p) => !perms.includes(p)) : [...selected, ...perms.filter((p) => !selected.includes(p))]);
+            }}
+          >
+            {perms.every((p) => selected.includes(p)) ? 'none' : 'all'}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {perms.map((perm) => {
+            const on = selected.includes(perm);
+            return (
+              <label
+                key={perm}
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border cursor-pointer transition-colors ${
+                  on
+                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600'
+                } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  className="accent-emerald-500 w-3 h-3"
+                  checked={on}
+                  disabled={disabled}
+                  onChange={() =>
+                    onChange(on ? selected.filter((p) => p !== perm) : [...selected, perm])
+                  }
+                />
+                {perm}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+export default function OrganizationsPage() {
+  const { user } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [detail, setDetail] = useState<Org | null>(null);
+  const [suspendTarget, setSuspendTarget] = useState<Org | null>(null);
+  const [entering, setEntering] = useState<string | null>(null);
+
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newPerms, setNewPerms] = useState<string[]>([]);
+  const [editPerms, setEditPerms] = useState<string[] | null>(null);
+
+  const [memberUsername, setMemberUsername] = useState('');
+  const [memberRoleId, setMemberRoleId] = useState('');
+
+  const isSuper = !!user?.isPlatformSuperAdmin;
+
+  const { data: orgs = [], isLoading, refetch, isRefetching } = useQuery<Org[]>({
+    queryKey: ['platform-orgs'],
+    queryFn: async () => {
+      const res = await api.get('/platform/orgs');
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: isSuper,
+  });
+
+  const { data: roles = [] } = useQuery<{ id: string; name: string; displayName: string }[]>({
+    queryKey: ['platform-org-roles', detail?.id],
+    queryFn: async () => {
+      const res = await api.get(`/roles`);
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: !!detail,
+  });
+
+  const { data: summary } = useQuery<OrgSummaryData>({
+    queryKey: ['platform-org-summary', detail?.id],
+    queryFn: async () => {
+      const res = await api.get(`/platform/orgs/${detail!.id}/summary`);
+      return res.data;
+    },
+    enabled: !!detail,
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['platform-orgs'] });
+    if (detail) queryClient.invalidateQueries({ queryKey: ['platform-org-summary', detail.id] });
+  };
+
+  const createOrg = useMutation({
+    mutationFn: async () => {
+      await api.post('/platform/orgs', {
+        name: newName,
+        contactPhone: newPhone || undefined,
+        contactEmail: newEmail || undefined,
+        address: newAddress || undefined,
+        adminPermissionSet: newPerms,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Organization created');
+      setCreateOpen(false);
+      setNewName(''); setNewPhone(''); setNewEmail(''); setNewAddress(''); setNewPerms([]);
+      refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updatePerms = useMutation({
+    mutationFn: async () => {
+      await api.put(`/platform/orgs/${detail!.id}/permissions`, { adminPermissionSet: editPerms });
+    },
+    onSuccess: () => {
+      toast.success('Permission envelope updated — effective immediately');
+      setEditPerms(null);
+      invalidate();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const setStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: 'ACTIVE' | 'SUSPENDED' }) => {
+      await api.patch(`/platform/orgs/${id}`, { status });
+    },
+    onSuccess: () => {
+      toast.success('Organization updated');
+      setSuspendTarget(null);
+      refetch();
+      if (detail) setDetail(null);
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const addMember = useMutation({
+    mutationFn: async () => {
+      await api.post(`/platform/orgs/${detail!.id}/members`, {
+        username: memberUsername,
+        roleId: memberRoleId,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Member added');
+      setMemberUsername(''); setMemberRoleId('');
+      invalidate();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const enterOrg = async (org: Org) => {
+    if (entering) return;
+    setEntering(org.id);
+    try {
+      const res = await api.post<{ token: string }>(`/platform/orgs/${org.id}/enter`);
+      if (res.data?.token) {
+        sessionStorage.setItem('pos_token', res.data.token);
+        queryClient.clear();
+        toast.success(`Working inside "${org.name}"`);
+        window.location.href = '/dashboard';
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setEntering(null);
+    }
+  };
+
+  if (!isSuper) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
+        <Shield className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+        <p className="text-slate-400 text-sm">Only the platform Super Admin can manage organizations.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 pb-10">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg">
+            <Building2 className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">Organizations</h1>
+            <p className="text-sm text-slate-400">
+              One software, many organizations — set each org&apos;s permission envelope and enter it to work inside.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" leftIcon={<RefreshCw className={isRefetching ? 'animate-spin' : ''} />} onClick={() => refetch()}>
+            Refresh
+          </Button>
+          <Button variant="primary" size="sm" leftIcon={<Plus />} onClick={() => setCreateOpen(true)}>
+            New Organization
+          </Button>
+        </div>
+      </div>
+
+      {/* Org cards */}
+      {isLoading ? (
+        <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+      ) : orgs.length === 0 ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center text-slate-400 text-sm">
+          No organizations yet. Create the first one.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {orgs.map((org) => (
+            <div key={org.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{org.name}</p>
+                    <p className="text-[11px] text-slate-500 truncate">/{org.slug}</p>
+                  </div>
+                </div>
+                <Badge variant={org.status === 'ACTIVE' ? 'success' : 'danger'} size="sm">{org.status}</Badge>
+              </div>
+
+              <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                <span className="inline-flex items-center gap-1"><UsersIcon className="w-3.5 h-3.5" /> {org.memberCount} member{org.memberCount === 1 ? '' : 's'}</span>
+                <span className="inline-flex items-center gap-1"><Shield className="w-3.5 h-3.5" /> {org.adminPermissionSet.length} permissions</span>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-auto pt-1">
+                <Button variant="primary" size="sm" leftIcon={<LogIn className="w-3.5 h-3.5" />} loading={entering === org.id} onClick={() => enterOrg(org)}>
+                  Enter
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDetail(org)}>
+                  Manage
+                </Button>
+                {org.status === 'ACTIVE' ? (
+                  <Button variant="danger" size="sm" leftIcon={<Ban className="w-3.5 h-3.5" />} onClick={() => setSuspendTarget(org)}>
+                    Suspend
+                  </Button>
+                ) : (
+                  <Button variant="success" size="sm" leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />} onClick={() => setStatus.mutate({ id: org.id, status: 'ACTIVE' })}>
+                    Activate
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create modal */}
+      <Modal
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="New Organization"
+        subtitle="Creates per-org settings, roles, chart of accounts and expense categories"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-slate-400">Organization name *</label>
+            <Input value={newName} onChange={(e: any) => setNewName(e.target.value)} placeholder="e.g. Rahim Traders" className="mt-1" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-400">Phone</label>
+              <Input value={newPhone} onChange={(e: any) => setNewPhone(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-400">Email</label>
+              <Input value={newEmail} onChange={(e: any) => setNewEmail(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-400">Address</label>
+            <Input value={newAddress} onChange={(e: any) => setNewAddress(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-2 block">
+              Permission envelope — the ceiling for everyone inside this organization
+            </label>
+            <PermissionChecklist selected={newPerms} onChange={setNewPerms} disabled={createOrg.isPending} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="primary" loading={createOrg.isPending} disabled={!newName.trim()} onClick={() => createOrg.mutate()}>
+              Create Organization
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Manage modal */}
+      <Modal
+        isOpen={!!detail}
+        onClose={() => { setDetail(null); setEditPerms(null); }}
+        title={detail?.name || ''}
+        subtitle={detail ? `/${detail.slug}` : ''}
+        size="lg"
+      >
+        {detail && (
+          <div className="space-y-5">
+            {/* summary counts */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {summary && (
+                <>
+                  {[
+                    { label: 'Members', value: summary.counts.users, icon: UsersIcon },
+                    { label: 'Products', value: summary.counts.products, icon: Package },
+                    { label: 'Customers', value: summary.counts.customers, icon: UsersIcon },
+                    { label: 'Sales', value: summary.counts.sales, icon: Receipt },
+                  ].map(({ label, value, icon: Icon }) => (
+                    <div key={label} className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
+                      <Icon className="w-4 h-4 text-slate-500 mb-1" />
+                      <p className="text-lg font-bold text-white leading-none">{value}</p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wide mt-1">{label}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {/* permission envelope */}
+            <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Permission envelope</h4>
+                {editPerms === null && (
+                  <Button variant="outline" size="sm" onClick={() => setEditPerms([...detail.adminPermissionSet])}>
+                    Edit envelope
+                  </Button>
+                )}
+              </div>
+              {editPerms === null ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {detail.adminPermissionSet.length === 0 && (
+                    <p className="text-xs text-slate-500">No permissions granted — nobody inside this org can work.</p>
+                  )}
+                  {detail.adminPermissionSet.map((p) => (
+                    <span key={p} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[11px] text-slate-300">{p}</span>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <PermissionChecklist selected={editPerms} onChange={setEditPerms} disabled={updatePerms.isPending} />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setEditPerms(null)}>Cancel</Button>
+                    <Button variant="primary" size="sm" loading={updatePerms.isPending} onClick={() => updatePerms.mutate()}>
+                      Save envelope
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* members */}
+            <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 space-y-3">
+              <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Add existing user as member</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Input value={memberUsername} onChange={(e: any) => setMemberUsername(e.target.value)} placeholder="username or email" />
+                <select
+                  value={memberRoleId}
+                  onChange={(e: any) => setMemberRoleId(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm"
+                >
+                  <option value="">Select org role</option>
+                  {roles
+                    .filter((r: any) => r.orgId === detail.id)
+                    .map((r: any) => (
+                      <option key={r.id} value={r.id}>{r.displayName}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="flex justify-end">
+                <Button variant="primary" size="sm" loading={addMember.isPending} disabled={!memberUsername.trim() || !memberRoleId} onClick={() => addMember.mutate()}>
+                  Add member
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button
+                variant="danger"
+                size="sm"
+                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                onClick={() => { setSuspendTarget(detail); }}
+                disabled={detail.status === 'SUSPENDED'}
+              >
+                Suspend organization
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={!!suspendTarget}
+        onClose={() => setSuspendTarget(null)}
+        onConfirm={() => suspendTarget && setStatus.mutate({ id: suspendTarget.id, status: 'SUSPENDED' })}
+        title="Suspend organization"
+        description={`All users of "${suspendTarget?.name}" lose access immediately until re-activated.`}
+        confirmText="Suspend"
+        variant="danger"
+        loading={setStatus.isPending}
+      />
+    </div>
+  );
+}

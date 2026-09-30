@@ -17,7 +17,7 @@ import {
 
 const router = Router();
 
-router.use(authenticate);
+
 
 // ── reading the books (admin) ───────────────────────────────────────────
 router.get('/accounts', requirePermissions('accounts:view'), (req, res, next) => accountingController.chart(req, res, next));

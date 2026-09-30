@@ -16,6 +16,10 @@ interface SalesReport {
     totalPaid: number;
     totalDue: number;
   };
+  /** Per-staff performance — who sold how much in the selected period. */
+  cashierBreakdown?: Array<{ cashierId: string; name: string; orders: number; totalNet: number; totalDue: number }>;
+  /** Wholesale & Retail split — sales per pricing tier. */
+  tierBreakdown?: Array<{ _id: string; orders: number; total: number }>;
   data: any[];
 }
 
@@ -60,6 +64,50 @@ export default function SalesReportPage() {
           <KpiCard label="Total Collected" value={money(data?.summary.totalPaid)} tone="emerald" />
           <KpiCard label="Unpaid Dues" value={money(data?.summary.totalDue)} tone="rose" />
         </div>
+
+        {/* Staff performance — sales per user within the selected period */}
+        {(data?.cashierBreakdown || []).length > 0 && (
+          <ReportTable
+            isEmpty={false}
+            headers={[
+              { label: 'Staff (Cashier)' },
+              { label: 'Invoices', align: 'right' },
+              { label: 'Sales Total', align: 'right', className: 'font-bold text-white' },
+              { label: 'Dues Created', align: 'right' },
+            ]}
+          >
+            {(data?.cashierBreakdown || []).map((c) => (
+              <tr key={c.cashierId} className="hover:bg-slate-800/40">
+                <td className="py-3 px-4 font-bold text-white">{c.name}</td>
+                <td className="py-3 px-4 text-right text-slate-300">{c.orders}</td>
+                <td className="py-3 px-4 text-right font-black text-emerald-400">{money(c.totalNet)}</td>
+                <td className="py-3 px-4 text-right font-bold">
+                  {c.totalDue > 0 ? <span className="text-rose-400">{money(c.totalDue)}</span> : money(0)}
+                </td>
+              </tr>
+            ))}
+          </ReportTable>
+        )}
+
+        {/* Wholesale & Retail split — sales per pricing tier */}
+        {(data?.tierBreakdown || []).length > 0 && (
+          <ReportTable
+            isEmpty={false}
+            headers={[
+              { label: 'Pricing Tier' },
+              { label: 'Invoices', align: 'right' },
+              { label: 'Sales Total', align: 'right', className: 'font-bold text-white' },
+            ]}
+          >
+            {(data?.tierBreakdown || []).map((t: any) => (
+              <tr key={t._id} className="hover:bg-slate-800/40">
+                <td className="py-3 px-4 font-bold text-white">{t._id || 'RETAIL'}</td>
+                <td className="py-3 px-4 text-right text-slate-300">{t.orders}</td>
+                <td className="py-3 px-4 text-right font-black text-emerald-400">{money(t.total)}</td>
+              </tr>
+            ))}
+          </ReportTable>
+        )}
 
         <ReportTable
           isEmpty={rows.length === 0}

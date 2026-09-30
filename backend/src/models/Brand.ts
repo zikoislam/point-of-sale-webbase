@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IBrand extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   name: string;
   originCountry?: string;
   logoUrl?: string;
@@ -12,6 +13,11 @@ export interface IBrand extends Document {
 
 const BrandSchema = new Schema<IBrand>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     name: {
       type: String,
       required: true,

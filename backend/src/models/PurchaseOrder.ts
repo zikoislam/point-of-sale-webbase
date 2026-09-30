@@ -12,9 +12,20 @@ export interface IPOItem {
 
 export interface IPurchaseOrder extends Document {
   _id: Types.ObjectId;
-  poNumber: string; // Unique, e.g. "PO-20260907-0001"
+  orgId: Types.ObjectId;
+  /** Branch that raised the order (multi-branch chains). */
+  branchId?: Types.ObjectId | null;
+  /** Project this purchase belongs to, when the order is job-based. */
+  projectId?: Types.ObjectId | null;
+  poNumber: string; // Unique per org, e.g. "PO-20260907-0001"
   supplierId: Types.ObjectId; // Ref: suppliers
   status: 'DRAFT' | 'ORDERED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED';
+  /** Approval workflow — big purchase orders wait for a manager. */
+  approvalStatus: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'AUTO_APPROVED';
+  approvedBy?: Types.ObjectId | null; // Ref: users
+  approvedAt?: Date | null;
+  rejectionReason?: string;
+  requestedBy?: Types.ObjectId | null; // Ref: users (who raised the PO)
   items: IPOItem[];
   subtotal: number;
   taxAmount: number;
@@ -75,10 +86,26 @@ const POItemSchema = new Schema<IPOItem>(
 
 const PurchaseOrderSchema = new Schema<IPurchaseOrder>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+      index: true,
+    },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+      default: null,
+      index: true,
+    },
     poNumber: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       uppercase: true,
     },
@@ -93,6 +120,17 @@ const PurchaseOrderSchema = new Schema<IPurchaseOrder>(
       default: 'DRAFT',
       required: true,
     },
+    approvalStatus: {
+      type: String,
+      enum: ['PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'AUTO_APPROVED'],
+      default: 'AUTO_APPROVED',
+      required: true,
+      index: true,
+    },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    approvedAt: { type: Date, default: null },
+    rejectionReason: { type: String, trim: true, maxlength: 300 },
+    requestedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     items: {
       type: [POItemSchema],
       required: true,
@@ -167,7 +205,12 @@ const PurchaseOrderSchema = new Schema<IPurchaseOrder>(
 );
 
 // Indexes
+PurchaseOrderSchema.index({ orgId: 1, poNumber: 1 }, { unique: true });
 PurchaseOrderSchema.index({ supplierId: 1, createdAt: -1 });
 PurchaseOrderSchema.index({ status: 1 });
+// Reporting / approval paths (Phase 12.1)
+PurchaseOrderSchema.index({ orgId: 1, supplierId: 1, status: 1 });
+PurchaseOrderSchema.index({ orgId: 1, approvalStatus: 1 });
+PurchaseOrderSchema.index({ orgId: 1, createdAt: -1 });
 
 export const PurchaseOrder = mongoose.model<IPurchaseOrder>('PurchaseOrder', PurchaseOrderSchema);

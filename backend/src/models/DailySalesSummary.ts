@@ -2,7 +2,8 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IDailySalesSummary extends Document {
   _id: Types.ObjectId;
-  date: string; // "YYYY-MM-DD" (Unique Index)
+  orgId: Types.ObjectId;
+  date: string; // "YYYY-MM-DD" (Unique per org)
   totalSalesRevenue: number; // Gross sales turnover
   totalCOGS: number; // Cost of goods sold based on sale-time cost snapshots
   totalTaxCollected: number;
@@ -17,10 +18,14 @@ export interface IDailySalesSummary extends Document {
 
 const DailySalesSummarySchema = new Schema<IDailySalesSummary>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     date: {
       type: String,
       required: true,
-      unique: true,
       match: [/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'],
     },
     totalSalesRevenue: {
@@ -75,5 +80,7 @@ const DailySalesSummarySchema = new Schema<IDailySalesSummary>(
     collection: 'daily_sales_summaries',
   }
 );
+
+DailySalesSummarySchema.index({ orgId: 1, date: 1 }, { unique: true });
 
 export const DailySalesSummary = mongoose.model<IDailySalesSummary>('DailySalesSummary', DailySalesSummarySchema);

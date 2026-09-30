@@ -2,6 +2,9 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IShift extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  /** Branch the till belongs to (multi-branch chains). */
+  branchId?: Types.ObjectId | null;
   userId: Types.ObjectId; // Ref: users (Cashier)
   terminalId: string; // Counter identifier (e.g. "COUNTER-01")
   openedAt: Date;
@@ -23,6 +26,17 @@ export interface IShift extends Document {
 
 const ShiftSchema = new Schema<IShift>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+      index: true,
+    },
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User',

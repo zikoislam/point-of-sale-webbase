@@ -23,6 +23,25 @@ export class ProductController {
     } catch (error) { next(error); }
   }
 
+  /** Trade catalogue — every active product with its wholesale price. */
+  async wholesalePriceList(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const list = await productService.getWholesalePriceList(req.query.categoryId as string | undefined);
+      sendSuccess(res, 200, 'Wholesale price list retrieved', list);
+    } catch (error) { next(error); }
+  }
+
+  /** The same catalogue as a printable A4 PDF. */
+  async wholesalePriceListPdf(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { buffer } = await productService.generateWholesalePriceListPdf();
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="wholesale-price-list.pdf"');
+      res.setHeader('Content-Length', String(buffer.length));
+      res.send(buffer);
+    } catch (error) { next(error); }
+  }
+
   async getProductById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const product = await productService.getProductById(req.params.id, req.user?.role);

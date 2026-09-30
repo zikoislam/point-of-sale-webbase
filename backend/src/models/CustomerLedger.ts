@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface ICustomerLedger extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   customerId: Types.ObjectId; // Ref: customers
   transactionType: 'SALE_DUE' | 'PAYMENT_COLLECTION' | 'RETURN_CREDIT' | 'OPENING';
   amount: number;
@@ -22,6 +23,11 @@ export interface ICustomerLedger extends Document {
 
 const CustomerLedgerSchema = new Schema<ICustomerLedger>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     customerId: {
       type: Schema.Types.ObjectId,
       ref: 'Customer',

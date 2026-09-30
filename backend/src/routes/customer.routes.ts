@@ -9,7 +9,7 @@ import { editCustomerLedgerSchema } from '../validators/customer-ledger.validato
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/', requirePermissions('customers:view'), (req, res, next) => customerController.list(req, res, next));
 router.get('/:id', requirePermissions('customers:view'), (req, res, next) => customerController.getById(req, res, next));

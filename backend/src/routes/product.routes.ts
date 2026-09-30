@@ -6,12 +6,16 @@ import { validate } from '../middlewares/validation.middleware';
 import { createProductSchema, updateProductSchema } from '../validators/product.validators';
 
 const router = Router();
-router.use(authenticate);
+
 
 // Barcode lookup MUST be before /:id to avoid route conflict
 router.get('/barcode/:barcode', requirePermissions('pos:checkout'), (req, res, next) => productController.getProductByBarcode(req, res, next));
 
 router.get('/', requirePermissions('inv:view'), (req, res, next) => productController.listProducts(req, res, next));
+// Trade catalogue — declared before /:id so the path is not read as a product id.
+router.get('/wholesale-price-list', requirePermissions('inv:view'), (req, res, next) => productController.wholesalePriceList(req, res, next));
+router.get('/wholesale-price-list/pdf', requirePermissions('inv:view'), (req, res, next) => productController.wholesalePriceListPdf(req, res, next));
+
 router.get('/:id', requirePermissions('inv:view'), (req, res, next) => productController.getProductById(req, res, next));
 router.post('/', requirePermissions('inv:manage'), validate(createProductSchema), (req, res, next) => productController.createProduct(req, res, next));
 router.put('/:id', requirePermissions('inv:manage'), validate(updateProductSchema), (req, res, next) => productController.updateProduct(req, res, next));

@@ -1,7 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './api-client';
+
+export interface UserMembership {
+  orgId: string;
+  orgName: string;
+  roleName: string;
+  isActive: boolean;
+}
 
 export interface UserProfile {
   id: string;
@@ -15,6 +23,10 @@ export interface UserProfile {
   terminalLocked: boolean;
   avatarUrl?: string;
   lastLoginAt?: string;
+  isPlatformSuperAdmin?: boolean;
+  activeOrgId?: string;
+  orgName?: string;
+  memberships?: UserMembership[];
 }
 
 interface AuthContextType {
@@ -27,6 +39,8 @@ interface AuthContextType {
   lockTerminal: () => Promise<void>;
   unlockTerminal: (pin: string) => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** Switches the active organization and resets all cached per-org data. */
+  switchOrganization: (orgId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,6 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const mountedRef = useRef(true);
+  const queryClient = useQueryClient();
 
   const refreshUser = useCallback(async () => {
     // If no token exists in this tab's sessionStorage, do not fetch /auth/me
@@ -126,6 +141,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser((prev) => (prev ? { ...prev, terminalLocked: false } : null));
   };
 
+  const switchOrganization = async (orgId: string): Promise<void> => {
+    const res = await apiClient<{ token: string; user: UserProfile }>('/auth/switch-org', {
+      method: 'POST',
+      body: JSON.stringify({ orgId }),
+    });
+
+    if (res.success && res.data) {
+      if (typeof window !== 'undefined' && res.data.token) {
+        sessionStorage.setItem('pos_token', res.data.token);
+      }
+      // Everything cached (lists, reports, branding) belongs to the previous
+      // organization — drop it before the new context renders.
+      queryClient.clear();
+      setUser(res.data.user);
+      return;
+    }
+    throw new Error('Organization switch response invalid');
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -138,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lockTerminal,
         unlockTerminal,
         refreshUser,
+        switchOrganization,
       }}
     >
       {children}

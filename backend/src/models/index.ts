@@ -1,13 +1,21 @@
 // Central Models Export
+
+// MUST be the first import: registers the tenant-scoping plugin globally so
+// every schema constructed below gets orgId auto-scoping where applicable.
+import './register-org-scope-plugin';
+
 export * from './Counter';
+export * from './Organization';
 export * from './Role';
 export * from './User';
 export * from './TokenBlacklist';
 export * from './Category';
 export * from './Brand';
 export * from './Product';
+export * from './ProductGroup';
 export * from './StockMovement';
 export * from './PurchaseOrder';
+export * from './PurchaseReturn';
 export * from './Sale';
 export * from './StoreCreditVoucher';
 export * from './SalesReturn';
@@ -27,3 +35,35 @@ export * from './HoldCart';
 export * from './Settings';
 export * from './StockAdjustment';
 export * from './SyncState';
+export * from './PriceTier';
+export * from './VolumePricing';
+export * from './Notification';
+export * from './Branch';
+export * from './StockTransfer';
+export * from './LetterOfCredit';
+export * from './ProformaInvoice';
+export * from './CommercialInvoice';
+export * from './CnfAgent';
+export * from './ApprovalWorkflow';
+export * from './ApprovalRequest';
+export * from './Project';
+export * from './ScheduledReport';
+export * from './SupportTicket';
+export * from './LeaveRequest';
+export * from './Lead';
+export * from './Zone';
+export * from './Route';
+export * from './SalesRep';
+export * from './SrOrder';
+export * from './Employee';
+export * from './Attendance';
+export * from './EmployeeAdvance';
+export * from './PayrollRun';
+export * from './Bom';
+export * from './ProductionRun';
+export * from './LoyaltyConfig';
+export * from './LoyaltyTransaction';
+export * from './CrmActivity';
+export * from './Campaign';
+export * from './OnlineOrder';
+

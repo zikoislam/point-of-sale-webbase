@@ -7,7 +7,9 @@ class SalesReturnController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
-      const result = await salesReturnService.list(page, limit);
+      // mine=true → returns tied to the caller (their sales / their authorizations)
+      const mine = req.query.mine === 'true';
+      const result = await salesReturnService.list(page, limit, mine ? req.user!.userId : undefined);
       sendSuccess(res, 200, 'Sales returns fetched', result);
     } catch (err) { next(err); }
   }

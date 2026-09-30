@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface ISupplierLedger extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   supplierId: Types.ObjectId; // Ref: suppliers
   transactionType: 'PO_GRN_BILL' | 'PAYMENT_DISBURSAL' | 'PURCHASE_RETURN';
   amount: number;
@@ -16,6 +17,11 @@ export interface ISupplierLedger extends Document {
 
 const SupplierLedgerSchema = new Schema<ISupplierLedger>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     supplierId: {
       type: Schema.Types.ObjectId,
       ref: 'Supplier',

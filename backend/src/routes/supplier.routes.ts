@@ -8,7 +8,7 @@ import { supplierDuePaymentSchema } from '../validators/supplier-ledger.validato
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/', requirePermissions('procurement:view'), (req, res, next) => supplierController.list(req, res, next));
 router.get('/:id', requirePermissions('procurement:view'), (req, res, next) => supplierController.getById(req, res, next));

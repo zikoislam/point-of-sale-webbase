@@ -1,124 +1,9 @@
 import { Role } from '../models/Role';
+import { ALL_PERMISSIONS, ADMIN_PERMISSIONS, MANAGER_PERMISSIONS, CASHIER_PERMISSIONS } from '../config/permissions';
 
-export const ALL_PERMISSIONS = [
-  'pos:checkout',
-  'inv:view',
-  'inv:manage',
-  'inv:adjust',
-  'inv:labels',
-  'procurement:view',
-  'procurement:manage',
-  'procurement:receive',
-  'procurement:pay',
-  'sales:view',
-  'returns:authorize',
-  'shifts:operate',
-  'shifts:view',
-  'customers:view',
-  'customers:create',
-  'customers:manage',
-  'customers:pay_due',
-  'accounts:view',
-  'accounts:manage',
-  'accounts:transfer',
-  'expenses:view',
-  'expenses:create',
-  'expenses:manage',
-  'reports:dashboard',
-  'reports:sales',
-  'reports:inventory',
-  'reports:purchases',
-  'reports:dues',
-  'reports:payables',
-  'reports:pnl',
-  'reports:export',
-  'audit:view',
-  'settings:manage',
-  'users:manage',
-  'roles:view',
-  'roles:manage',
-  'approvals:manage',
-  'customers:edit_ledger',
-];
-
-export const MANAGER_PERMISSIONS = [
-  'pos:checkout',
-  'inv:view',
-  'inv:manage',
-  'inv:adjust',
-  'inv:labels',
-  'procurement:view',
-  'procurement:manage',
-  'procurement:receive',
-  'procurement:pay',
-  'sales:view',
-  'returns:authorize',
-  'shifts:operate',
-  'shifts:view',
-  'customers:view',
-  'customers:create',
-  'customers:manage',
-  'customers:pay_due',
-  'expenses:view',
-  'expenses:create',
-  'expenses:manage',
-  'reports:dashboard',
-  'reports:sales',
-  'reports:inventory',
-  'reports:purchases',
-  'reports:dues',
-  'reports:payables',
-  'reports:export',
-  'roles:view',
-];
-
-export const ADMIN_PERMISSIONS = [
-  'pos:checkout',
-  'inv:view',
-  'inv:manage',
-  'inv:adjust',
-  'inv:labels',
-  'procurement:view',
-  'procurement:manage',
-  'procurement:receive',
-  'procurement:pay',
-  'sales:view',
-  'returns:authorize',
-  'shifts:operate',
-  'shifts:view',
-  'customers:view',
-  'customers:create',
-  'customers:manage',
-  'customers:pay_due',
-  'accounts:view',
-  'accounts:manage',
-  'accounts:transfer',
-  'expenses:view',
-  'expenses:create',
-  'expenses:manage',
-  'reports:dashboard',
-  'reports:sales',
-  'reports:inventory',
-  'reports:purchases',
-  'reports:dues',
-  'reports:payables',
-  'reports:pnl',
-  'reports:export',
-  'users:view',
-  'roles:view',
-  'approvals:manage', // Admin can approve manager/cashier actions
-];
-
-export const CASHIER_PERMISSIONS = [
-  'pos:checkout',
-  'sales:view',
-  'shifts:operate',
-  'customers:view',
-  'customers:create',
-  'customers:pay_due',
-  'expenses:create',
-  'inv:view',
-];
+// Re-exported for backwards compatibility — the canonical catalog now lives in
+// src/config/permissions.ts and is shared with the platform org service.
+export { ALL_PERMISSIONS, ADMIN_PERMISSIONS, MANAGER_PERMISSIONS, CASHIER_PERMISSIONS };
 
 export const seedRoles = async (): Promise<void> => {
   const roles = [
@@ -150,11 +35,11 @@ export const seedRoles = async (): Promise<void> => {
 
   for (const roleData of roles) {
     await Role.findOneAndUpdate(
-      { name: roleData.name },
+      { orgId: null, name: roleData.name },
       { $set: roleData },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
   }
 
-  console.log('✅ Default roles seeded successfully (SUPER_ADMIN, ADMIN, BRANCH_MANAGER, CASHIER)');
+  console.log('✅ Platform role templates seeded successfully (SUPER_ADMIN, ADMIN, BRANCH_MANAGER, CASHIER)');
 };

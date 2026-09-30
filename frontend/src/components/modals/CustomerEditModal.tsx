@@ -19,6 +19,8 @@ import {
   BadgeCheck,
   BadgeX,
   Info,
+  Tags,
+  FileText,
 } from 'lucide-react';
 
 export interface CustomerForEdit {
@@ -27,10 +29,20 @@ export interface CustomerForEdit {
   contactPerson?: string;
   phone: string;
   email?: string;
+  /** BIN / TIN — printed on wholesale invoices. */
+  taxId?: string;
   address?: string;
+  priceTierId?: string | null;
   creditLimit: number;
   currentDueBalance: number;
   loyaltyPoints: number;
+  isActive: boolean;
+}
+
+interface PriceTierOption {
+  id: string;
+  name: string;
+  discountPercent: number;
   isActive: boolean;
 }
 
@@ -56,10 +68,13 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [taxId, setTaxId] = useState('');
   const [address, setAddress] = useState('');
+  const [priceTierId, setPriceTierId] = useState('');
   const [creditLimit, setCreditLimit] = useState(0);
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [isActive, setIsActive] = useState(true);
+  const [tiers, setTiers] = useState<PriceTierOption[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -71,11 +86,17 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
     setContactPerson(customer.contactPerson || '');
     setPhone(customer.phone);
     setEmail(customer.email || '');
+    setTaxId(customer.taxId || '');
     setAddress(customer.address || '');
+    setPriceTierId(customer.priceTierId || '');
     setCreditLimit(customer.creditLimit ?? 0);
     setLoyaltyPoints(customer.loyaltyPoints ?? 0);
     setIsActive(customer.isActive ?? true);
     setError('');
+    api
+      .get('/price-tiers')
+      .then((res) => setTiers(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setTiers([]));
   }, [isOpen, customer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,7 +121,9 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         contactPerson: contactPerson.trim() || undefined,
         phone: phone.trim(),
         email: email.trim() || undefined,
+        taxId: taxId.trim() || undefined,
         address: address.trim() || undefined,
+        priceTierId: priceTierId || '',
         creditLimit: Number(creditLimit) || 0,
         isActive,
       };
@@ -250,6 +273,22 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
                 className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
               />
             </div>
+
+            {/* BIN / TIN — appears on wholesale invoices */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                <FileText className="w-3 h-3 inline mr-1" />
+                BIN / TIN{' '}
+                <span className="normal-case font-normal text-slate-500">(optional, trade buyers)</span>
+              </label>
+              <input
+                type="text"
+                value={taxId}
+                onChange={(e) => setTaxId(e.target.value)}
+                placeholder="e.g. 0021345678-0101"
+                className="w-full h-10 px-3.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
           </div>
         </div>
 
@@ -259,6 +298,32 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
             Account Settings
           </p>
           <div className="space-y-3">
+            {/* Price Tier */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                <Tags className="w-3 h-3 inline mr-1" />
+                Price Tier
+              </label>
+              <select
+                value={priceTierId}
+                onChange={(e) => setPriceTierId(e.target.value)}
+                className="w-full h-10 px-3.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
+              >
+                <option value="">No tier — retail price</option>
+                {tiers
+                  .filter((t) => t.isActive)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                      {t.discountPercent > 0 ? ` (−${t.discountPercent}%)` : ''}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[11px] text-slate-500 mt-1">
+                POS automatically prices this customer&apos;s carts on their tier.
+              </p>
+            </div>
+
             {/* Credit Limit */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">

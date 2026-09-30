@@ -34,13 +34,34 @@ import {
   Plus,
   Calculator,
   CalendarCheck,
+  MapPinned,
+  Route as RouteIcon,
+  Factory,
+  Heart,
+  ShoppingBag,
+  Layers,
+  Ship,
+  CheckSquare,
+  FolderKanban,
+  CalendarClock,
+  Target,
+  LifeBuoy,
+  CalendarOff,
+  PackageCheck,
+  XCircle,
+  BadgePercent,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { SOFTWARE_CREDIT } from '../lib/constants';
+import { useI18n } from '../lib/i18n';
+import { MODULE_DEFS, moduleForNavEntry, resolveModule, routeInModule, type ModuleDef } from '../lib/modules';
 
 interface SubNavItem {
-  label: string;
+  /** i18n key, e.g. "nav.dashboard" — translated at render time. */
+  labelKey: string;
   href: string;
+  /** Module heading inside the dropdown — set on the first item of a block. */
+  section?: string;
   permission?: string;
   icon?: React.ElementType;
   /** Posting to the books stays with the owner — hidden from other admins. */
@@ -48,136 +69,278 @@ interface SubNavItem {
 }
 
 interface NavItem {
-  label: string;
+  /** i18n key, e.g. "nav.dashboard" — translated at render time. */
+  labelKey: string;
   icon: React.ElementType;
   href?: string;
   permission?: string;
+  /** Platform-level item — only the Super Admin sees it. */
+  superAdminOnly?: boolean;
   subItems?: SubNavItem[];
 }
 
 const navItems: NavItem[] = [
   {
-    label: 'Dashboard',
+    labelKey: 'nav.dashboard',
     icon: LayoutDashboard,
     href: '/dashboard',
     permission: 'reports:dashboard',
   },
   {
-    label: 'POS Terminal',
-    icon: ShoppingCart,
-    href: '/pos',
-    permission: 'pos:checkout',
-  },
-  {
-    label: 'Products',
-    icon: Package,
+    labelKey: 'nav.tradeInventory',
+    icon: Warehouse,
     permission: 'inv:view',
     subItems: [
-      { label: 'All Products', href: '/products', icon: Package, permission: 'inv:view' },
-      { label: 'Categories', href: '/categories', icon: Tags, permission: 'inv:view' },
-      { label: 'Brands', href: '/brands', icon: Bookmark, permission: 'inv:view' },
-      { label: 'Inventory', href: '/inventory', icon: Warehouse, permission: 'inv:view' },
-      { label: 'Barcode Labels', href: '/barcode-labels', icon: Barcode, permission: 'inv:labels' },
+      { labelKey: 'nav.tradeDashboard', href: '/trade', icon: LayoutDashboard },
+      { labelKey: 'nav.posTerminal', section: 'nav.sectionSmartPos', href: '/pos', icon: ShoppingCart, permission: 'pos:checkout' },
+      { labelKey: 'nav.shifts', href: '/shifts', icon: Clock, permission: 'shifts:operate' },
+      { labelKey: 'nav.salesHistory', section: 'nav.sectionSales', href: '/sales', icon: Receipt, permission: 'sales:view' },
+      { labelKey: 'nav.mySales', href: '/my-sales', icon: Receipt },
+      { labelKey: 'nav.customers', href: '/customers', icon: Users, permission: 'customers:view' },
+      { labelKey: 'nav.purchaseOrders', section: 'nav.sectionPurchase', href: '/purchase-orders', icon: Truck, permission: 'procurement:view' },
+      { labelKey: 'nav.purchaseReceive', href: '/purchase-orders/receive', icon: PackageCheck, permission: 'procurement:receive' },
+      { labelKey: 'nav.purchaseReturns', href: '/purchase-orders/returns', icon: XCircle, permission: 'procurement:view' },
+      { labelKey: 'nav.suppliers', href: '/suppliers', icon: Building2, permission: 'procurement:view' },
+      { labelKey: 'nav.inventory', section: 'nav.sectionInventory', href: '/inventory', icon: Warehouse, permission: 'inv:view' },
+      { labelKey: 'nav.allProducts', href: '/products', icon: Package, permission: 'inv:view' },
+      { labelKey: 'nav.wholesalePriceList', href: '/products/wholesale-price-list', icon: Tags, permission: 'inv:view' },
+      { labelKey: 'nav.categories', href: '/categories', icon: Tags, permission: 'inv:view' },
+      { labelKey: 'nav.productGroups', href: '/product-groups', icon: Layers, permission: 'inv:view' },
+      { labelKey: 'nav.brands', href: '/brands', icon: Bookmark, permission: 'inv:view' },
+      { labelKey: 'nav.stockTransfers', href: '/stock-transfers', icon: Truck, permission: 'inv:view' },
+      { labelKey: 'nav.incomingStock', href: '/stock-transfers', icon: PackageCheck, permission: 'inv:view' },
+      { labelKey: 'nav.chainDashboard', href: '/chain-management', icon: Building2, permission: 'reports:dashboard' },
+      { labelKey: 'nav.barcodeLabels', href: '/barcode-labels', icon: Barcode, permission: 'inv:labels' },
+      { labelKey: 'nav.priceTiers', section: 'nav.sectionWholesale', href: '/price-tiers', icon: Tags, permission: 'customers:view' },
+      { labelKey: 'nav.volumePricing', href: '/price-tiers/volume-pricing', icon: BadgePercent, permission: 'pricing:manage' },
     ],
   },
   {
-    label: 'Purchase Orders',
-    icon: Truck,
-    href: '/purchase-orders',
+    labelKey: 'nav.importExport',
+    icon: Ship,
+    href: '/import-export',
     permission: 'procurement:view',
   },
   {
-    label: 'Sales History',
-    icon: Receipt,
-    href: '/sales',
-    permission: 'sales:view',
+    labelKey: 'nav.approvals',
+    icon: CheckSquare,
+    href: '/approvals',
   },
   {
-    label: 'Customers',
-    icon: Users,
-    href: '/customers',
-    permission: 'customers:view',
+    labelKey: 'nav.projects',
+    icon: FolderKanban,
+    href: '/projects',
   },
   {
-    label: 'Suppliers',
-    icon: Building2,
-    href: '/suppliers',
-    permission: 'procurement:view',
+    labelKey: 'nav.scheduledReports',
+    icon: CalendarClock,
+    href: '/scheduled-reports',
+    permission: 'reports:export',
   },
   {
-    label: 'Shifts',
-    icon: Clock,
-    href: '/shifts',
-    permission: 'shifts:operate',
+    labelKey: 'nav.onlineOrders',
+    icon: ShoppingBag,
+    permission: 'ecom:view',
+    subItems: [
+      { labelKey: 'nav.orders', href: '/ecommerce/orders', icon: ShoppingBag, permission: 'ecom:view' },
+      { labelKey: 'nav.courierDelivery', href: '/courier', icon: Truck, permission: 'ecom:view' },
+    ],
   },
   {
-    label: 'Expenses',
+    labelKey: 'nav.leads',
+    icon: Target,
+    href: '/leads',
+    permission: 'crm:view',
+  },
+  {
+    labelKey: 'nav.supportTickets',
+    icon: LifeBuoy,
+    href: '/support',
+    permission: 'crm:view',
+  },
+  {
+    labelKey: 'nav.leaveRequests',
+    icon: CalendarOff,
+    href: '/hr/leave',
+    permission: 'hr:view',
+  },
+  {
+    labelKey: 'nav.distribution',
+    icon: MapPinned,
+    permission: 'sr:view',
+    subItems: [
+      { labelKey: 'nav.overview', href: '/distribution', icon: MapPinned, permission: 'sr:view' },
+      { labelKey: 'nav.routesTerritories', href: '/distribution/routes', icon: RouteIcon, permission: 'distribution:manage' },
+    ],
+  },
+  {
+    labelKey: 'nav.hrPayroll',
+    icon: CalendarCheck,
+    href: '/hr',
+    permission: 'hr:view',
+  },
+  {
+    labelKey: 'nav.production',
+    icon: Factory,
+    href: '/production',
+    permission: 'production:view',
+  },
+  {
+    labelKey: 'nav.crm',
+    icon: Heart,
+    href: '/crm',
+    permission: 'crm:view',
+  },
+  {
+    labelKey: 'nav.expenses',
     icon: CreditCard,
     href: '/expenses',
     permission: 'expenses:view',
   },
   {
-    label: 'Accounts',
+    labelKey: 'nav.accounts',
     icon: Landmark,
     permission: 'accounts:view',
     subItems: [
-      { label: 'Wallets & Balances', href: '/accounts', icon: Landmark, permission: 'accounts:view' },
-      { label: 'Chart of Accounts', href: '/accounts/chart', icon: Bookmark, permission: 'accounts:view' },
-      { label: 'Day Book', href: '/accounts/journal', icon: ScrollText, permission: 'accounts:view' },
-      { label: 'Opening Balances', href: '/accounts/opening-balances', icon: Calculator, permission: 'accounts:view', superAdminOnly: true },
-      { label: 'Year End Closing', href: '/accounts/year-close', icon: CalendarCheck, permission: 'accounts:view', superAdminOnly: true },
-      { label: 'New Journal Voucher', href: '/accounts/journal/new', icon: Plus, permission: 'accounts:manage', superAdminOnly: true },
+      { labelKey: 'nav.walletsBalances', href: '/accounts', icon: Landmark, permission: 'accounts:view' },
+      { labelKey: 'nav.chartOfAccounts', href: '/accounts/chart', icon: Bookmark, permission: 'accounts:view' },
+      { labelKey: 'nav.dayBook', href: '/accounts/journal', icon: ScrollText, permission: 'accounts:view' },
+      { labelKey: 'nav.openingBalances', href: '/accounts/opening-balances', icon: Calculator, permission: 'accounts:view', superAdminOnly: true },
+      { labelKey: 'nav.yearEndClosing', href: '/accounts/year-close', icon: CalendarCheck, permission: 'accounts:view', superAdminOnly: true },
+      { labelKey: 'nav.newJournalVoucher', href: '/accounts/journal/new', icon: Plus, permission: 'accounts:manage', superAdminOnly: true },
     ],
   },
   {
-    label: 'Reports',
+    /**
+     * Not the owner of any report any more — every module carries its own
+     * reports. This is the cross-module index for analysts and admins.
+     */
+    labelKey: 'nav.allReports',
     icon: BarChart3,
+    href: '/reports',
     permission: 'reports:dashboard',
-    subItems: [
-      { label: 'Reports Hub', href: '/reports', permission: 'reports:dashboard' },
-      { label: 'Sales Report', href: '/reports/sales', permission: 'reports:dashboard' },
-      { label: 'Inventory Valuation', href: '/reports/inventory', permission: 'reports:dashboard' },
-      { label: 'Profit & Loss (P&L)', href: '/reports/pnl', permission: 'reports:dashboard' },
-      { label: 'Customer Due Aging', href: '/reports/customer-aging', permission: 'reports:dashboard' },
-      { label: 'Supplier Payable', href: '/reports/supplier-payable', permission: 'reports:dashboard' },
-      { label: 'Purchases Summary', href: '/reports/purchases', permission: 'reports:dashboard' },
-      { label: 'Wastage Report', href: '/reports/wastage', permission: 'reports:dashboard' },
-      { label: 'Trial Balance', href: '/reports/trial-balance', permission: 'accounts:view' },
-      { label: 'Balance Sheet', href: '/reports/balance-sheet', permission: 'accounts:view' },
-      { label: 'Cash Flow', href: '/reports/cash-flow', permission: 'accounts:view' },
-    ],
   },
   {
-    label: 'Users',
+    labelKey: 'nav.organizations',
+    icon: Building2,
+    href: '/organizations',
+    superAdminOnly: true,
+  },
+  {
+    labelKey: 'nav.users',
     icon: UserCog,
     href: '/users',
     permission: 'users:manage',
   },
   {
-    label: 'Roles',
+    labelKey: 'nav.roles',
     icon: Shield,
     href: '/roles',
     permission: 'roles:view',
   },
   {
-    label: 'Audit Logs',
+    labelKey: 'nav.auditLogs',
     icon: ScrollText,
     href: '/audit-logs',
     permission: 'audit:view',
   },
   {
-    label: 'Backup',
+    labelKey: 'nav.backup',
     icon: Database,
     href: '/backup',
     permission: 'settings:manage',
   },
   {
-    label: 'Settings',
+    labelKey: 'nav.settings',
     icon: Settings,
     href: '/settings',
     permission: 'settings:manage',
   },
 ];
+
+/**
+ * ── Contextual navigation ─────────────────────────────────────────────────
+ *
+ * The list above is the "home" menu. Every module (see lib/modules.ts) owns its
+ * features *and* its reports — `buildHomeNav` folds each module's reports into
+ * that module's own dropdown, so reporting lives inside the module it belongs
+ * to instead of in one central "Reports" pile.
+ *
+ * Inside a module we then show only that module's entries plus the globals, and
+ * `resolveModule` always picks the *longest* matching prefix, so /reports/sales
+ * is Trade's report while /reports itself is the cross-module reporting centre.
+ */
+const GLOBAL_NAV: NavItem[] = [
+  { labelKey: 'nav.dashboard', icon: LayoutDashboard, href: '/dashboard', permission: 'reports:dashboard' },
+  { labelKey: 'nav.settings', icon: Settings, href: '/settings', permission: 'settings:manage' },
+];
+
+/**
+ * Home menu with each module's reports attached to that module. A module whose
+ * page is a single entry (CRM, HR, Distribution…) becomes a group so it has
+ * somewhere to keep its reports: the module page first, then its reporting.
+ */
+function buildHomeNav(): NavItem[] {
+  const byNavKey = new Map<string, ModuleDef>();
+  MODULE_DEFS.forEach((mod) => {
+    if (mod.navKey) byNavKey.set(mod.navKey, mod);
+  });
+
+  return navItems.map((item) => {
+    const module = byNavKey.get(item.labelKey);
+    if (!module || module.reports.length === 0) return item;
+
+    const reports: SubNavItem[] = module.reports.map((report, index) => ({
+      labelKey: report.labelKey,
+      href: report.href,
+      permission: report.permission,
+      section: index === 0 ? 'nav.reportsSection' : undefined,
+    }));
+
+    if (item.subItems) {
+      return { ...item, subItems: [...item.subItems, ...reports] };
+    }
+
+    return {
+      ...item,
+      href: undefined,
+      subItems: [
+        { labelKey: 'nav.overview', href: item.href!, icon: item.icon, permission: item.permission },
+        ...reports,
+      ],
+    };
+  });
+}
+
+const homeNav: NavItem[] = buildHomeNav();
+
+/**
+ * The coloured square that marks a section heading.
+ *
+ * Headings used to look exactly like their own sub-items; giving each one its
+ * module's accent (or a neutral chip for non-module entries) is what makes the
+ * menu readable at a glance.
+ */
+const HeadingChip = ({
+  icon: ChipIcon,
+  module,
+  active,
+}: {
+  icon: React.ElementType;
+  module?: ModuleDef;
+  active?: boolean;
+}) => (
+  <span
+    className={cn(
+      'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all',
+      module ? `bg-gradient-to-br ${module.accent} shadow-sm` : 'bg-slate-800 border border-slate-700',
+      active && 'ring-2 ring-blue-500/50'
+    )}
+  >
+    <ChipIcon className={cn('w-3.5 h-3.5', module ? 'text-white' : 'text-slate-300')} />
+  </span>
+);
+
 
 interface SidebarProps {
   isOpen: boolean;
@@ -195,11 +358,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const pathname = usePathname();
   const { user } = useAuth();
   const branding = useBranding();
-  const [expandedSubmenus, setExpandedSubmenus] = useState<Record<string, boolean>>({
-    Products: true,
-    Reports: false,
-  });
-
+  const { t } = useI18n();
+  const [expandedSubmenus, setExpandedSubmenus] = useState<Record<string, boolean>>({});
   const toggleSubmenu = (label: string) => {
     setExpandedSubmenus((prev) => ({
       ...prev,
@@ -213,7 +373,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return user.permissions.includes(permission);
   };
 
-  const filteredNav = navItems.filter((item) => {
+  const activeModule = resolveModule(pathname || '');
+
+  /**
+   * Where the menu comes from. Inside a module only that module's routes
+   * survive (groups keep just their own children), then the global entries are
+   * appended so Dashboard and Settings never disappear.
+   */
+  const sourceNav: NavItem[] = React.useMemo(() => {
+    if (!activeModule) return homeNav;
+    const scoped = homeNav
+      .map((item) => {
+        if (item.subItems) {
+          return { ...item, subItems: item.subItems.filter((sub) => routeInModule(sub.href, activeModule)) };
+        }
+        return routeInModule(item.href, activeModule) ? item : null;
+      })
+      .filter((item): item is NavItem => {
+        if (!item) return false;
+        return item.subItems ? item.subItems.length > 0 : true;
+      });
+
+    // Global entries (Dashboard, Settings) always stay, without duplicates
+    const already = new Set<string>();
+    for (const item of scoped) {
+      if (item.href) already.add(item.href);
+      (item.subItems || []).forEach((sub) => already.add(sub.href));
+    }
+    const globals = GLOBAL_NAV.filter((g) => !already.has(g.href || ''));
+    return [...scoped, ...globals];
+  }, [activeModule]);
+
+  const filteredNav = sourceNav.filter((item) => {
+    if (item.superAdminOnly && !user?.isPlatformSuperAdmin) return false;
     if (item.subItems) {
       return item.subItems.some((sub) => canAccess(sub.permission));
     }
@@ -283,8 +475,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation list */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1 scrollbar-none">
+          {/* Which module am I in? — with a way back to the full menu */}
+          {activeModule && !isCollapsed && (
+            <div className="mb-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'w-7 h-7 rounded-lg bg-gradient-to-br flex items-center justify-center shrink-0',
+                    activeModule.accent
+                  )}
+                >
+                  <activeModule.icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500">{t('nav.currentModule')}</p>
+                  <p className="text-xs font-bold text-white truncate">{t(activeModule.labelKey)}</p>
+                </div>
+              </div>
+              <Link
+                href="/modules"
+                onClick={onClose}
+                className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                <ChevronLeft className="w-3 h-3" /> {t('nav.allModules')}
+              </Link>
+            </div>
+          )}
+
+          {activeModule && isCollapsed && (
+            <Link
+              href="/modules"
+              onClick={onClose}
+              title={t('nav.allModules')}
+              className="flex items-center justify-center p-2 mb-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Link>
+          )}
+
           {filteredNav.map((item) => {
             const Icon = item.icon;
+            // Which module this heading belongs to — its accent colours the chip.
+            const headingModule = moduleForNavEntry(item.labelKey, item.href);
 
             // Handle submenu items
             if (item.subItems) {
@@ -296,16 +528,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               const isSubActive = allowedSubItems.some(
                 (sub) => pathname === sub.href || (sub.href !== '/reports' && pathname.startsWith(sub.href))
               );
-              const isExpanded = expandedSubmenus[item.label] ?? false;
+              // Inside a module the groups open by default — the user came here
+              // to see this module's pages, not to hunt for them.
+              const isExpanded = expandedSubmenus[item.labelKey] ?? !!activeModule;
 
               if (isCollapsed) {
                 // In collapsed mode, click takes to first subitem or shows popover
                 const firstSub = allowedSubItems[0];
                 return (
                   <Link
-                    key={item.label}
+                    key={item.labelKey}
                     href={firstSub.href}
-                    title={item.label}
+                    title={t(item.labelKey)}
                     className={cn(
                       'flex items-center justify-center p-3 rounded-xl transition-all group relative',
                       isSubActive
@@ -319,47 +553,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }
 
               return (
-                <div key={item.label} className="space-y-0.5">
+                <div key={item.labelKey} className="space-y-0.5">
                   <button
                     type="button"
-                    onClick={() => toggleSubmenu(item.label)}
+                    onClick={() => toggleSubmenu(item.labelKey)}
                     className={cn(
-                      'w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 group text-left',
+                      'w-full flex items-center justify-between gap-2 px-2.5 py-2.5 rounded-xl transition-all duration-150 group text-left',
+                      // A heading, not a link: bolder, with its own surface so it
+                      // never reads as one more sub-item.
                       isSubActive
-                        ? 'bg-slate-800/60 text-slate-100 font-medium'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'
+                        ? 'bg-slate-800 text-white shadow-sm'
+                        : 'bg-slate-800/40 text-slate-100 hover:bg-slate-800/70 hover:text-white'
                     )}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className={cn('w-4 h-4 shrink-0', isSubActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200')} />
-                      <span className="text-sm font-medium">{item.label}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <HeadingChip icon={Icon} module={headingModule} active={isSubActive} />
+                      <span className="text-[13px] font-bold truncate">{t(item.labelKey)}</span>
                     </div>
                     <ChevronDown
                       className={cn(
-                        'w-4 h-4 text-slate-400 transition-transform duration-200',
+                        'w-4 h-4 shrink-0 text-slate-400 transition-transform duration-200',
                         isExpanded && 'rotate-180 text-blue-400'
                       )}
                     />
                   </button>
 
                   {isExpanded && (
-                    <div className="pl-9 pr-1 py-1 space-y-0.5">
-                      {allowedSubItems.map((sub) => {
+                    <div className="pl-3 pr-1 py-1 space-y-0.5 ml-[22px] border-l border-slate-800 max-h-[70vh] overflow-y-auto scrollbar-none">
+                      {allowedSubItems.map((sub, index) => {
                         const isChildActive = pathname === sub.href;
+                        // A new module block starts a labelled section
+                        const startsSection = !!sub.section && allowedSubItems[index - 1]?.section !== sub.section;
                         return (
-                          <Link
-                            key={sub.href}
-                            href={sub.href}
-                            onClick={onClose}
-                            className={cn(
-                              'block px-3 py-2 text-xs rounded-lg transition-all',
-                              isChildActive
-                                ? 'bg-blue-600/20 text-blue-400 font-semibold border-l-2 border-blue-500 pl-2.5'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                          <React.Fragment key={`${sub.href}-${sub.labelKey}`}>
+                            {startsSection && (
+                              <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                {t(sub.section!)}
+                              </p>
                             )}
-                          >
-                            {sub.label}
-                          </Link>
+                            <Link
+                              href={sub.href}
+                              onClick={onClose}
+                              className={cn(
+                                'block px-3 py-2 text-xs rounded-lg transition-all',
+                                isChildActive
+                                  ? 'bg-blue-600/20 text-blue-400 font-semibold border-l-2 border-blue-500 pl-2.5'
+                                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                              )}
+                            >
+                              {t(sub.labelKey)}
+                            </Link>
+                          </React.Fragment>
                         );
                       })}
                     </div>
@@ -373,26 +617,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             return (
               <Link
-                key={item.label}
+                key={item.labelKey}
                 href={item.href || '#'}
                 onClick={onClose}
-                title={isCollapsed ? item.label : undefined}
+                title={isCollapsed ? t(item.labelKey) : undefined}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl transition-all duration-150 group relative',
-                  isCollapsed ? 'px-3 py-3 justify-center' : 'px-3 py-2.5',
+                  'flex items-center gap-2.5 rounded-xl transition-all duration-150 group relative',
+                  isCollapsed ? 'px-2.5 py-3 justify-center' : 'px-2.5 py-2.5',
+                  // Same heading surface as the collapsible groups, so every
+                  // top-level entry reads as a section rather than a leaf.
                   isActive
-                    ? 'bg-blue-600/20 text-blue-400 border-l-4 border-blue-500 font-medium shadow-sm'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'bg-slate-800/40 text-slate-100 hover:bg-slate-800/70 hover:text-white'
                 )}
               >
-                <Icon
-                  className={cn(
-                    'shrink-0 transition-colors',
-                    isCollapsed ? 'w-5 h-5' : 'w-4 h-4',
-                    isActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'
-                  )}
-                />
-                {!isCollapsed && <span className="text-sm font-medium truncate">{item.label}</span>}
+                {isCollapsed ? (
+                  <Icon
+                    className={cn(
+                      'shrink-0 transition-colors w-5 h-5',
+                      isActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-slate-200'
+                    )}
+                  />
+                ) : (
+                  <>
+                    <HeadingChip icon={Icon} module={headingModule} active={isActive} />
+                    <span className="text-[13px] font-bold truncate">{t(item.labelKey)}</span>
+                  </>
+                )}
                 {isActive && !isCollapsed && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400 shadow-sm shadow-blue-400" />
                 )}

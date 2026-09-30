@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface ICategory extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   name: string;
   code: string; // Short uppercase slug, e.g. "BEV-COLD"
   parentId?: Types.ObjectId; // Ref: categories (For nested subcategories)
@@ -14,6 +15,11 @@ export interface ICategory extends Document {
 
 const CategorySchema = new Schema<ICategory>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     name: {
       type: String,
       required: true,
@@ -22,7 +28,6 @@ const CategorySchema = new Schema<ICategory>(
     code: {
       type: String,
       required: true,
-      unique: true,
       uppercase: true,
       trim: true,
     },
@@ -54,6 +59,7 @@ const CategorySchema = new Schema<ICategory>(
 );
 
 // Indexes
+CategorySchema.index({ orgId: 1, code: 1 }, { unique: true });
 CategorySchema.index({ parentId: 1 });
 
 export const Category = mongoose.model<ICategory>('Category', CategorySchema);

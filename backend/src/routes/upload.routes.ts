@@ -6,7 +6,7 @@ import { imageUpload } from '../middlewares/upload.middleware';
 
 const router = Router();
 
-router.use(authenticate);
+
 
 // Product images / shop logo
 router.post(

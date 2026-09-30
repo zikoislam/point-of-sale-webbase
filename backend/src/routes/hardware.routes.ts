@@ -14,7 +14,7 @@ import { cashDrawerSchema, printReceiptSchema } from '../validators/hardware.val
  */
 const router = Router();
 
-router.use(authenticate);
+
 router.use(requirePermissions('pos:checkout'));
 
 // GET /api/v1/hardware/printers

@@ -84,7 +84,9 @@ class CustomerService {
       contactPerson: dto.contactPerson,
       phone: dto.phone,
       email: dto.email,
+      taxId: (dto as any).taxId || undefined,
       address: dto.address,
+      priceTierId: (dto as any).priceTierId || undefined,
       creditLimit: Number(dto.creditLimit) || 0,
       currentDueBalance: 0,
       loyaltyPoints: 0,
@@ -106,7 +108,15 @@ class CustomerService {
     if (dto.contactPerson !== undefined) updates.contactPerson = dto.contactPerson;
     if (dto.phone !== undefined) updates.phone = dto.phone;
     if (dto.email !== undefined) updates.email = dto.email;
+    if ((dto as any).taxId !== undefined) updates.taxId = (dto as any).taxId;
     if (dto.address !== undefined) updates.address = dto.address;
+    if ((dto as any).priceTierId !== undefined) {
+      updates.priceTierId = (dto as any).priceTierId ? new Types.ObjectId((dto as any).priceTierId) : null;
+    }
+    if ((dto as any).customerType !== undefined) updates.customerType = (dto as any).customerType;
+    if ((dto as any).routeId !== undefined) updates.routeId = (dto as any).routeId ? new Types.ObjectId((dto as any).routeId) : null;
+    if ((dto as any).assignedSRId !== undefined) updates.assignedSRId = (dto as any).assignedSRId ? new Types.ObjectId((dto as any).assignedSRId) : null;
+    if ((dto as any).creditDays !== undefined) updates.creditDays = (dto as any).creditDays;
     if (dto.creditLimit !== undefined) updates.creditLimit = dto.creditLimit;
     if (dto.loyaltyPoints !== undefined) updates.loyaltyPoints = dto.loyaltyPoints;
     if (dto.isActive !== undefined) updates.isActive = dto.isActive;

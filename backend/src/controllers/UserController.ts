@@ -12,6 +12,7 @@ export class UserController {
         search: search as string | undefined,
         roleId: roleId as string | undefined,
         isActive: isActive !== undefined ? isActive === 'true' : undefined,
+        orgId: req.user!.orgId,
       });
 
       sendSuccess(res, 200, 'Users retrieved successfully', result.users, {
@@ -27,7 +28,7 @@ export class UserController {
 
   async createUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const user = await userService.createUser(req.body);
+      const user = await userService.createUser(req.body, req.user!.orgId);
       sendSuccess(res, 201, 'User created successfully', user);
     } catch (error) {
       next(error);
@@ -55,7 +56,7 @@ export class UserController {
 
   async getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const user = await userService.getUserById(req.params.id);
+      const user = await userService.getUserById(req.params.id, req.user!.orgId);
       sendSuccess(res, 200, 'User retrieved successfully', user);
     } catch (error) {
       next(error);
@@ -64,7 +65,7 @@ export class UserController {
 
   async updateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const user = await userService.updateUser(req.params.id, req.body, req.user!.userId);
+      const user = await userService.updateUser(req.params.id, req.body, req.user!.userId, req.user!.orgId);
       sendSuccess(res, 200, 'User updated successfully', user);
     } catch (error) {
       next(error);

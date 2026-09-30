@@ -2,6 +2,8 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IAuditLog extends Document {
   _id: Types.ObjectId;
+  /** Organization the action happened in — null for platform-level actions. */
+  orgId?: Types.ObjectId;
   userId: Types.ObjectId; // Ref: users (Actor)
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'PRICE_OVERRIDE' | 'OFFLINE_OVERSELL' | 'SHIFT_DISCREPANCY';
   entity: string; // "sales", "products", "shifts", "accounts"
@@ -13,6 +15,12 @@ export interface IAuditLog extends Document {
 
 const AuditLogSchema = new Schema<IAuditLog>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      default: null,
+      index: true,
+    },
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User',

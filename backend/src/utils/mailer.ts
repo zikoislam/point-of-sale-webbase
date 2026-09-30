@@ -36,8 +36,9 @@ async function sendViaHttpApi(params: {
   subject: string;
   text: string;
   html: string;
+  attachments?: Array<{ filename: string; content: Buffer }>;
 }): Promise<void> {
-  const { to, subject, text, html } = params;
+  const { to, subject, text, html, attachments } = params;
   const provider = (env.EMAIL_API_PROVIDER || 'brevo').toLowerCase();
   const fromEmail = env.SMTP_USER || to;
   const fromName = env.SMTP_FROM_NAME || 'POS';
@@ -49,7 +50,21 @@ async function sendViaHttpApi(params: {
   if (provider === 'resend') {
     url = 'https://api.resend.com/emails';
     headers = { Authorization: `Bearer ${env.EMAIL_API_KEY}`, 'Content-Type': 'application/json' };
-    body = { from: `${fromName} <${fromEmail}>`, to: [to], subject, text, html };
+    body = {
+      from: `${fromName} <${fromEmail}>`,
+      to: [to],
+      subject,
+      text,
+      html,
+      ...(attachments?.length
+        ? {
+            attachments: attachments.map((a) => ({
+              filename: a.filename,
+              content: a.content.toString('base64'),
+            })),
+          }
+        : {}),
+    };
   } else if (provider === 'brevo') {
     url = 'https://api.brevo.com/v3/smtp/email';
     headers = { 'api-key': env.EMAIL_API_KEY!, 'Content-Type': 'application/json' };
@@ -59,6 +74,14 @@ async function sendViaHttpApi(params: {
       subject,
       htmlContent: html,
       textContent: text,
+      ...(attachments?.length
+        ? {
+            attachment: attachments.map((a) => ({
+              name: a.filename,
+              content: a.content.toString('base64'),
+            })),
+          }
+        : {}),
     };
   } else {
     throw new Error(`Unsupported EMAIL_API_PROVIDER "${provider}" (use "brevo" or "resend")`);
@@ -69,6 +92,34 @@ async function sendViaHttpApi(params: {
     const detail = await res.text().catch(() => '');
     throw new Error(`${provider} email API responded ${res.status}: ${detail.slice(0, 300)}`);
   }
+}
+
+/**
+ * Generic sender used by the scheduled-report job: plain text + HTML body with
+ * optional file attachments (PDF / Excel summaries).
+ */
+export async function sendMail(params: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  attachments?: Array<{ filename: string; content: Buffer }>;
+}): Promise<void> {
+  const { to, subject, text, html, attachments } = params;
+
+  if (env.EMAIL_API_KEY) {
+    await sendViaHttpApi({ to, subject, text, html, attachments });
+    return;
+  }
+
+  await getTransporter().sendMail({
+    from: env.SMTP_FROM || env.SMTP_USER!,
+    to,
+    subject,
+    text,
+    html,
+    attachments,
+  });
 }
 
 export async function sendPasswordResetOtp(params: {

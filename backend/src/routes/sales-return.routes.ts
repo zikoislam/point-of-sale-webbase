@@ -7,7 +7,7 @@ import { processReturnSchema } from '../validators/return.validators';
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/', requirePermissions('sales:view'), (req, res, next) => salesReturnController.list(req, res, next));
 router.get('/voucher/:code', requirePermissions('pos:checkout'), (req, res, next) => salesReturnController.validateVoucher(req, res, next));

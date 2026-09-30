@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth';
 import { useBranding } from '../../hooks/useBranding';
+import { ScrollingBanner } from '../../components/ScrollingBanner';
 import {
   Store,
   Lock,
@@ -20,11 +21,14 @@ import {
 import { Spinner } from '../../components/ui/Spinner';
 import { apiClient } from '../../lib/api-client';
 import { SOFTWARE_CREDIT } from '../../lib/constants';
+import { useI18n } from '../../lib/i18n';
+import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
   const branding = useBranding();
+  const { t } = useI18n();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -46,10 +50,11 @@ export default function LoginPage() {
   // Redirect once auth check is done and user is already logged in
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated && user) {
-      if (user.role === 'CASHIER') {
-        router.replace('/pos');
+      if (user.isPlatformSuperAdmin && !user.activeOrgId) {
+        router.replace('/organizations');
       } else {
-        router.replace('/dashboard');
+        // Everyone lands straight in the POS terminal
+        router.replace('/pos');
       }
     }
   }, [isAuthLoading, isAuthenticated, user, router]);
@@ -60,7 +65,7 @@ export default function LoginPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex flex-col justify-center items-center">
         <div className="flex flex-col items-center gap-4">
           <Spinner size="lg" color="primary" />
-          <p className="text-slate-400 text-sm font-medium animate-pulse">Checking session...</p>
+          <p className="text-slate-400 text-sm font-medium animate-pulse">{t('login.checkingSession')}</p>
         </div>
       </div>
     );
@@ -83,10 +88,12 @@ export default function LoginPage() {
 
     try {
       const loggedUser = await login(username.trim(), password, rememberMe);
-      if (loggedUser.role === 'CASHIER') {
-        router.replace('/pos');
+      if (loggedUser.isPlatformSuperAdmin && !loggedUser.activeOrgId) {
+        // Platform super admins land on the organization manager first
+        router.replace('/organizations');
       } else {
-        router.replace('/dashboard');
+        // Everyone else goes straight into the POS terminal
+        router.replace('/pos');
       }
     } catch (err: any) {
       if (err.statusCode === 429 || err.code === 'RATE_LIMIT_EXCEEDED') {
@@ -170,6 +177,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden select-none">
+      {/* Scrolling brand marquee */}
+      <div className="w-full max-w-3xl mb-6 relative z-10">
+        <ScrollingBanner message="WELCOME TO BDBBC SOFTWARE" />
+      </div>
+
       {/* Dynamic Background Glow Elements */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none" />
@@ -191,14 +203,17 @@ export default function LoginPage() {
             </div>
           )}
           <h1 className="text-3xl font-extrabold text-white tracking-tight">{branding.shopName || 'Smart Retail POS'}</h1>
-          <p className="text-sm text-slate-400 mt-1">Enterprise Cloud Shop &amp; Inventory Management</p>
+          <p className="text-sm text-slate-400 mt-1">{t('login.enterpriseSubtitle')}</p>
         </div>
 
         {/* Card Container */}
         <div className="bg-slate-900/90 border border-slate-800/80 backdrop-blur-xl rounded-2xl shadow-2xl p-6 sm:p-8">
           <div className="mb-6">
-            <h2 className="text-xl font-bold text-white">Sign In</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Enter your credentials to access the terminal</p>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-bold text-white">{t('login.title')}</h2>
+              <LanguageSwitcher />
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">{t('login.credentialsHint')}</p>
           </div>
 
           {/* Error Banner */}
@@ -280,11 +295,11 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Spinner size="sm" color="white" />
-                  <span>Authenticating...</span>
+                  <span>{t('login.signingIn')}</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In</span>
+                  <span>{t('login.signIn')}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

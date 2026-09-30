@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IStockAdjustment extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   variantId: Types.ObjectId; // Ref: products.variants (not strictly ref because it's a subdoc)
   productId: Types.ObjectId; // Ref: products
   type: 'INCREASE' | 'DECREASE';
@@ -17,6 +18,11 @@ export interface IStockAdjustment extends Document {
 
 const StockAdjustmentSchema = new Schema<IStockAdjustment>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     variantId: {
       type: Schema.Types.ObjectId,
       required: true,

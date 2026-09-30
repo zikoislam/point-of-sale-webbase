@@ -7,7 +7,7 @@ import { createRoleSchema, updateRoleSchema } from '../validators/role.validator
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/', requirePermissions('roles:view'), (req, res, next) => roleController.listRoles(req, res, next));
 router.get('/permissions', requirePermissions('roles:view'), (req, res, next) => roleController.getAllPermissions(req, res, next));

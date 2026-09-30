@@ -11,7 +11,7 @@ import {
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/', requirePermissions('accounts:view'), (req, res, next) => accountController.list(req, res, next));
 router.get('/:id', requirePermissions('accounts:view'), (req, res, next) => accountController.getById(req, res, next));

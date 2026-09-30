@@ -2,6 +2,11 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IExpense extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  /** Branch that spent the money (multi-branch chains). */
+  branchId?: Types.ObjectId | null;
+  /** Project this cost belongs to, when the spend is job-based. */
+  projectId?: Types.ObjectId | null;
   categoryId: Types.ObjectId; // Ref: expense_categories
   amount: number;
   accountId: Types.ObjectId; // Ref: accounts (Debited account)
@@ -16,6 +21,23 @@ export interface IExpense extends Document {
 
 const ExpenseSchema = new Schema<IExpense>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+      index: true,
+    },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+      default: null,
+      index: true,
+    },
     categoryId: {
       type: Schema.Types.ObjectId,
       ref: 'ExpenseCategory',

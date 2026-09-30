@@ -17,6 +17,8 @@ export interface ReportShellProps {
   loading?: boolean;
   error?: string;
   showDateFilter?: boolean;
+  /** Extra query params appended to the export URLs (barcode, threshold, days…). */
+  extraQuery?: Record<string, string>;
   children: React.ReactNode;
 }
 
@@ -32,11 +34,13 @@ export function ReportShell({
   loading,
   error,
   showDateFilter = true,
+  extraQuery,
   children,
 }: ReportShellProps) {
   const query = new URLSearchParams({
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
+    ...(extraQuery || {}),
   }).toString();
 
   const open = (path: string) => window.open(`${REPORT_API}${path}${query ? `?${query}` : ''}`, '_blank');

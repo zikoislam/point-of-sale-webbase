@@ -17,6 +17,7 @@ export const updateSettingsSchema = z.object({
   receiptHeader: z.string().trim().optional(),
   receiptFooter: z.string().trim().optional(),
   logoUrl: z.string().trim().optional(),
+  poApprovalThreshold: z.coerce.number().min(0).optional(),
 });
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

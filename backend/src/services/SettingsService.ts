@@ -17,6 +17,8 @@ export interface ShopSettings {
   receiptHeader: string;
   receiptFooter: string;
   logoUrl?: string;
+  /** Purchase orders above this amount need a manager's approval (0 = never). */
+  poApprovalThreshold?: number;
 }
 
 export class SettingsService {
@@ -24,9 +26,8 @@ export class SettingsService {
     const existing = await Settings.findOne().lean();
     if (existing) return existing as unknown as ShopSettings;
 
-    // Auto-create default singleton settings
+    // Auto-create per-org settings (orgId comes from the request scope plugin)
     const created = await Settings.create({
-      isDefault: true,
       shopName: 'Smart Retail POS',
       shopAddress: '',
       shopPhone: '',
@@ -50,26 +51,40 @@ export class SettingsService {
     const settings = await Settings.findOneAndUpdate(
       {},
       { $set: data },
-      { new: true, upsert: true, runValidators: true }
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     ).lean();
     if (!settings) throw new AppError(500, 'SETTINGS_ERROR', 'Failed to update settings');
     return settings as unknown as ShopSettings;
   }
 
-  async getPublicBranding() {
-    const settings = await this.getSettings();
+  /**
+   * Public branding for the login screen. Unauthenticated, so it resolves the
+   * organization explicitly — by slug when one is given, otherwise the first.
+   */
+  async getPublicBranding(orgSlug?: string) {
+    let settings: any;
+    if (orgSlug) {
+      const { Organization } = await import('../models/Organization');
+      const org = await Organization.findOne({ slug: orgSlug.toLowerCase() }).lean();
+      settings = org ? await Settings.findOne({ orgId: org._id }).lean() : undefined;
+    } else {
+      settings = await Settings.findOne().lean();
+    }
+    if (!settings) {
+      settings = await Settings.findOne({}).lean();
+    }
     return {
-      shopName: settings.shopName,
-      logoUrl: settings.logoUrl || '',
-      currencySymbol: settings.currencySymbol,
-      shopAddress: settings.shopAddress,
-      shopPhone: settings.shopPhone,
+      shopName: settings?.shopName || 'Smart Retail POS',
+      logoUrl: settings?.logoUrl || '',
+      currencySymbol: settings?.currencySymbol || '৳',
+      shopAddress: settings?.shopAddress || '',
+      shopPhone: settings?.shopPhone || '',
       // Paper settings ride along with the branding so the POS can size a memo
       // on any client — a cashier cannot read the full settings document.
-      thermalPrinterType: settings.thermalPrinterType || '80mm',
-      memoPrintMode: settings.memoPrintMode || 'thermal',
-      memoWidthMm: settings.memoWidthMm || 210,
-      memoHeightMm: settings.memoHeightMm || 297,
+      thermalPrinterType: settings?.thermalPrinterType || '80mm',
+      memoPrintMode: settings?.memoPrintMode || 'thermal',
+      memoWidthMm: settings?.memoWidthMm || 210,
+      memoHeightMm: settings?.memoHeightMm || 297,
     };
   }
 }

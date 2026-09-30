@@ -41,6 +41,7 @@ import { printSaleReceipt } from '../../../lib/receipt-printer';
 import { prepareMemoPrint } from '../../../lib/memo-print';
 import { electronBridge, isElectron } from '../../../lib/electron-bridge';
 import { useBranding } from '../../../hooks/useBranding';
+import { ScrollingBanner } from '../../../components/ScrollingBanner';
 import { BarcodeRenderer } from '../../../components/BarcodeRenderer';
 import { NumberInput } from '../../../components/ui/NumberInput';
 
@@ -79,12 +80,17 @@ interface Product {
 
 interface CartItem {
   variantId: string;
+  productId?: string;
   productName: string;
   variantName: string;
   sku: string;
   barcode?: string;
   quantity: number;
   unitSellingPrice: number;
+  /** Price before any volume/trade discount — restored when the band no longer applies. */
+  basePrice?: number;
+  /** Active quantity-band discount, shown as a badge on the line. */
+  volume?: { discountPercent: number; fixedPrice: number | null } | null;
   taxRate: number;
   taxType: string;
   discount: number;
@@ -109,6 +115,9 @@ interface Customer {
   phone: string;
   creditLimit: number;
   currentDueBalance: number;
+  /** Loyalty balance and tier — shown so the cashier can offer a redemption. */
+  loyaltyPoints?: number;
+  loyaltyTier?: string;
 }
 
 interface Shift {
@@ -244,6 +253,14 @@ export default function POSTerminalPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pricingTier, setPricingTier] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [overallDiscount, setOverallDiscount] = useState<number>(0);
+  /** Loyalty points the cashier is spending on this bill. */
+  const [redeemPoints, setRedeemPoints] = useState<number>(0);
+  const [loyaltyCfg, setLoyaltyCfg] = useState<{
+    isActive: boolean;
+    redeemValuePerPoint: number;
+    minPointsToRedeem: number;
+    maxRedeemPercent: number;
+  } | null>(null);
   // Row highlighted in the cart grid / shown in the "Product Info." panel
   const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
   // Slide-over product catalog (touch-friendly alternative to scanning)
@@ -259,6 +276,27 @@ export default function POSTerminalPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
+  // Loyalty rules for the till. Read with pos:checkout so a cashier can use the
+  // programme without holding crm:view.
+  useEffect(() => {
+    let active = true;
+    fetch(`${API}/crm/loyalty/pos`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (active && json?.success) setLoyaltyCfg(json.data);
+      })
+      .catch(() => {
+        /* no loyalty programme reachable — the till simply does not offer it */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Points belong to whoever is on the bill, so switching customer clears them.
+  useEffect(() => {
+    setRedeemPoints(0);
+  }, [selectedCustomer?._id]);
   // Hold Carts
   const [holdCarts, setHoldCarts] = useState<HoldCartItem[]>([]);
   const [showHoldModal, setShowHoldModal] = useState(false);
@@ -427,12 +465,15 @@ export default function POSTerminalPage() {
           ...prev,
           {
             variantId: variant._id,
+            productId: product.id,
             productName: product.name,
             variantName: variant.attributeName,
             sku: variant.sku,
             barcode: variant.barcode,
             quantity: 1,
             unitSellingPrice: price,
+            basePrice: price,
+            volume: null,
             taxRate: product.taxRate || 0,
             taxType: product.taxType || 'INCLUSIVE',
             discount: 0,
@@ -635,37 +676,73 @@ export default function POSTerminalPage() {
     alert(`No exact product found for "${term}". Pick one from the search results list.`);
   };
 
-  const updateCartQty = (variantId: string, direction: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) => {
+  /**
+   * Volume / trade pricing: re-check the quantity band for a line and refresh
+   * its price + badge. Best-effort only — the server re-prices authoritatively
+   * at checkout, so a failed lookup never blocks billing.
+   */
+  const syncVolumePrice = async (variantId: string, qty: number, customerType: 'RETAIL' | 'WHOLESALE') => {
+    try {
+      const params = new URLSearchParams({ variantId, qty: String(qty), customerType });
+      const res = await fetch(`${API}/volume-pricing/applicable?${params.toString()}`, fetchOpts());
+      const j = await res.json().catch(() => null);
+      const rule = j?.success ? j.data : null;
+
+      setCart((prev) =>
+        prev.map((item) => {
           if (item.variantId !== variantId) return item;
-          // Measured units step by 0.25, countable units by 1
-          const next = Number((item.quantity + direction * qtyStep(item.unit)).toFixed(2));
-          if (next <= 0) return null;
-          if (next > item.stockAvailable) {
-            alert(`Max available stock is ${item.stockAvailable}`);
-            return item;
+          const base = item.basePrice ?? item.unitSellingPrice;
+          if (rule && (rule.fixedPrice !== null || (rule.discountPercent || 0) > 0)) {
+            const price =
+              rule.fixedPrice !== null
+                ? Number(rule.fixedPrice)
+                : Math.round(base * (1 - rule.discountPercent / 100) * 100) / 100;
+            return {
+              ...item,
+              basePrice: base,
+              unitSellingPrice: price,
+              volume: { discountPercent: rule.discountPercent || 0, fixedPrice: rule.fixedPrice ?? null },
+            };
           }
-          return { ...item, quantity: next };
+          return { ...item, basePrice: base, unitSellingPrice: base, volume: null };
         })
-        .filter(Boolean) as CartItem[]
-    );
+      );
+    } catch {
+      // preview only — checkout is authoritative
+    }
+  };
+
+  const syncAllVolumePrices = (customerType: 'RETAIL' | 'WHOLESALE') => {
+    for (const item of cart) {
+      void syncVolumePrice(item.variantId, item.quantity, customerType);
+    }
+  };
+
+  const updateCartQty = (variantId: string, direction: number) => {
+    const item = cart.find((i) => i.variantId === variantId);
+    if (!item) return;
+    // Measured units step by 0.25, countable units by 1
+    const next = Number((item.quantity + direction * qtyStep(item.unit)).toFixed(2));
+    if (next <= 0) {
+      removeCartItem(variantId);
+      return;
+    }
+    if (next > item.stockAvailable) {
+      alert(`Max available stock is ${item.stockAvailable}`);
+      return;
+    }
+    setCart((prev) => prev.map((i) => (i.variantId === variantId ? { ...i, quantity: next } : i)));
+    void syncVolumePrice(variantId, next, pricingTier);
   };
 
   // Type an exact quantity, clamped to the unit's minimum..available stock
   const setCartQty = (variantId: string, qty: number) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.variantId !== variantId) return item;
-        if (!Number.isFinite(qty)) return item;
-        const snapped = isWholeUnit(item.unit)
-          ? Math.round(qty)
-          : Math.round(qty * 100) / 100;
-        const clamped = Math.min(Math.max(snapped, minQty(item.unit)), item.stockAvailable);
-        return { ...item, quantity: clamped };
-      })
-    );
+    const item = cart.find((i) => i.variantId === variantId);
+    if (!item || !Number.isFinite(qty)) return;
+    const snapped = isWholeUnit(item.unit) ? Math.round(qty) : Math.round(qty * 100) / 100;
+    const clamped = Math.min(Math.max(snapped, minQty(item.unit)), item.stockAvailable);
+    setCart((prev) => prev.map((i) => (i.variantId === variantId ? { ...i, quantity: clamped } : i)));
+    void syncVolumePrice(variantId, clamped, pricingTier);
   };
 
   const removeCartItem = (variantId: string) => {
@@ -721,9 +798,30 @@ export default function POSTerminalPage() {
 
   const subtotal = round2(cart.reduce((acc, item) => acc + lineNet(item), 0));
   const totalTax = round2(cart.reduce((acc, item) => acc + lineTax(item), 0));
+
+  // Loyalty redemption — points become a bill discount, exactly as the backend
+  // applies it, so the tendered amount and change stay truthful.
+  const loyaltyBalance = selectedCustomer?.loyaltyPoints || 0;
+  const loyaltyValue =
+    loyaltyCfg?.isActive && redeemPoints > 0 ? round2(redeemPoints * loyaltyCfg.redeemValuePerPoint) : 0;
+  const billBeforeLoyalty = round2(cart.reduce((acc, item) => acc + lineTotal(item), 0) - overallDiscount);
+  const loyaltyMaxPoints = loyaltyCfg
+    ? Math.max(0, Math.min(loyaltyBalance, Math.floor((billBeforeLoyalty * loyaltyCfg.maxRedeemPercent) / 100 / (loyaltyCfg.redeemValuePerPoint || 1))))
+    : 0;
+  const loyaltyError =
+    redeemPoints <= 0
+      ? ''
+      : redeemPoints > loyaltyBalance
+      ? 'The customer does not have that many points'
+      : redeemPoints < (loyaltyCfg?.minPointsToRedeem || 0)
+      ? `Minimum ${loyaltyCfg?.minPointsToRedeem} points to redeem`
+      : redeemPoints > loyaltyMaxPoints
+      ? `Points can cover at most ${loyaltyCfg?.maxRedeemPercent}% of this bill`
+      : '';
+
   const grandTotal = Math.max(
     0,
-    round2(cart.reduce((acc, item) => acc + lineTotal(item), 0) - overallDiscount)
+    round2(cart.reduce((acc, item) => acc + lineTotal(item), 0) - overallDiscount - loyaltyValue)
   );
 
   // Hold Cart
@@ -828,6 +926,7 @@ export default function POSTerminalPage() {
         discount: i.discount,
       })),
       discountAmount: overallDiscount,
+      loyaltyPointsToRedeem: loyaltyValue > 0 ? redeemPoints : undefined,
       payments: [
         {
           method: paymentMethod,
@@ -1101,6 +1200,9 @@ export default function POSTerminalPage() {
         </form>
       </header>
 
+      {/* Shop-name LED marquee — the name comes from this organization's Settings */}
+      <ScrollingBanner slim />
+
       {/* Status strip */}
       <div className="bg-[#eef1f2] border-b border-slate-300 px-3 py-1.5 flex items-center gap-2 flex-wrap shrink-0 text-[11px]">
         <span className="flex items-center gap-1.5 px-2 py-1 bg-white border border-slate-300 rounded-sm font-bold text-slate-700">
@@ -1135,7 +1237,10 @@ export default function POSTerminalPage() {
         {/* Pricing Tier Toggle */}
         <div className="flex items-center bg-white border border-slate-300 rounded-sm font-semibold overflow-hidden">
           <button
-            onClick={() => setPricingTier('RETAIL')}
+            onClick={() => {
+              setPricingTier('RETAIL');
+              syncAllVolumePrices('RETAIL');
+            }}
             className={`px-3 py-1 transition ${
               pricingTier === 'RETAIL' ? 'bg-[#0f9aa8] text-white' : 'text-slate-600 hover:bg-slate-100'
             }`}
@@ -1143,7 +1248,10 @@ export default function POSTerminalPage() {
             Retail
           </button>
           <button
-            onClick={() => setPricingTier('WHOLESALE')}
+            onClick={() => {
+              setPricingTier('WHOLESALE');
+              syncAllVolumePrices('WHOLESALE');
+            }}
             className={`px-3 py-1 transition ${
               pricingTier === 'WHOLESALE' ? 'bg-[#0f9aa8] text-white' : 'text-slate-600 hover:bg-slate-100'
             }`}
@@ -1301,6 +1409,40 @@ export default function POSTerminalPage() {
 
                   <span className={labelCls}>Full Name :</span>
                   <input readOnly value={selectedCustomer?.name || '—'} className={fieldCls} />
+
+                  {selectedCustomer && loyaltyCfg?.isActive && (
+                    <>
+                      <span className={labelCls}>Loyalty :</span>
+                      <div className="flex items-center gap-2">
+                        {selectedCustomer.loyaltyTier && selectedCustomer.loyaltyTier !== 'NONE' && (
+                          <span className="px-1.5 py-0.5 rounded border border-amber-500 bg-amber-100 text-[10px] font-bold text-amber-800">
+                            {selectedCustomer.loyaltyTier}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-slate-700">
+                          {loyaltyBalance} pt(s) · worth{' '}
+                          {(loyaltyBalance * (loyaltyCfg.redeemValuePerPoint || 0)).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <span className={labelCls}>Redeem :</span>
+                      <div className="flex items-center gap-2">
+                        <NumberInput
+                          min={0}
+                          value={redeemPoints}
+                          onValueChange={setRedeemPoints}
+                          className={`${fieldCls} text-right`}
+                        />
+                        <span className="text-[11px] text-slate-700 whitespace-nowrap">
+                          = ৳{loyaltyValue.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {loyaltyError && (
+                        <div className="col-span-2 text-[10px] text-red-600 font-semibold">{loyaltyError}</div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 {selectedCustomer && (
@@ -1444,6 +1586,13 @@ export default function POSTerminalPage() {
                           </td>
                           <td className="border border-slate-300 py-1 px-2 text-right text-slate-800">
                             ৳{item.unitSellingPrice.toFixed(2)}
+                            {item.volume && (
+                              <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-emerald-100 border border-emerald-300 text-emerald-700 text-[9px] font-bold align-middle">
+                                {item.volume.fixedPrice !== null
+                                  ? 'VOLUME PRICE'
+                                  : `VOL −${item.volume.discountPercent}%`}
+                              </span>
+                            )}
                           </td>
                           <td className="border border-slate-300 py-1 px-2">
                             <div className="flex items-center justify-center gap-1">
@@ -1563,6 +1712,18 @@ export default function POSTerminalPage() {
 
                 <span className={labelCls}>Tax (VAT) :</span>
                 <input readOnly value={totalTax.toFixed(2)} className={`${fieldCls} text-right`} />
+
+                {loyaltyValue > 0 && (
+                  <>
+                    <span className={labelCls}>Points :</span>
+                    <input
+                      readOnly
+                      value={`-${loyaltyValue.toFixed(2)}`}
+                      className={`${fieldCls} text-right font-semibold text-emerald-700`}
+                      title={`${redeemPoints} loyalty point(s)`}
+                    />
+                  </>
+                )}
 
                 <span className={labelCls}>Total :</span>
                 <input

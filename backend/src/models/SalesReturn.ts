@@ -10,7 +10,8 @@ export interface IReturnItem {
 
 export interface ISalesReturn extends Document {
   _id: Types.ObjectId;
-  returnNo: string; // Unique, e.g. "RET-20260907-0001"
+  orgId: Types.ObjectId;
+  returnNo: string; // Unique per org, e.g. "RET-20260907-0001"
   saleId: Types.ObjectId; // Ref: sales
   originalInvoiceNo: string; // Snapshot
   customerId?: Types.ObjectId; // Ref: customers
@@ -55,10 +56,14 @@ const ReturnItemSchema = new Schema<IReturnItem>(
 
 const SalesReturnSchema = new Schema<ISalesReturn>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     returnNo: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       uppercase: true,
     },
@@ -116,6 +121,7 @@ const SalesReturnSchema = new Schema<ISalesReturn>(
 );
 
 // Indexes
+SalesReturnSchema.index({ orgId: 1, returnNo: 1 }, { unique: true });
 SalesReturnSchema.index({ saleId: 1, createdAt: -1 });
 
 export const SalesReturn = mongoose.model<ISalesReturn>('SalesReturn', SalesReturnSchema);

@@ -8,7 +8,7 @@ import { createUserSchema, updateUserSchema, updatePinSchema, updateProfileSchem
 const router = Router();
 
 // All user management routes require auth
-router.use(authenticate);
+
 
 // Self-service profile (any authenticated user) — must precede /:id
 router.get('/me/profile', (req, res, next) => userController.getMyProfile(req, res, next));

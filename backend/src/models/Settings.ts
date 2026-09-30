@@ -2,7 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface ISettings extends Document {
   _id: Types.ObjectId;
-  isDefault: boolean; // Unique Index: only one active settings document
+  orgId: Types.ObjectId; // One settings document per organization
   shopName: string; // e.g. "Al-Amin Traders"
   shopAddress: string;
   shopPhone: string;
@@ -32,16 +32,19 @@ export interface ISettings extends Document {
    * before it is refused, so a closed year cannot be altered by accident.
    */
   booksClosedUpTo?: Date;
+  /** Purchase orders above this amount need a manager's approval (0 = never). */
+  poApprovalThreshold: number;
   updatedAt: Date;
 }
 
 const SettingsSchema = new Schema<ISettings>(
   {
-    isDefault: {
-      type: Boolean,
-      default: true,
-      unique: true,
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
       required: true,
+      unique: true,
+      index: true,
     },
     shopName: {
       type: String,
@@ -134,6 +137,11 @@ const SettingsSchema = new Schema<ISettings>(
     },
     booksClosedUpTo: {
       type: Date,
+    },
+    poApprovalThreshold: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   {

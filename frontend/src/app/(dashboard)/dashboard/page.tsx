@@ -29,6 +29,7 @@ import {
   ChevronRight,
   ShieldAlert,
   Calendar,
+  ArrowRight,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -69,6 +70,16 @@ interface DashboardResponse {
 export default function DashboardPage() {
   const branding = useBranding();
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
+
+  // Purchase orders waiting for a manager's approval (Phase 6.3)
+  const { data: pendingPoApprovals = 0 } = useQuery<number>({
+    queryKey: ['po-pending-approvals'],
+    queryFn: async () => {
+      const res = await api.get('/purchase-orders', { params: { approvalStatus: 'PENDING_APPROVAL', limit: 1 } } as any);
+      return res.meta?.totalItems ?? 0;
+    },
+    refetchInterval: 60000,
+  });
 
   // Fetch Dashboard Metrics
   const {
@@ -327,6 +338,29 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* SECTION 0: Pending PO approvals alert (Phase 6.3)  */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {pendingPoApprovals > 0 && (
+        <Link
+          href="/purchase-orders"
+          className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/40 rounded-2xl px-5 py-4 hover:bg-amber-500/15 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-amber-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-200">
+              {pendingPoApprovals} purchase order{pendingPoApprovals === 1 ? '' : 's'} waiting for approval
+            </p>
+            <p className="text-[11px] text-amber-300/80">
+              Above the approval threshold — open Purchase Orders to approve or reject
+            </p>
+          </div>
+          <ArrowRight className="w-5 h-5 text-amber-300 shrink-0" />
+        </Link>
+      )}
 
       {/* ═══════════════════════════════════════════════════ */}
       {/* SECTION 1: Quick Links (Metro-Style Cards Grid)    */}

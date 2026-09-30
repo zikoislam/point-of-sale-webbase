@@ -1,7 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { getSocket } from '../lib/socket-client';
+import { api } from '../lib/api-client';
 
+/** Persisted notification types the backend writes (Phase 9.5). */
 export type NotificationType =
+  | 'LOW_STOCK'
+  | 'PO_APPROVAL'
+  | 'NEW_SALE'
+  | 'DUE_ALERT'
+  | 'SYSTEM'
+  // legacy live alerts kept for backwards compatibility
   | 'LOW_STOCK_ALERT'
   | 'SHIFT_DISCREPANCY_ALERT'
   | 'OFFLINE_OVERSELL_ALERT'
@@ -15,6 +23,8 @@ export interface RealtimeAlert {
   message: string;
   timestamp: Date;
   read: boolean;
+  entityType?: string;
+  entityId?: string;
   meta?: any;
 }
 
@@ -44,15 +54,54 @@ function playAlertChime() {
   }
 }
 
+/**
+ * Notification feed for the header bell.
+ *
+ * Sources:
+ *  - GET /notifications            → persisted feed (survives reloads)
+ *  - Socket.IO `NOTIFICATION`      → live push into the org room
+ *  - legacy alert events           → older emitters (low stock / shift / …)
+ *
+ * Read state is written back to the server, so a badge cleared on one device
+ * stays cleared everywhere.
+ */
 export const useRealTimeNotifications = () => {
   const [alerts, setAlerts] = useState<RealtimeAlert[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const loadedRef = useRef(false);
 
-  const addAlert = useCallback((alert: Omit<RealtimeAlert, 'id' | 'timestamp' | 'read'>) => {
+  const mapRow = (row: any): RealtimeAlert => ({
+    id: String(row._id || row.id),
+    type: (row.type || 'SYSTEM') as NotificationType,
+    title: row.title || 'Notification',
+    message: row.message || '',
+    timestamp: new Date(row.createdAt || Date.now()),
+    read: !!row.isRead,
+    entityType: row.entityType,
+    entityId: row.entityId,
+  });
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await api.get('/notifications?limit=30');
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setAlerts(rows.map(mapRow));
+      setUnreadCount(rows.filter((r: any) => !r.isRead).length);
+      loadedRef.current = true;
+    } catch {
+      // offline / not logged in yet — the socket will fill the list live
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const pushAlert = useCallback((alert: Omit<RealtimeAlert, 'id' | 'timestamp' | 'read'> & { id?: string; timestamp?: Date }) => {
     const newAlert: RealtimeAlert = {
       ...alert,
-      id: `alert-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      timestamp: new Date(),
+      id: alert.id || `alert-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: alert.timestamp || new Date(),
       read: false,
     };
 
@@ -61,16 +110,24 @@ export const useRealTimeNotifications = () => {
     playAlertChime();
   }, []);
 
-  const markAsRead = useCallback((id: string) => {
-    setAlerts((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, read: true } : a))
-    );
+  const markAsRead = useCallback(async (id: string) => {
+    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      await api.put(`/notifications/${id}/read`);
+    } catch {
+      // the next refresh reconciles
+    }
   }, []);
 
-  const markAllAsRead = useCallback(() => {
+  const markAllAsRead = useCallback(async () => {
     setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
     setUnreadCount(0);
+    try {
+      await api.put('/notifications/mark-all-read');
+    } catch {
+      // the next refresh reconciles
+    }
   }, []);
 
   const clearAlerts = useCallback(() => {
@@ -81,54 +138,63 @@ export const useRealTimeNotifications = () => {
   useEffect(() => {
     const socket = getSocket();
 
-    const handleLowStock = (data: any) => {
-      addAlert({
+    // Live persisted notification (Phase 9.5)
+    const handleNotification = (row: any) => {
+      if (!loadedRef.current) return; // initial fetch will include it
+      pushAlert(mapRow(row));
+    };
+
+    // Legacy live events still emitted by some flows
+    const handleLowStock = (data: any) =>
+      pushAlert({
         type: 'LOW_STOCK_ALERT',
         title: 'Low Stock Alert',
         message: `Product "${data.productName || data.name || 'Item'}" reached low stock threshold (${data.currentStock} remaining).`,
+        entityType: 'inventory',
         meta: data,
       });
-    };
 
-    const handleShiftDiscrepancy = (data: any) => {
-      addAlert({
+    const handleShiftDiscrepancy = (data: any) =>
+      pushAlert({
         type: 'SHIFT_DISCREPANCY_ALERT',
         title: 'Shift Discrepancy Escalation',
         message: `Shift closed by ${data.cashierName || 'Cashier'} with cash discrepancy of ৳${data.discrepancy || data.amount}.`,
+        entityType: 'shifts',
         meta: data,
       });
-    };
 
-    const handleOversell = (data: any) => {
-      addAlert({
+    const handleOversell = (data: any) =>
+      pushAlert({
         type: 'OFFLINE_OVERSELL_ALERT',
         title: 'Offline Oversell Warning',
         message: `Offline sale synced with negative inventory balance for SKU ${data.sku || data.barcode || 'N/A'}.`,
+        entityType: 'inventory',
         meta: data,
       });
-    };
 
-    const handleExpiry = (data: any) => {
-      addAlert({
+    const handleExpiry = (data: any) =>
+      pushAlert({
         type: 'EXPIRY_WARNING',
         title: 'Batch Expiry Warning',
         message: `Batch for "${data.productName || 'Product'}" is expiring soon on ${data.expiryDate || 'N/A'}.`,
+        entityType: 'inventory',
         meta: data,
       });
-    };
 
+    socket.on('NOTIFICATION', handleNotification);
     socket.on('LOW_STOCK_ALERT', handleLowStock);
     socket.on('SHIFT_DISCREPANCY_ALERT', handleShiftDiscrepancy);
     socket.on('OFFLINE_OVERSELL_ALERT', handleOversell);
     socket.on('EXPIRY_WARNING', handleExpiry);
 
     return () => {
+      socket.off('NOTIFICATION', handleNotification);
       socket.off('LOW_STOCK_ALERT', handleLowStock);
       socket.off('SHIFT_DISCREPANCY_ALERT', handleShiftDiscrepancy);
       socket.off('OFFLINE_OVERSELL_ALERT', handleOversell);
       socket.off('EXPIRY_WARNING', handleExpiry);
     };
-  }, [addAlert]);
+  }, [pushAlert]);
 
   return {
     alerts,
@@ -136,6 +202,7 @@ export const useRealTimeNotifications = () => {
     markAsRead,
     markAllAsRead,
     clearAlerts,
-    addAlert,
+    addAlert: pushAlert,
+    refresh,
   };
 };

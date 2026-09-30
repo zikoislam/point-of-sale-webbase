@@ -5,7 +5,7 @@ import { sendSuccess } from '../utils/api-response';
 export class SettingsController {
   async getPublicSettings(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const branding = await settingsService.getPublicBranding();
+      const branding = await settingsService.getPublicBranding(req.query.org as string | undefined);
       sendSuccess(res, 200, 'Branding retrieved', branding);
     } catch (error) { next(error); }
   }
@@ -14,6 +14,20 @@ export class SettingsController {
     try {
       const settings = await settingsService.getSettings();
       sendSuccess(res, 200, 'Settings retrieved', settings);
+    } catch (error) { next(error); }
+  }
+
+  /** Branding for the ACTIVE organization (request scope resolves the org). */
+  async getBranding(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const settings = await settingsService.getSettings();
+      sendSuccess(res, 200, 'Branding retrieved', {
+        shopName: settings.shopName,
+        logoUrl: settings.logoUrl || '',
+        currencySymbol: settings.currencySymbol,
+        shopAddress: settings.shopAddress,
+        shopPhone: settings.shopPhone,
+      });
     } catch (error) { next(error); }
   }
 

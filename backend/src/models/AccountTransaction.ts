@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IAccountTransaction extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   accountId: Types.ObjectId; // Ref: accounts
   type: 'CREDIT' | 'DEBIT';
   amount: number;
@@ -26,6 +27,11 @@ export interface IAccountTransaction extends Document {
 
 const AccountTransactionSchema = new Schema<IAccountTransaction>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     accountId: {
       type: Schema.Types.ObjectId,
       ref: 'Account',

@@ -139,6 +139,28 @@ class ExpenseService {
       }
 
       await session.commitTransaction();
+
+      // Multi-tier approval workflow (Module 7) — expenses that are not
+      // auto-approved are routed through the configured chain.
+      if (!isAutoApproved) {
+        try {
+          const { approvalService } = await import('./ApprovalService');
+          await approvalService.submit(
+            {
+              entityType: 'EXPENSE',
+              entityId: String(expense[0]._id),
+              entityRef: `EXP-${String(expense[0]._id).slice(-6).toUpperCase()}`,
+              title: dto.description.trim() || 'Expense',
+              amount,
+              requestedBy: userId,
+            },
+            userId
+          );
+        } catch (err) {
+          console.warn('expense approval submit failed:', (err as Error).message);
+        }
+      }
+
       return expense[0].toObject() as unknown as IExpense;
     } catch (err) {
       await session.abortTransaction();

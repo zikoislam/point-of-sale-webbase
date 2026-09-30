@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Bell,
   Package,
@@ -9,12 +10,31 @@ import {
   Trash2,
   Check,
   X,
+  ClipboardCheck,
+  ShoppingCart,
+  Wallet,
+  Info,
 } from 'lucide-react';
 import { useRealTimeNotifications, RealtimeAlert } from '../hooks/useRealTimeNotifications';
 import { cn, formatDateTime } from '../lib/utils';
 
+/** Where a notification click should take the user. */
+const ENTITY_ROUTES: Record<string, string> = {
+  'purchase-orders': '/purchase-orders',
+  sales: '/sales',
+  inventory: '/inventory',
+  products: '/products',
+  customers: '/customers',
+  shifts: '/shifts',
+  hr: '/hr',
+  production: '/production',
+  crm: '/crm',
+  'ecommerce/orders': '/ecommerce/orders',
+};
+
 export const NotificationBell: React.FC = () => {
   const { alerts, unreadCount, markAsRead, markAllAsRead, clearAlerts } = useRealTimeNotifications();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -30,10 +50,26 @@ export const NotificationBell: React.FC = () => {
 
   const getAlertConfig = (type: RealtimeAlert['type']) => {
     switch (type) {
+      case 'LOW_STOCK':
       case 'LOW_STOCK_ALERT':
         return {
           icon: <Package className="w-4 h-4 text-rose-400" />,
           badgeClass: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+        };
+      case 'PO_APPROVAL':
+        return {
+          icon: <ClipboardCheck className="w-4 h-4 text-amber-400" />,
+          badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+        };
+      case 'NEW_SALE':
+        return {
+          icon: <ShoppingCart className="w-4 h-4 text-emerald-400" />,
+          badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+        };
+      case 'DUE_ALERT':
+        return {
+          icon: <Wallet className="w-4 h-4 text-orange-400" />,
+          badgeClass: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
         };
       case 'SHIFT_DISCREPANCY_ALERT':
         return {
@@ -50,11 +86,26 @@ export const NotificationBell: React.FC = () => {
           icon: <Clock className="w-4 h-4 text-orange-400" />,
           badgeClass: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
         };
+      case 'SYSTEM':
+        return {
+          icon: <Info className="w-4 h-4 text-blue-400" />,
+          badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+        };
       default:
         return {
           icon: <Bell className="w-4 h-4 text-blue-400" />,
           badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
         };
+    }
+  };
+
+  /** Click → mark read and jump to the related page. */
+  const openNotification = (item: RealtimeAlert) => {
+    if (!item.read) void markAsRead(item.id);
+    const href = item.entityType ? ENTITY_ROUTES[item.entityType] : undefined;
+    if (href) {
+      setIsOpen(false);
+      router.push(href);
     }
   };
 
@@ -132,8 +183,10 @@ export const NotificationBell: React.FC = () => {
                 return (
                   <div
                     key={item.id}
+                    onClick={() => openNotification(item)}
                     className={cn(
                       'p-2.5 rounded-xl border text-xs transition-all relative group',
+                      ENTITY_ROUTES[item.entityType || ''] ? 'cursor-pointer hover:border-slate-600' : '',
                       item.read ? 'bg-slate-900/60 border-slate-800/60 text-slate-400' : 'bg-slate-800/80 border-slate-700 text-slate-200 shadow-sm'
                     )}
                   >
@@ -162,7 +215,10 @@ export const NotificationBell: React.FC = () => {
                       {!item.read && (
                         <button
                           type="button"
-                          onClick={() => markAsRead(item.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void markAsRead(item.id);
+                          }}
                           className="text-slate-500 hover:text-emerald-400 p-1 rounded transition-colors shrink-0"
                           title="Mark as read"
                         >

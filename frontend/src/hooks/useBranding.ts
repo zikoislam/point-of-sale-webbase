@@ -24,7 +24,16 @@ export function useBranding(): Branding {
       return;
     }
     let active = true;
-    fetch(`${API_BASE_URL}/settings/public`, { credentials: 'include' })
+
+    // Logged-in users get the ACTIVE organization's branding (org-scoped
+    // endpoint); everyone else falls back to the public first-org branding.
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('pos_token') : null;
+    const url = token ? `${API_BASE_URL}/settings/branding` : `${API_BASE_URL}/settings/public`;
+
+    fetch(url, {
+      credentials: 'include',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then((r) => r.json())
       .then((j) => {
         if (j?.success && j.data && active) {

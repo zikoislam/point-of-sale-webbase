@@ -1,6 +1,12 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+export interface IOrgMembership {
+  orgId: Types.ObjectId; // Ref: organizations
+  roleId: Types.ObjectId; // Ref: roles — the role this user holds in that org
+  isActive: boolean;
+}
+
 export interface IUser extends Document {
   _id: Types.ObjectId;
   username: string; // Unique lowercase handle
@@ -9,7 +15,13 @@ export interface IUser extends Document {
   phone: string;
   passwordHash: string; // bcrypt salt factor 12
   pinHash: string; // bcrypt hashed 4-digit PIN for Terminal Lock
-  roleId: Types.ObjectId; // Ref: roles
+  roleId: Types.ObjectId; // Ref: roles — global/primary role (SUPER_ADMIN template or legacy)
+  /** Branch this user works at (multi-branch chains); null = all branches. */
+  branchId?: Types.ObjectId | null;
+  /** Platform-level flag: can manage organizations and enter any of them. */
+  isPlatformSuperAdmin: boolean;
+  /** One login can belong to many organizations — role per membership. */
+  memberships: IOrgMembership[];
   isActive: boolean;
   terminalLocked: boolean; // Quick screen lock state
   avatarUrl?: string; // Profile picture URL
@@ -62,6 +74,36 @@ const UserSchema = new Schema<IUser>(
       ref: 'Role',
       required: true,
     },
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+    },
+    isPlatformSuperAdmin: {
+      type: Boolean,
+      default: false,
+    },
+    memberships: {
+      type: [
+        {
+          orgId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Organization',
+            required: true,
+          },
+          roleId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Role',
+            required: true,
+          },
+          isActive: {
+            type: Boolean,
+            default: true,
+          },
+        },
+      ],
+      default: [],
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -95,6 +137,7 @@ const UserSchema = new Schema<IUser>(
 
 // Indexes
 UserSchema.index({ roleId: 1 });
+UserSchema.index({ 'memberships.orgId': 1 });
 UserSchema.index({ phone: 1 }, { unique: true });
 
 // Pre-save hook to hash password and PIN if modified

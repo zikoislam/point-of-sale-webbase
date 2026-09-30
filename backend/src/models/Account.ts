@@ -45,6 +45,7 @@ export type AccountSubType = (typeof ACCOUNT_SUB_TYPES)[number];
 
 export interface IAccount extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   /** Ledger code, e.g. "1010". Optional on legacy rows, required on new heads. */
   code?: string;
   name: string; // e.g. "Cash Drawer 1", "bKash Merchant", "City Bank A/C"
@@ -71,6 +72,11 @@ export interface IAccount extends Document {
 
 const AccountSchema = new Schema<IAccount>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     code: {
       type: String,
       trim: true,
@@ -139,7 +145,7 @@ const AccountSchema = new Schema<IAccount>(
 );
 
 // Indexes
-AccountSchema.index({ code: 1 }, { unique: true, sparse: true });
+AccountSchema.index({ orgId: 1, code: 1 }, { unique: true, sparse: true });
 AccountSchema.index({ accountType: 1 });
 AccountSchema.index({ type: 1, subType: 1 });
 AccountSchema.index({ isCashEquivalent: 1 });

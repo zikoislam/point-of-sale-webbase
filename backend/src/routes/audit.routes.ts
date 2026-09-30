@@ -7,7 +7,7 @@ import { queryAuditLogsSchema } from '../validators/audit.validators';
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/', requirePermissions('audit:view'), validate(queryAuditLogsSchema, 'query'), (req, res, next) => auditController.list(req, res, next));
 

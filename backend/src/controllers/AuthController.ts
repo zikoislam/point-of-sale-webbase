@@ -41,8 +41,25 @@ export class AuthController {
 
   async getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const user = await authService.getMe(req.user!.userId);
+      const user = await authService.getMe(req.user!.userId, req.user!.orgId);
       sendSuccess(res, 200, 'User profile retrieved successfully', user);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** Switches the active organization and re-issues the session token. */
+  async switchOrg(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { orgId } = req.body;
+      const result = await authService.switchOrg(req.user!.userId, orgId);
+
+      res.cookie('pos_token', result.token, {
+        ...authCookieOptions(),
+        maxAge: 8 * 60 * 60 * 1000,
+      });
+
+      sendSuccess(res, 200, 'Organization switched successfully', result);
     } catch (error) {
       next(error);
     }

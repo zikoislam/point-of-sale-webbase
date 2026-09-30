@@ -10,6 +10,10 @@ export const poItemSchema = z.object({
 
 export const createPurchaseOrderSchema = z.object({
   supplierId: z.string().min(1, 'Supplier is required'),
+  /** Branch / warehouse the goods are ordered for (drives where stock lands). */
+  branchId: z.string().optional(),
+  /** Project this purchase belongs to (job costing, Module 7). */
+  projectId: z.string().optional(),
   items: z.array(poItemSchema).min(1, 'Purchase order must contain at least one item'),
   taxAmount: z.coerce.number().min(0).optional().default(0),
   shippingCost: z.coerce.number().min(0).optional().default(0),

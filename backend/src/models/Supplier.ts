@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface ISupplier extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   companyName: string;
   contactPerson: string;
   phone: string;
@@ -15,6 +16,11 @@ export interface ISupplier extends Document {
 
 const SupplierSchema = new Schema<ISupplier>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     companyName: {
       type: String,
       required: true,

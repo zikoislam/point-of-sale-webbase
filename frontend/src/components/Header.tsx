@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../hooks/useAuth';
 import { NotificationBell } from './NotificationBell';
+import { OrgSwitcher } from './OrgSwitcher';
 import { uploadImage } from '../lib/upload';
 import {
   Menu,
@@ -20,6 +21,8 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useI18n } from '../lib/i18n';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 
@@ -32,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout, lockTerminal, refreshUser } = useAuth();
+  const { t } = useI18n();
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -152,8 +156,8 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
   // Convert pathname to clean title
   const getPageTitle = () => {
-    if (pathname === '/dashboard') return 'Dashboard';
-    if (pathname === '/pos') return 'Point of Sale';
+    if (pathname === '/dashboard') return t('page.dashboard');
+    if (pathname === '/pos') return t('page.pos');
     const segment = pathname.split('/')[1] || '';
     return segment.replace('-', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
@@ -195,7 +199,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
               : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-750'
           )}
-          title={hasActiveShift ? 'Shift is open and active' : 'No active shift'}
+          title={hasActiveShift ? t('header.shiftOpenHint') : t('header.noShiftHint')}
         >
           <Circle
             className={cn(
@@ -203,7 +207,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               hasActiveShift ? 'text-emerald-400 animate-pulse' : 'text-slate-500'
             )}
           />
-          <span>{hasActiveShift ? 'Shift Open' : 'No Shift'}</span>
+          <span>{hasActiveShift ? t('header.shiftOpen') : t('header.noShift')}</span>
         </Link>
 
         {/* POS Shortcut (if permitted and not already on /pos) */}
@@ -211,22 +215,28 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           <Link
             href="/pos"
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all"
-            title="Open POS Terminal (F9)"
+            title={t('header.openPosHint')}
           >
             <ShoppingCart className="w-3.5 h-3.5" />
-            <span>Open POS</span>
+            <span>{t('header.openPos')}</span>
           </Link>
         )}
 
+        {/* Language: English / বাংলা */}
+        <LanguageSwitcher />
+
         {/* Real-time Notifications Bell */}
         <NotificationBell />
+
+        {/* Active organization + switcher */}
+        <OrgSwitcher />
 
         {/* Quick Lock Terminal Button (Ctrl+L) */}
         <button
           type="button"
           onClick={() => lockTerminal()}
           className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors relative group"
-          title="Lock Terminal (Ctrl+L)"
+          title={t('header.lockTerminalHint')}
           aria-label="Lock terminal"
         >
           <Lock className="w-5 h-5" />
@@ -241,7 +251,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           title="Sign out and return to the login page"
         >
           <LogOut className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Exit</span>
+          <span className="hidden sm:inline">{t('header.exit')}</span>
         </button>
 
         {/* User Profile Dropdown */}
@@ -307,7 +317,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left"
                 >
                   <Camera className="w-4 h-4 text-slate-400" />
-                  <span>My Profile Picture</span>
+                  <span>{t('header.myProfilePicture')}</span>
                 </button>
 
                 <Link
@@ -316,7 +326,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
                 >
                   <User className="w-4 h-4 text-slate-400" />
-                  <span>Profile & Settings</span>
+                  <span>{t('header.profileSettings')}</span>
                 </Link>
 
                 <button
@@ -329,7 +339,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 >
                   <div className="flex items-center gap-2.5">
                     <Lock className="w-4 h-4 text-slate-400" />
-                    <span>Lock Terminal</span>
+                    <span>{t('header.lockTerminal')}</span>
                   </div>
                   <kbd className="text-[10px] font-mono text-slate-500 bg-slate-800/80 px-1.5 py-0.5 rounded">
                     Ctrl+L
@@ -347,7 +357,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors text-left"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Sign Out</span>
+                  <span>{t('header.signOut')}</span>
                 </button>
               </div>
             </div>
@@ -393,7 +403,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
                 <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">
                   <Camera className="w-4 h-4" />
-                  <span>Choose image</span>
+                  <span>{t('header.chooseImage')}</span>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/gif"
@@ -424,7 +434,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   disabled={avatarSaving || !avatarFile}
                   className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900/50 disabled:cursor-not-allowed text-white transition"
                 >
-                  {avatarSaving ? 'Uploading...' : 'Save Picture'}
+                  {avatarSaving ? t('header.uploading') : t('header.savePicture')}
                 </button>
               </div>
             </div>

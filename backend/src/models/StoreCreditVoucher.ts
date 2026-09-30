@@ -2,7 +2,8 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IStoreCreditVoucher extends Document {
   _id: Types.ObjectId;
-  voucherCode: string; // Unique indexed, e.g. "CR-89F2-47A1"
+  orgId: Types.ObjectId;
+  voucherCode: string; // Unique per org, e.g. "CR-89F2-47A1"
   customerId: Types.ObjectId; // Ref: customers
   saleReturnId: Types.ObjectId; // Ref: sales_returns
   initialBalance: number;
@@ -16,10 +17,14 @@ export interface IStoreCreditVoucher extends Document {
 
 const StoreCreditVoucherSchema = new Schema<IStoreCreditVoucher>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     voucherCode: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       uppercase: true,
     },
@@ -67,6 +72,7 @@ const StoreCreditVoucherSchema = new Schema<IStoreCreditVoucher>(
 );
 
 // Indexes
+StoreCreditVoucherSchema.index({ orgId: 1, voucherCode: 1 }, { unique: true });
 StoreCreditVoucherSchema.index({ customerId: 1, status: 1 });
 
 export const StoreCreditVoucher = mongoose.model<IStoreCreditVoucher>('StoreCreditVoucher', StoreCreditVoucherSchema);

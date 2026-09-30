@@ -394,10 +394,14 @@ export default function CustomersPage() {
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                      <Link
+                        href={`/customers/${c._id}/loyalty`}
+                        title="View loyalty statement"
+                        className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition"
+                      >
                         <Award className="w-3 h-3 text-amber-400" />
                         <span>{c.loyaltyPoints || 0} pts</span>
-                      </span>
+                      </Link>
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-2">

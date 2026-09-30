@@ -11,6 +11,18 @@ export const productVariantSchema = z.object({
   alertQty: z.coerce.number().min(0).optional().default(5),
   rackLocation: z.string().trim().optional(),
   isAvailable: z.boolean().optional().default(true),
+  /** Opening batch lots (FEFO). The expiry report reads these. */
+  batches: z
+    .array(
+      z.object({
+        batchNo: z.string().trim().optional(),
+        costPrice: z.coerce.number().min(0).optional(),
+        expiryDate: z.string().trim().optional(),
+        quantity: z.coerce.number().min(0),
+        receivedAt: z.string().trim().optional(),
+      })
+    )
+    .optional(),
 });
 
 export const createProductSchema = z.object({
@@ -19,6 +31,10 @@ export const createProductSchema = z.object({
   categoryId: z.string().min(1, 'Category is required'),
   brandId: z.string().optional(),
   supplierId: z.string().optional(),
+  /** Product groups (ref: product_groups). */
+  groups: z.array(z.string()).optional().default([]),
+  /** Show this product on the public eCommerce storefront. */
+  isWebVisible: z.boolean().optional().default(false),
   unit: z.enum(['Pcs', 'Kg', 'Gram', 'Ltr', 'Ml', 'Box', 'Meter', 'Goj']),
   taxType: z.enum(['INCLUSIVE', 'EXCLUSIVE', 'EXEMPT']).default('INCLUSIVE'),
   taxRate: z.coerce.number().min(0).max(100).default(0),

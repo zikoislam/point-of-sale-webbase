@@ -15,6 +15,8 @@ export const JOURNAL_SOURCES = [
   'SHIFT',
   'MANUAL',
   'ADJUSTMENT',
+  'PAYROLL',
+  'PRODUCTION',
   'BACKFILL',
   'YEAR_CLOSE',
 ] as const;
@@ -33,6 +35,7 @@ export interface IJournalLine {
 
 export interface IJournalEntry extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
   entryNo: string;
   date: Date;
   narration: string;
@@ -78,10 +81,14 @@ const JournalLineSchema = new Schema<IJournalLine>(
 
 const JournalEntrySchema = new Schema<IJournalEntry>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     entryNo: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     date: {
@@ -135,6 +142,7 @@ const JournalEntrySchema = new Schema<IJournalEntry>(
 );
 
 // Indexes
+JournalEntrySchema.index({ orgId: 1, entryNo: 1 }, { unique: true });
 JournalEntrySchema.index({ date: -1 });
 JournalEntrySchema.index({ source: 1, referenceId: 1 });
 JournalEntrySchema.index({ 'lines.accountId': 1, date: -1 });

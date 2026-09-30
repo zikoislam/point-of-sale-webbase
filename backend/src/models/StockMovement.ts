@@ -2,6 +2,9 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IStockMovement extends Document {
   _id: Types.ObjectId;
+  orgId: Types.ObjectId;
+  /** Branch the movement happened at (multi-branch chains). */
+  branchId?: Types.ObjectId | null;
   productId: Types.ObjectId; // Ref: products
   variantId: Types.ObjectId; // Subdoc _id in products.variants
   type: 'IN' | 'OUT' | 'ADJUSTMENT' | 'RETURN' | 'WASTAGE';
@@ -9,7 +12,7 @@ export interface IStockMovement extends Document {
   stockBefore: number;
   stockAfter: number;
   unitCost: number; // Valuation cost at movement time
-  referenceType: 'SALE' | 'PO' | 'MANUAL' | 'RETURN' | 'WASTAGE_EXPENSE';
+  referenceType: 'SALE' | 'PO' | 'MANUAL' | 'RETURN' | 'WASTAGE_EXPENSE' | 'IMPORT';
   referenceId: Types.ObjectId;
   reason?: string;
   userId: Types.ObjectId; // Ref: users
@@ -18,6 +21,17 @@ export interface IStockMovement extends Document {
 
 const StockMovementSchema = new Schema<IStockMovement>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+      index: true,
+    },
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',
@@ -51,7 +65,7 @@ const StockMovementSchema = new Schema<IStockMovement>(
     },
     referenceType: {
       type: String,
-      enum: ['SALE', 'PO', 'MANUAL', 'RETURN', 'WASTAGE_EXPENSE'],
+      enum: ['SALE', 'PO', 'MANUAL', 'RETURN', 'WASTAGE_EXPENSE', 'IMPORT'],
       required: true,
     },
     referenceId: {
@@ -78,5 +92,9 @@ const StockMovementSchema = new Schema<IStockMovement>(
 // Indexes
 StockMovementSchema.index({ variantId: 1, createdAt: -1 });
 StockMovementSchema.index({ referenceType: 1, referenceId: 1 });
+// Reporting paths (Phase 12.1) — stock ledger, aging, dead stock, reorder
+StockMovementSchema.index({ orgId: 1, productId: 1, createdAt: -1 });
+StockMovementSchema.index({ orgId: 1, variantId: 1, createdAt: -1 });
+StockMovementSchema.index({ orgId: 1, type: 1 });
 
 export const StockMovement = mongoose.model<IStockMovement>('StockMovement', StockMovementSchema);

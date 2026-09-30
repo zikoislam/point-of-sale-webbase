@@ -86,6 +86,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [taxType, setTaxType] = useState('INCLUSIVE');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [description, setDescription] = useState('');
+  const [isWebVisible, setIsWebVisible] = useState(false);
+  const [productGroups, setProductGroups] = useState<Array<{ id: string; name: string; parentGroupId?: string | null }>>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
 
   // Variants State
   const [variants, setVariants] = useState<ProductVariantForm[]>([
@@ -107,10 +110,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
     const loadDropdownData = async () => {
       try {
-        const [catRes, brandRes, supRes] = await Promise.all([
+        const [catRes, brandRes, supRes, groupRes] = await Promise.all([
           api.get('/categories'),
           api.get('/brands'),
           api.get('/suppliers', { params: { limit: 200 } }),
+          api.get('/product-groups').catch(() => ({ data: [] } as any)),
         ]);
 
         // Backend returns paginated: { data: { data: [...], total, page } }
@@ -146,6 +150,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             label: s.companyName || s.name,
           }))
         );
+
+        const gList = extractList(groupRes);
+        setProductGroups(
+          gList.map((g: any) => ({
+            id: g.id || g._id,
+            name: g.name,
+            parentGroupId: g.parentGroupId || null,
+          }))
+        );
       } catch (err: any) {
         console.error('Failed to load dropdown data:', err);
       }
@@ -174,6 +187,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             setTaxType(p.taxType || 'INCLUSIVE');
             setTaxRate(p.taxRate ?? 0);
             setDescription(p.description || '');
+            setIsWebVisible(!!p.isWebVisible);
+            setSelectedGroups(Array.isArray(p.groups) ? p.groups.map((g: any) => String(g?._id || g)) : []);
 
             if (p.variants && p.variants.length > 0) {
               setVariants(
@@ -207,6 +222,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setTaxType('INCLUSIVE');
       setTaxRate(0);
       setDescription('');
+      setIsWebVisible(false);
+      setSelectedGroups([]);
       setVariants([
         {
           attributeName: 'Standard',
@@ -306,6 +323,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const payload = {
       name: name.trim(),
       description: description.trim() || undefined,
+      isWebVisible,
+      groups: selectedGroups,
       categoryId,
       brandId: brandId || undefined,
       supplierId: supplierId || undefined,
@@ -445,6 +464,59 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
                 />
+              </div>
+
+              <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800 rounded-lg px-3.5 py-2.5">
+                <div>
+                  <p className="text-xs font-semibold text-slate-300">Show on online store</p>
+                  <p className="text-[11px] text-slate-500">List this product on the public storefront at /store/&lt;org-slug&gt;</p>
+                </div>
+                <input
+                  type="checkbox"
+                  className="accent-emerald-500 w-4 h-4"
+                  checked={isWebVisible}
+                  onChange={(e) => setIsWebVisible(e.target.checked)}
+                />
+              </div>
+
+              {/* Product groups (multi-select) */}
+              <div className="border border-slate-800 rounded-lg px-3.5 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-slate-300">Product groups</p>
+                  <span className="text-[10px] text-slate-500">{selectedGroups.length} selected</span>
+                </div>
+                {productGroups.length === 0 ? (
+                  <p className="text-[11px] text-slate-500">
+                    No groups yet — create them from Products → Product Groups.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {productGroups.map((g) => {
+                      const on = selectedGroups.includes(g.id);
+                      const parent = productGroups.find((x) => x.id === String(g.parentGroupId));
+                      return (
+                        <label
+                          key={g.id}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border cursor-pointer transition-colors ${
+                            on
+                              ? 'bg-fuchsia-500/10 border-fuchsia-500/40 text-fuchsia-300'
+                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="accent-fuchsia-500 w-3 h-3"
+                            checked={on}
+                            onChange={() =>
+                              setSelectedGroups(on ? selectedGroups.filter((x) => x !== g.id) : [...selectedGroups, g.id])
+                            }
+                          />
+                          {parent ? `${parent.name} › ${g.name}` : g.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>

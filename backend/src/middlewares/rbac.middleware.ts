@@ -8,8 +8,8 @@ export const requirePermissions = (...requiredPermissions: string[]) => {
       return;
     }
 
-    // Super Admin has unrestricted access to all endpoints
-    if (req.user.role === 'SUPER_ADMIN') {
+    // Platform Super Admin has unrestricted access to all endpoints
+    if (req.user.isPlatformSuperAdmin || req.user.role === 'SUPER_ADMIN') {
       next();
       return;
     }
@@ -38,7 +38,7 @@ export const requireAnyPermission = (...permissions: string[]) => {
       return;
     }
 
-    if (req.user.role === 'SUPER_ADMIN') {
+    if (req.user.isPlatformSuperAdmin || req.user.role === 'SUPER_ADMIN') {
       next();
       return;
     }
@@ -72,7 +72,7 @@ export const requireSuperAdmin = (req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  if (req.user.role !== 'SUPER_ADMIN') {
+  if (!req.user.isPlatformSuperAdmin && req.user.role !== 'SUPER_ADMIN') {
     sendError(res, 403, 'PERMISSION_DENIED', 'This action is restricted to the Super Admin.');
     return;
   }

@@ -36,6 +36,10 @@ const nextConfig = {
     return [
       { source: '/api/:path*', destination: `${API_ORIGIN}/api/:path*` },
       { source: '/uploads/:path*', destination: `${API_ORIGIN}/uploads/:path*` },
+      // Socket.IO asks for "/socket.io/?EIO=…" and Next strips that trailing
+      // slash with a 308, arriving here as "/socket.io" — without this bare
+      // entry the handshake would 404 and realtime updates would never connect.
+      { source: '/socket.io', destination: `${API_ORIGIN}/socket.io/` },
       { source: '/socket.io/:path*', destination: `${API_ORIGIN}/socket.io/:path*` },
     ];
   },

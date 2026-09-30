@@ -15,6 +15,76 @@ import { Role } from '../models/Role';
 import { AppError } from '../utils/app-error';
 import { generateInvoiceNo } from './SequenceService';
 import { roundMoney, calculateTax } from '../utils/helpers';
+import { PriceTier } from '../models/PriceTier';
+import { volumePricingService } from './VolumePricingService';
+import { notificationService } from './NotificationService';
+import { currentBranchId } from '../middlewares/org.context';
+import { loyaltyService } from './LoyaltyService';
+import { IVariant } from '../models/Product';
+
+/**
+ * Authoritative unit price resolution.
+ *
+ *  1. A customer with a price tier always buys on that tier (product-level
+ *     fixed override first, then retail × (1 − tier discount%)).
+ *  2. Otherwise the POS retail/wholesale toggle decides, exactly as before.
+ *  3. Volume/trade pricing (quantity based) is applied on top of that price —
+ *     a fixed band price wins over a band discount.
+ */
+async function resolveUnitPrice(
+  variant: IVariant,
+  pricingTier: 'RETAIL' | 'WHOLESALE',
+  customerId?: string,
+  session?: ClientSession,
+  quantity?: number,
+  productId?: string
+): Promise<{ price: number; tierId?: Types.ObjectId; volumeDiscountPercent?: number }> {
+  let price: number | undefined;
+  let tierId: Types.ObjectId | undefined;
+
+  if (customerId && Types.ObjectId.isValid(customerId)) {
+    const customer: any = await Customer.findById(customerId).session(session || null).lean();
+    if (customer?.priceTierId) {
+      const tier: any = await PriceTier.findById(customer.priceTierId).session(session || null).lean();
+      if (tier && tier.isActive) {
+        const override = (variant.tierPrices || []).find(
+          (tp: any) => String(tp.tierId) === String(tier._id)
+        );
+        if (override) {
+          price = roundMoney(override.price);
+        } else {
+          price = roundMoney(variant.retailSellingPrice * (1 - (tier.discountPercent || 0) / 100));
+        }
+        tierId = tier._id;
+      }
+    }
+  }
+
+  if (price === undefined) {
+    price = roundMoney(pricingTier === 'WHOLESALE' ? variant.wholesaleSellingPrice : variant.retailSellingPrice);
+  }
+
+  // Volume / trade pricing — quantity bands defined per product
+  let volumeDiscountPercent = 0;
+  if (quantity && quantity > 0 && productId) {
+    const volume = await volumePricingService.getApplicableDiscount(
+      String(productId),
+      quantity,
+      pricingTier === 'WHOLESALE' ? 'WHOLESALE' : 'RETAIL',
+      String(variant._id)
+    );
+    if (volume) {
+      if (volume.fixedPrice !== null) {
+        price = roundMoney(volume.fixedPrice);
+      } else if (volume.discountPercent > 0) {
+        price = roundMoney(price * (1 - volume.discountPercent / 100));
+      }
+      volumeDiscountPercent = volume.discountPercent;
+    }
+  }
+
+  return { price, tierId, volumeDiscountPercent };
+}
 
 export interface CartItemDto {
   variantId: string;
@@ -34,8 +104,14 @@ export interface PaymentDto {
 export interface CheckoutDto {
   customerId?: string;
   pricingTier: 'RETAIL' | 'WHOLESALE';
+  /** Field rep attributed with this sale (optional). */
+  salesRepId?: string;
+  /** Project this revenue belongs to (job costing, Module 7). */
+  projectId?: string;
   items: CartItemDto[];
   discountAmount?: number;
+  /** Loyalty points the customer is spending on this bill. */
+  loyaltyPointsToRedeem?: number;
   payments: PaymentDto[];
   changeReturned?: number;
   idempotencyKey?: string;
@@ -108,6 +184,7 @@ class SaleService {
       let totalTax = 0;
       let sumLineTotals = 0;
       let totalItemDiscount = 0;
+      let activeTierId: Types.ObjectId | undefined;
       const saleItems: ISaleItem[] = [];
       const movementIds: Types.ObjectId[] = [];
       const movementsToCreate: any[] = [];
@@ -132,22 +209,43 @@ class SaleService {
           throw new AppError(404, 'VARIANT_NOT_FOUND', `Variant not available`);
         }
 
-        if (!isOfflineSynced && variant.currentStock < quantity) {
+        // Per-branch availability: when the variant's stock is split across the
+        // chain, the branch's own holding is what can be sold (7.1).
+        const saleBranchId = currentBranchId();
+        const branchEntry = saleBranchId
+          ? (variant.branchStock || []).find((e: any) => String(e.branchId) === String(saleBranchId))
+          : undefined;
+        const availableForBranch = branchEntry ? branchEntry.quantity : variant.currentStock;
+
+        if (!isOfflineSynced && availableForBranch < quantity) {
           throw new AppError(
             422,
             'INSUFFICIENT_INVENTORY',
-            `Insufficient stock for "${product.name} (${variant.attributeName})". Available: ${variant.currentStock}`
+            `Insufficient stock for "${product.name} (${variant.attributeName})". Available: ${availableForBranch}`
           );
         }
 
-        // Server-side authoritative tier pricing (Rule 2)
-        const unitSellingPrice = roundMoney(
-          dto.pricingTier === 'WHOLESALE' ? variant.wholesaleSellingPrice : variant.retailSellingPrice
+        // Server-side authoritative tier pricing (Rule 2 + configurable tiers + volume bands)
+        const { price: tierPrice, tierId } = await resolveUnitPrice(
+          variant as unknown as IVariant,
+          dto.pricingTier,
+          dto.customerId,
+          session,
+          quantity,
+          String(product._id)
         );
+        const unitSellingPrice = tierPrice;
+        activeTierId = tierId;
 
         const stockBefore = variant.currentStock;
         variant.currentStock = roundMoney(variant.currentStock - quantity);
         const stockAfter = variant.currentStock;
+
+        // Keep the branch split in step with the sale
+        if (branchEntry) {
+          branchEntry.quantity = roundMoney(branchEntry.quantity - quantity);
+          branchEntry.updatedAt = new Date();
+        }
 
         await product.save({ session });
 
@@ -198,10 +296,42 @@ class SaleService {
       }
 
       if (movementsToCreate.length > 0) {
-        await StockMovement.create(movementsToCreate, { session });
+        // A cart with several lines produces several movements — Mongoose needs
+        // `ordered` explicitly once a session is combined with multiple docs.
+        await StockMovement.create(movementsToCreate, { session, ordered: true });
       }
 
-      const billDiscount = Math.max(0, Number(dto.discountAmount) || 0);
+      // Loyalty redemption — points become a bill discount. The programme rules
+      // (minimum, per-bill ceiling, balance) all come from the loyalty service.
+      let loyaltyRedeemedPoints = 0;
+      let loyaltyRedeemedValue = 0;
+      if (dto.loyaltyPointsToRedeem && dto.loyaltyPointsToRedeem > 0 && dto.customerId) {
+        const points = Math.floor(Number(dto.loyaltyPointsToRedeem));
+        const eligibility = await loyaltyService.maxRedeemable(dto.customerId, sumLineTotals, session);
+        if (eligibility.config.isActive) {
+          if (points < eligibility.minPoints) {
+            throw new AppError(
+              422,
+              'LOYALTY_MIN_REDEEM',
+              `A minimum of ${eligibility.minPoints} points is needed to redeem`
+            );
+          }
+          if (points > eligibility.balance) {
+            throw new AppError(422, 'LOYALTY_INSUFFICIENT_POINTS', 'The customer does not have enough loyalty points');
+          }
+          if (points > eligibility.maxPoints) {
+            throw new AppError(
+              422,
+              'LOYALTY_REDEEM_LIMIT',
+              `Points can cover at most ${eligibility.config.maxRedeemPercent}% of this bill`
+            );
+          }
+          loyaltyRedeemedPoints = points;
+          loyaltyRedeemedValue = roundMoney(points * eligibility.valuePerPoint);
+        }
+      }
+
+      const billDiscount = roundMoney(Math.max(0, Number(dto.discountAmount) || 0) + loyaltyRedeemedValue);
       const totalAmount = roundMoney(Math.max(0, sumLineTotals - billDiscount));
 
       // Discount override rules (SECTION 8 Rule 9)
@@ -284,6 +414,11 @@ class SaleService {
             cashierId: new Types.ObjectId(cashierId),
             customerId: dto.customerId ? new Types.ObjectId(dto.customerId) : undefined,
             pricingTier: dto.pricingTier,
+            priceTierId: activeTierId,
+            salesRepId: dto.salesRepId && Types.ObjectId.isValid(dto.salesRepId) ? new Types.ObjectId(dto.salesRepId) : undefined,
+            projectId: dto.projectId && Types.ObjectId.isValid(dto.projectId)
+              ? new Types.ObjectId(dto.projectId)
+              : undefined,
             items: saleItems,
             subtotal,
             totalTax,
@@ -331,6 +466,55 @@ class SaleService {
           ],
           { session }
         );
+      }
+
+      // Loyalty: spend the redeemed points, then earn on what was actually paid.
+      // Both movements are written to the loyalty ledger so the customer's
+      // statement adds up.
+      if (dto.customerId) {
+        if (loyaltyRedeemedPoints > 0) {
+          await loyaltyService.applyRedeem(dto.customerId, String(createdSale._id), loyaltyRedeemedPoints, session);
+        }
+        await loyaltyService.applyEarn(dto.customerId, String(createdSale._id), totalAmount, session);
+      }
+
+      // ── Notifications (bell + live socket) — never block the sale ──────────
+      const customerName = customer?.name || (createdSale.customerId ? 'Customer' : null);
+      notificationService.notify({
+        type: 'NEW_SALE',
+        title: `New sale · ৳${totalAmount.toFixed(2)}`,
+        message: `${createdSale.invoiceNo}${customerName ? ` to ${customerName}` : ' (walk-in)'} · ${saleItems.length} item(s)`,
+        entityType: 'sales',
+        entityId: String(createdSale._id),
+      });
+
+      // Items that just fell to (or below) their alert quantity
+      for (const line of saleItems) {
+        const product: any = await Product.findOne({ 'variants._id': line.variantId }).session(session).lean();
+        const variant: any = product?.variants?.find((v: any) => String(v._id) === String(line.variantId));
+        if (variant && variant.currentStock <= variant.alertQty) {
+          notificationService.notify({
+            type: 'LOW_STOCK',
+            title: 'Low stock alert',
+            message: `${product.name} (${variant.attributeName}) is down to ${variant.currentStock} — alert level ${variant.alertQty}`,
+            entityType: 'inventory',
+            entityId: String(product._id),
+          });
+        }
+      }
+
+      // Customer credit near its limit
+      if (dueAmount > 0 && customer && customer.creditLimit > 0) {
+        const usedPercent = (dueBalanceAfter / customer.creditLimit) * 100;
+        if (usedPercent >= 90) {
+          notificationService.notify({
+            type: 'DUE_ALERT',
+            title: 'Customer credit near limit',
+            message: `${customer.name} now owes ৳${dueBalanceAfter.toFixed(2)} of a ৳${customer.creditLimit.toFixed(2)} limit (${usedPercent.toFixed(0)}%)`,
+            entityType: 'customers',
+            entityId: String(customer._id),
+          });
+        }
       }
 
       // Store credit voucher redemption (Rule 3 Step 8)
@@ -460,9 +644,9 @@ class SaleService {
       const variant = product.variants.find((v) => v._id.toString() === item.variantId);
       if (!variant) continue;
 
-      const unitSellingPrice = roundMoney(
-        dto.pricingTier === 'WHOLESALE' ? variant.wholesaleSellingPrice : variant.retailSellingPrice
-      );
+      const unitSellingPrice = (
+        await resolveUnitPrice(variant as unknown as IVariant, dto.pricingTier, dto.customerId)
+      ).price;
       const quantity = Number(item.quantity);
       const lineTotal = roundMoney(quantity * unitSellingPrice);
       subtotal = roundMoney(subtotal + lineTotal);
@@ -540,11 +724,37 @@ class SaleService {
     return sale as unknown as ISale;
   }
 
-  async listSales(page = 1, limit = 20, filters: { shiftId?: string; customerId?: string; search?: string } = {}) {
+  /**
+   * The A4 wholesale invoice for one sale: letterhead, buyer details (with
+   * BIN/TIN), a VAT-per-line item table, tenders received and signature boxes.
+   * Returned as a PDF buffer for the counter to print or download.
+   */
+  async generateWholesaleInvoice(saleId: string): Promise<{ buffer: Buffer; invoiceNo: string }> {
+    if (!Types.ObjectId.isValid(saleId)) throw new AppError(400, 'INVALID_ID', 'Invalid sale ID');
+
+    const sale: any = await Sale.findById(saleId)
+      .populate('customerId', 'name phone email address taxId customerType creditDays creditLimit currentDueBalance')
+      .populate('cashierId', 'fullName username')
+      .populate('salesRepId', 'name code')
+      .lean();
+    if (!sale) throw new AppError(404, 'SALE_NOT_FOUND', 'Sale not found');
+
+    // Imported lazily so the PDF stack never loads on the checkout path.
+    const { settingsService } = await import('./SettingsService');
+    const { exportService } = await import('./ExportService');
+
+    const shop = await settingsService.getSettings();
+    const buffer = await exportService.renderWholesaleInvoice(sale, shop);
+    return { buffer, invoiceNo: sale.invoiceNo };
+  }
+
+  async listSales(page = 1, limit = 20, filters: { shiftId?: string; customerId?: string; search?: string; cashierId?: string } = {}) {
     const query: any = {};
     if (filters.shiftId && Types.ObjectId.isValid(filters.shiftId)) query.shiftId = new Types.ObjectId(filters.shiftId);
     if (filters.customerId && Types.ObjectId.isValid(filters.customerId))
       query.customerId = new Types.ObjectId(filters.customerId);
+    if (filters.cashierId && Types.ObjectId.isValid(filters.cashierId))
+      query.cashierId = new Types.ObjectId(filters.cashierId);
     if (filters.search) query.invoiceNo = { $regex: filters.search, $options: 'i' };
 
     const [sales, total] = await Promise.all([
@@ -569,7 +779,7 @@ class SaleService {
     if (!sale) throw new AppError(404, 'SALE_NOT_FOUND', 'Sale invoice not found');
 
     const { Settings } = await import('../models/Settings');
-    const settings = await Settings.findOne({ isDefault: true }).lean();
+    const settings = await Settings.findOne({}).lean();
 
     return {
       shopName: settings?.shopName || 'POS RETAIL STORE',

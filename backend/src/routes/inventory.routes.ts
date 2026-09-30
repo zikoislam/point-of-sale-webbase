@@ -6,7 +6,7 @@ import { stockAdjustmentController } from '../controllers/StockAdjustmentControl
 
 const router = Router();
 
-router.use(authenticate);
+
 
 router.get('/wastage', requirePermissions('inv:view'), (req, res, next) => wastageController.list(req, res, next));
 router.post('/wastage', requirePermissions('inv:adjust'), (req, res, next) => wastageController.record(req, res, next));

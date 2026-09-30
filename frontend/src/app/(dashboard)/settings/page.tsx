@@ -34,6 +34,8 @@ interface ShopSettings {
   receiptHeader: string;
   receiptFooter: string;
   logoUrl?: string;
+  /** Purchase orders above this amount need manager approval (0 = never). */
+  poApprovalThreshold: number;
 }
 
 const defaultSettings: ShopSettings = {
@@ -42,6 +44,7 @@ const defaultSettings: ShopSettings = {
   thermalPrinterType: '80mm', barcodeLabelFormat: '38mm_x_25mm_2up',
   memoPrintMode: 'thermal', memoWidthMm: 210, memoHeightMm: 297,
   receiptHeader: '', receiptFooter: '',
+  poApprovalThreshold: 0,
 };
 
 /** Which output the receipt uses, and how that output is configured. */
@@ -393,6 +396,13 @@ export default function SettingsPage() {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Default Tax Rate (%)" value={form.defaultTaxRate} onChange={(v) => setForm((f) => ({ ...f, defaultTaxRate: parseFloat(v) || 0 }))} type="number" placeholder="0" />
+          <Field
+            label="PO Approval Threshold (৳)"
+            value={form.poApprovalThreshold}
+            onChange={(v) => setForm((f) => ({ ...f, poApprovalThreshold: parseFloat(v) || 0 }))}
+            type="number"
+            placeholder="0 = no approval needed"
+          />
           <div className="flex items-center gap-3 pt-5">
             <button
               type="button"

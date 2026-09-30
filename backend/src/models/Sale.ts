@@ -24,11 +24,20 @@ export interface IPaymentRecord {
 
 export interface ISale extends Document {
   _id: Types.ObjectId;
-  invoiceNo: string; // Unique, e.g. "INV-20260907-00001"
+  orgId: Types.ObjectId;
+  /** Branch that rang up the sale (multi-branch chains). */
+  branchId?: Types.ObjectId | null;
+  /** Project this revenue belongs to, when the sale is job-based. */
+  projectId?: Types.ObjectId | null;
+  invoiceNo: string; // Unique per org, e.g. "INV-20260907-00001"
   shiftId: Types.ObjectId; // Ref: shifts
   cashierId: Types.ObjectId; // Ref: users
   customerId?: Types.ObjectId; // Ref: customers (Walk-in if null)
   pricingTier: 'RETAIL' | 'WHOLESALE';
+  /** Configurable price tier that governed this invoice (customer-based). */
+  priceTierId?: Types.ObjectId; // Ref: price_tiers
+  /** Field rep attributed with this sale (SR module). */
+  salesRepId?: Types.ObjectId | null; // Ref: sales_reps
   items: ISaleItem[];
   subtotal: number; // Pre-tax, pre-discount total
   totalTax: number; // Accumulated VAT
@@ -138,10 +147,26 @@ const PaymentRecordSchema = new Schema<IPaymentRecord>(
 
 const SaleSchema = new Schema<ISale>(
   {
+    orgId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
+    branchId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+      index: true,
+    },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+      default: null,
+      index: true,
+    },
     invoiceNo: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     shiftId: {
@@ -164,6 +189,17 @@ const SaleSchema = new Schema<ISale>(
       enum: ['RETAIL', 'WHOLESALE'],
       required: true,
       default: 'RETAIL',
+    },
+    priceTierId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PriceTier',
+      default: null,
+    },
+    salesRepId: {
+      type: Schema.Types.ObjectId,
+      ref: 'SalesRep',
+      default: null,
+      index: true,
     },
     items: {
       type: [SaleItemSchema],
@@ -221,7 +257,6 @@ const SaleSchema = new Schema<ISale>(
     idempotencyKey: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
   },
@@ -233,6 +268,15 @@ const SaleSchema = new Schema<ISale>(
 );
 
 // Indexes
+SaleSchema.index({ orgId: 1, invoiceNo: 1 }, { unique: true });
+SaleSchema.index({ orgId: 1, idempotencyKey: 1 }, { unique: true });
+// Reporting / dashboard paths (Phase 12.1) — the orgId prefix keeps tenants
+// isolated while the second key serves the actual filter/sort.
+SaleSchema.index({ orgId: 1, createdAt: -1 });
+SaleSchema.index({ orgId: 1, customerId: 1 });
+SaleSchema.index({ orgId: 1, pricingTier: 1, createdAt: -1 });
+SaleSchema.index({ orgId: 1, salesRepId: 1, createdAt: -1 });
+SaleSchema.index({ cashierId: 1, createdAt: -1 });
 SaleSchema.index({ shiftId: 1, createdAt: -1 });
 SaleSchema.index({ customerId: 1, createdAt: -1 });
 SaleSchema.index({ createdAt: -1 });

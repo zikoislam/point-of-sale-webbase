@@ -34,22 +34,25 @@ export class UserService {
     search?: string;
     roleId?: string;
     isActive?: boolean;
+    orgId?: string;
   }): Promise<PaginatedUsers> {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
     const skip = (page - 1) * limit;
 
     const filter: Record<string, any> = {};
+    if (options.orgId) filter['memberships.orgId'] = new Types.ObjectId(options.orgId);
     if (options.search) {
       const regex = new RegExp(escapeRegex(options.search), 'i');
       filter.$or = [{ username: regex }, { fullName: regex }, { email: regex }, { phone: regex }];
     }
-    if (options.roleId) filter.roleId = options.roleId;
+    if (options.roleId) filter['memberships.roleId'] = new Types.ObjectId(options.roleId);
     if (options.isActive !== undefined) filter.isActive = options.isActive;
 
     const [users, total] = await Promise.all([
       User.find(filter)
         .populate<{ roleId: any }>('roleId', 'name displayName')
+        .populate<{ memberships: any[] }>('memberships.roleId', 'name displayName')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -57,23 +60,29 @@ export class UserService {
       User.countDocuments(filter),
     ]);
 
-    const formatted: UserListItem[] = users.map((u) => ({
-      id: u._id.toString(),
-      username: u.username,
-      fullName: u.fullName,
-      email: u.email,
-      phone: u.phone,
-      role: {
-        id: u.roleId?._id?.toString() || '',
-        name: u.roleId?.name || '',
-        displayName: u.roleId?.displayName || '',
-      },
-      isActive: u.isActive,
-      terminalLocked: u.terminalLocked,
-      avatarUrl: (u as any).avatarUrl,
-      lastLoginAt: u.lastLoginAt,
-      createdAt: u.createdAt,
-    }));
+    const formatted: UserListItem[] = users.map((u: any) => {
+      const membership = options.orgId
+        ? (u.memberships || []).find((m: any) => String(m.orgId) === options.orgId)
+        : null;
+      const roleDoc = membership?.roleId || u.roleId;
+      return {
+        id: u._id.toString(),
+        username: u.username,
+        fullName: u.fullName,
+        email: u.email,
+        phone: u.phone,
+        role: {
+          id: roleDoc?._id?.toString() || '',
+          name: roleDoc?.name || '',
+          displayName: roleDoc?.displayName || '',
+        },
+        isActive: u.isActive,
+        terminalLocked: u.terminalLocked,
+        avatarUrl: (u as any).avatarUrl,
+        lastLoginAt: u.lastLoginAt,
+        createdAt: u.createdAt,
+      };
+    });
 
     return {
       users: formatted,
@@ -84,7 +93,7 @@ export class UserService {
     };
   }
 
-  async createUser(data: CreateUserInput): Promise<UserListItem> {
+  async createUser(data: CreateUserInput, orgId?: string): Promise<UserListItem> {
     // Check for existing username, email, phone
     const exists = await User.findOne({
       $or: [{ username: data.username.toLowerCase() }, { email: data.email.toLowerCase() }, { phone: data.phone }],
@@ -112,7 +121,18 @@ export class UserService {
       roleId: role._id,
       isActive: true,
       terminalLocked: false,
+      memberships: [],
     });
+
+    // Inside an organization every user gets a membership; platform-context
+    // creates (super admin) stay membership-less by default.
+    if (orgId) {
+      user.memberships.push({
+        orgId: new Types.ObjectId(orgId),
+        roleId: role._id as Types.ObjectId,
+        isActive: true,
+      });
+    }
 
     await user.save();
 
@@ -131,11 +151,18 @@ export class UserService {
     };
   }
 
-  async getUserById(id: string): Promise<UserListItem> {
+  async getUserById(id: string, orgId?: string): Promise<UserListItem> {
     if (!Types.ObjectId.isValid(id)) throw new AppError(400, 'INVALID_ID', 'Invalid user ID');
 
-    const user = await User.findById(id).populate<{ roleId: any }>('roleId', 'name displayName');
+    const user = await User.findById(id)
+      .populate<{ roleId: any }>('roleId', 'name displayName')
+      .populate<{ memberships: any[] }>('memberships.roleId', 'name displayName');
     if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+
+    const membership = orgId
+      ? (user.memberships as any[] || []).find((m) => String(m.orgId) === orgId)
+      : null;
+    const roleDoc: any = membership?.roleId || user.roleId;
 
     return {
       id: user._id.toString(),
@@ -144,9 +171,9 @@ export class UserService {
       email: user.email,
       phone: user.phone,
       role: {
-        id: user.roleId?._id?.toString() || '',
-        name: user.roleId?.name || '',
-        displayName: user.roleId?.displayName || '',
+        id: roleDoc?._id?.toString() || '',
+        name: roleDoc?.name || '',
+        displayName: roleDoc?.displayName || '',
       },
       isActive: user.isActive,
       terminalLocked: user.terminalLocked,
@@ -172,7 +199,7 @@ export class UserService {
     return this.getUserById(id);
   }
 
-  async updateUser(id: string, data: UpdateUserInput, requestingUserId: string): Promise<UserListItem> {
+  async updateUser(id: string, data: UpdateUserInput, requestingUserId: string, orgId?: string): Promise<UserListItem> {
     if (!Types.ObjectId.isValid(id)) throw new AppError(400, 'INVALID_ID', 'Invalid user ID');
 
     const user = await User.findById(id);
@@ -182,6 +209,21 @@ export class UserService {
       const role = await Role.findById(data.roleId);
       if (!role) throw new AppError(404, 'ROLE_NOT_FOUND', 'Assigned role not found');
       user.roleId = role._id as Types.ObjectId;
+
+      // Keep the org membership in sync when working inside an organization.
+      if (orgId) {
+        const membership = (user.memberships as any[] || []).find(
+          (m) => String(m.orgId) === orgId
+        );
+        if (membership) membership.roleId = role._id as Types.ObjectId;
+        else {
+          user.memberships.push({
+            orgId: new Types.ObjectId(orgId),
+            roleId: role._id as Types.ObjectId,
+            isActive: true,
+          });
+        }
+      }
     }
 
     if (data.fullName) user.fullName = data.fullName;
@@ -192,7 +234,7 @@ export class UserService {
     if (data.avatarUrl !== undefined) (user as any).avatarUrl = data.avatarUrl;
 
     await user.save();
-    return this.getUserById(id);
+    return this.getUserById(id, orgId);
   }
 
   async deactivateUser(id: string): Promise<void> {

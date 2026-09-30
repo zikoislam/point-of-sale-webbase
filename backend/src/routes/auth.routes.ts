@@ -18,6 +18,7 @@ router.post('/reset-password', authRateLimiter, validate(resetPasswordSchema), (
 // Protected routes
 router.post('/logout', authenticate, (req, res, next) => authController.logout(req, res, next));
 router.get('/me', authenticate, (req, res, next) => authController.getMe(req, res, next));
+router.post('/switch-org', authenticate, (req, res, next) => authController.switchOrg(req, res, next));
 router.post('/lock-terminal', authenticate, (req, res, next) => authController.lockTerminal(req, res, next));
 router.post('/unlock-terminal', authenticate, pinRateLimiter, validate(unlockTerminalSchema), (req, res, next) => authController.unlockTerminal(req, res, next));
 

@@ -19,6 +19,7 @@ import {
   Circle,
   Camera,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
@@ -162,7 +163,19 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     return segment.replace('-', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
+  // Renewal banner: shows once the org is in its grace window, or within
+  // `warnDays` of expiry. Platform super admins are exempt from the lock.
+  const subscription = user?.subscription;
+  const showSubscriptionBanner =
+    !user?.isPlatformSuperAdmin &&
+    !!subscription &&
+    (subscription.status === 'GRACE' ||
+      (subscription.status === 'ACTIVE' &&
+        subscription.daysRemaining !== null &&
+        subscription.daysRemaining <= subscription.warnDays));
+
   return (
+    <>
     <header className="h-[65px] bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 sm:px-6 gap-4 sticky top-0 z-30 select-none">
       {/* Left: Mobile menu toggle + Live Clock */}
       <div className="flex items-center gap-3">
@@ -442,5 +455,21 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         </div>
       )}
     </header>
+    {showSubscriptionBanner && subscription && (
+      <div className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium bg-amber-500/10 text-amber-300 border-b border-amber-500/30">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+        {subscription.status === 'GRACE' ? (
+          <span>
+            Subscription expired {subscription.daysOverdue} day(s) ago — renew now to avoid losing access.
+          </span>
+        ) : (
+          <span>Subscription expires in {subscription.daysRemaining} day(s). Please renew soon.</span>
+        )}
+        <Link href="/locked" className="underline hover:text-amber-200 font-semibold">
+          Renew
+        </Link>
+      </div>
+    )}
+    </>
   );
 };

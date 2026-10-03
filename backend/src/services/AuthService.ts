@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { env } from '../config/env';
 import { User, IUser } from '../models/User';
 import { Role } from '../models/Role';
-import { Organization } from '../models/Organization';
+import { Organization, resolveSubscriptionState } from '../models/Organization';
 import { Branch } from '../models/Branch';
 import { Settings } from '../models/Settings';
 import { TokenBlacklist } from '../models/TokenBlacklist';
@@ -30,6 +30,15 @@ export interface UserMembershipInfo {
   isActive: boolean;
 }
 
+export interface UserSubscriptionInfo {
+  status: string;
+  endsAt: Date | null;
+  graceDays: number;
+  daysRemaining: number | null;
+  daysOverdue: number;
+  warnDays: number;
+}
+
 export interface UserProfileResponse {
   id: string;
   username: string;
@@ -47,6 +56,8 @@ export interface UserProfileResponse {
   branchName?: string;
   activeOrgId?: string;
   orgName?: string;
+  /** Subscription window for the active organization; null in the platform context. */
+  subscription: UserSubscriptionInfo | null;
   memberships: UserMembershipInfo[];
 }
 
@@ -110,6 +121,18 @@ export class AuthService {
       }
     }
 
+    // Subscription window for the active organization — drives the frontend's
+    // renewal banner and the "Software Locked" page. The org is already loaded
+    // above, so this adds no extra query.
+    let subscription: UserSubscriptionInfo | null = null;
+    if (activeOrgId) {
+      const org: any = orgById.get(String(activeOrgId));
+      if (org) {
+        const state = resolveSubscriptionState(org);
+        subscription = { ...state, warnDays: env.SUBSCRIPTION_WARN_DAYS };
+      }
+    }
+
     return {
       id: user._id.toString(),
       username: user.username,
@@ -126,6 +149,7 @@ export class AuthService {
       orgName,
       branchId,
       branchName,
+      subscription,
       memberships,
     };
   }

@@ -38,6 +38,19 @@ interface EnvironmentConfig {
   BACKUP_CRON: string;
   /** How many automatic backups to keep before the oldest are pruned. */
   BACKUP_RETENTION: number;
+  /** Master switch for the SaaS subscription lock. Off = never return 402. */
+  SUBSCRIPTION_ENFORCED: boolean;
+  /** Default grace window (days) applied to newly created organizations. */
+  SUBSCRIPTION_DEFAULT_GRACE_DAYS: number;
+  /** Length of the trial granted to a freshly created organization. */
+  SUBSCRIPTION_DEFAULT_TRIAL_DAYS: number;
+  /** Show the pre-expiry warning banner once this many days remain. */
+  SUBSCRIPTION_WARN_DAYS: number;
+  /**
+   * ISO date the desktop build's offline licence expires at. Electron passes
+   * this so the local organization's subscription mirrors the signed key.
+   */
+  DESKTOP_SUBSCRIPTION_ENDS_AT?: string;
 }
 
 const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET'] as const;
@@ -78,6 +91,13 @@ export const env: EnvironmentConfig = {
     : true,
   BACKUP_CRON: process.env.BACKUP_CRON || '0 2 * * *',
   BACKUP_RETENTION: parseInt(process.env.BACKUP_RETENTION || '7', 10),
+  SUBSCRIPTION_ENFORCED: process.env.SUBSCRIPTION_ENFORCED
+    ? process.env.SUBSCRIPTION_ENFORCED !== 'false'
+    : true,
+  SUBSCRIPTION_DEFAULT_GRACE_DAYS: parseInt(process.env.SUBSCRIPTION_DEFAULT_GRACE_DAYS || '7', 10),
+  SUBSCRIPTION_DEFAULT_TRIAL_DAYS: parseInt(process.env.SUBSCRIPTION_DEFAULT_TRIAL_DAYS || '14', 10),
+  SUBSCRIPTION_WARN_DAYS: parseInt(process.env.SUBSCRIPTION_WARN_DAYS || '15', 10),
+  DESKTOP_SUBSCRIPTION_ENDS_AT: process.env.DESKTOP_SUBSCRIPTION_ENDS_AT,
 };
 
 // CLIENT_URL accepts a comma-separated list so several frontends can be

@@ -74,7 +74,9 @@ import crmRoutes from './routes/crm.routes';
 import ecommerceRoutes from './routes/ecommerce.routes';
 import storefrontRoutes from './routes/storefront.routes';
 import platformRoutes from './routes/platform.routes';
+import subscriptionRoutes from './routes/subscription.routes';
 import { requireOrg } from './middlewares/org.middleware';
+import { requireActiveSubscription } from './middlewares/subscription.middleware';
 import { authenticate } from './middlewares/auth.middleware';
 
 const app = express();
@@ -130,13 +132,17 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
 app.use('/api/v1/platform', platformRoutes);
 
 // Organization-scoped routes: authenticate resolves the JWT, requireOrg opens
-// the tenant scope that the Mongoose org-scope plugin enforces on every query.
-// The report-cache invalidator sits after requireOrg so it knows which tenant
-// to clear when a write lands.
+// the tenant scope that the Mongoose org-scope plugin enforces on every query,
+// and requireActiveSubscription enforces the SaaS subscription (402 when the
+// grace window has passed). The report-cache invalidator sits after requireOrg
+// so it knows which tenant to clear when a write lands.
 const orgRouter = (router: express.Router) =>
-  express.Router().use(authenticate, requireOrg, reportCacheInvalidation(), router);
+  express.Router().use(authenticate, requireOrg, requireActiveSubscription, reportCacheInvalidation(), router);
 
 app.use('/api/v1/auth', authRoutes);
+// Subscription status + license redemption must stay reachable while locked, so
+// this is mounted outside the subscription gate (authenticate + requireOrg only).
+app.use('/api/v1/subscription', authenticate, requireOrg, subscriptionRoutes);
 app.use('/api/v1/users', orgRouter(userRoutes));
 app.use('/api/v1/roles', orgRouter(roleRoutes));
 // Public branding endpoint — no auth, no org scope (used by the login screen)

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '../hooks/useAuth';
 import { Lock, KeyRound, ShieldAlert, Loader2 } from 'lucide-react';
 
@@ -46,6 +47,37 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // If not logged in
   if (!isAuthenticated || !user) {
     return null;
+  }
+
+  // If the organization's subscription has lapsed, the whole shell is blocked.
+  // (Platform super admins are exempt so they can administer a locked tenant.)
+  if (!user.isPlatformSuperAdmin && user.subscription?.status === 'EXPIRED') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-100">
+        <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center mb-4">
+          <Lock className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold mb-2">Software Locked</h2>
+        <p className="text-slate-400 max-w-md mb-6">
+          {user.orgName ? `${user.orgName}'s` : 'Your organization\u2019s'} subscription has expired.
+          Enter a valid license key to restore access.
+        </p>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/locked"
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all font-semibold"
+          >
+            Enter License Key
+          </Link>
+          <button
+            onClick={() => logout().then(() => router.replace('/login'))}
+            className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // If terminal is locked

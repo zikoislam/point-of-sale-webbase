@@ -24,41 +24,7 @@ export const seedDemoData = async (): Promise<void> => {
   const passwordHash = await bcrypt.hash('Password@123', 12);
   const pinHash = await bcrypt.hash('1234', 10);
 
-  const demoUsers = [
-    {
-      username: 'manager_dhaka',
-      fullName: 'Tariqul Islam (Branch Manager)',
-      email: 'manager@superpos.com',
-      phone: '+8801711000001',
-      passwordHash,
-      pinHash,
-      roleId: managerRole._id,
-      isActive: true,
-      terminalLocked: false,
-    },
-    {
-      username: 'cashier_karim',
-      fullName: 'Abdul Karim (Cashier 1)',
-      email: 'karim@superpos.com',
-      phone: '+8801811000002',
-      passwordHash,
-      pinHash,
-      roleId: cashierRole._id,
-      isActive: true,
-      terminalLocked: false,
-    },
-    {
-      username: 'cashier_rahim',
-      fullName: 'Abdur Rahim (Cashier 2)',
-      email: 'rahim@superpos.com',
-      phone: '+8801911000003',
-      passwordHash,
-      pinHash,
-      roleId: cashierRole._id,
-      isActive: true,
-      terminalLocked: false,
-    },
-  ];
+  const demoUsers: any[] = [];
 
   for (const u of demoUsers) {
     await User.findOneAndUpdate({ username: u.username }, { $set: u }, { upsert: true, new: true });

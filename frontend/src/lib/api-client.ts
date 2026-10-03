@@ -114,6 +114,16 @@ export async function apiClient<T = any>(
     throw new ApiError(401, 'AUTH_REQUIRED', 'Authentication required. Please login.');
   }
 
+  // Handle 402 Payment Required globally — the org subscription has lapsed.
+  // Send the user to the "Software Locked" page; the body is still parsed below
+  // so callers get a typed ApiError carrying the server's error code.
+  if (response.status === 402 && typeof window !== 'undefined') {
+    const pathname = window.location.pathname;
+    if (!pathname.startsWith('/locked') && !pathname.startsWith('/login')) {
+      window.location.href = '/locked';
+    }
+  }
+
   let data: any;
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {

@@ -26,6 +26,28 @@ import { DailySalesSummary } from '../models/DailySalesSummary';
 import { HoldCart } from '../models/HoldCart';
 import { StockAdjustment } from '../models/StockAdjustment';
 import { ALL_PERMISSIONS } from '../config/permissions';
+import { env } from '../config/env';
+
+/**
+ * Desktop support: the Electron shell passes the signed offline licence's
+ * expiry as DESKTOP_SUBSCRIPTION_ENDS_AT so the local organization's
+ * subscription mirrors it. Only ever moves the end date forward; a no-op on
+ * the web deployment (the env var is unset there) and when enforcement is off.
+ */
+async function mirrorDesktopSubscription(orgId: string): Promise<void> {
+  if (!env.SUBSCRIPTION_ENFORCED || !env.DESKTOP_SUBSCRIPTION_ENDS_AT) return;
+  const parsed = new Date(env.DESKTOP_SUBSCRIPTION_ENDS_AT);
+  if (Number.isNaN(parsed.getTime())) return;
+
+  const org = await Organization.findById(orgId);
+  if (!org) return;
+  const current = org.subscriptionEndsAt ? new Date(org.subscriptionEndsAt) : null;
+  if (!current || parsed.getTime() > current.getTime()) {
+    org.subscriptionEndsAt = parsed;
+    if (!org.subscriptionPlan) org.subscriptionPlan = 'STANDARD';
+    await org.save();
+  }
+}
 
 /**
  * One-time, idempotent migration that turns an existing single-shop database
@@ -45,6 +67,7 @@ import { ALL_PERMISSIONS } from '../config/permissions';
 export async function ensureMultiOrgBootstrap(): Promise<{ created: boolean; orgId?: string }> {
   const existingOrg = await Organization.findOne({}).lean();
   if (existingOrg) {
+    await mirrorDesktopSubscription(String(existingOrg._id));
     return { created: false, orgId: String(existingOrg._id) };
   }
 
@@ -151,6 +174,8 @@ export async function ensureMultiOrgBootstrap(): Promise<{ created: boolean; org
   // 6. Rebuild indexes so the new per-org unique constraints take effect
   const { syncAllIndexes } = await import('./index-sync-service');
   await syncAllIndexes();
+
+  await mirrorDesktopSubscription(String(org._id));
 
   console.log(`✅ Multi-organization bootstrap complete — default organization: "${orgName}"`);
   return { created: true, orgId: String(org._id) };

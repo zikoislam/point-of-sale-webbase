@@ -14,6 +14,9 @@ import {
   Package,
   Receipt,
   Trash2,
+  KeyRound,
+  Copy,
+  CalendarClock,
 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { Button } from '../../../components/ui/Button';
@@ -37,6 +40,42 @@ interface Org {
   adminPermissionSet: string[];
   memberCount: number;
   createdAt: string;
+  subscriptionEndsAt: string | null;
+  subscriptionStatus: 'UNLIMITED' | 'ACTIVE' | 'GRACE' | 'EXPIRED' | string;
+  subscriptionPlan: string;
+  subscriptionGraceDays: number;
+  daysRemaining: number | null;
+}
+
+interface LicenseKey {
+  _id: string;
+  key: string;
+  days: number;
+  plan?: string;
+  status: 'ISSUED' | 'REDEEMED' | 'REVOKED';
+  machineId?: string;
+  note?: string;
+  redeemedAt?: string;
+  createdAt: string;
+}
+
+function subscriptionBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
+  switch (status) {
+    case 'ACTIVE':
+      return 'success';
+    case 'GRACE':
+      return 'warning';
+    case 'EXPIRED':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+function formatSubscription(endsAt: string | null, status: string): string {
+  if (!endsAt) return 'Unlimited';
+  const date = new Date(endsAt).toLocaleDateString();
+  return status === 'EXPIRED' ? `Expired ${date}` : `Until ${date}`;
 }
 
 interface OrgSummaryData {
@@ -125,6 +164,14 @@ export default function OrganizationsPage() {
   const [memberUsername, setMemberUsername] = useState('');
   const [memberRoleId, setMemberRoleId] = useState('');
 
+  // Subscription / license issuance
+  const [extendDays, setExtendDays] = useState('30');
+  const [genDays, setGenDays] = useState('30');
+  const [genPlan, setGenPlan] = useState('STANDARD');
+  const [genNote, setGenNote] = useState('');
+  const [genMachine, setGenMachine] = useState('');
+  const [generatedKey, setGeneratedKey] = useState('');
+
   const isSuper = !!user?.isPlatformSuperAdmin;
 
   const { data: orgs = [], isLoading, refetch, isRefetching } = useQuery<Org[]>({
@@ -154,9 +201,21 @@ export default function OrganizationsPage() {
     enabled: !!detail,
   });
 
+  const { data: licenses = [] } = useQuery<LicenseKey[]>({
+    queryKey: ['platform-org-licenses', detail?.id],
+    queryFn: async () => {
+      const res = await api.get(`/platform/orgs/${detail!.id}/licenses`);
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: !!detail,
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['platform-orgs'] });
-    if (detail) queryClient.invalidateQueries({ queryKey: ['platform-org-summary', detail.id] });
+    if (detail) {
+      queryClient.invalidateQueries({ queryKey: ['platform-org-summary', detail.id] });
+      queryClient.invalidateQueries({ queryKey: ['platform-org-licenses', detail.id] });
+    }
   };
 
   const createOrg = useMutation({
@@ -217,6 +276,58 @@ export default function OrganizationsPage() {
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const extendSubscription = useMutation({
+    mutationFn: async () => {
+      await api.patch(`/platform/orgs/${detail!.id}/subscription`, {
+        days: Number(extendDays),
+        plan: genPlan || undefined,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Subscription extended');
+      invalidate();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const generateLicense = useMutation({
+    mutationFn: async () => {
+      const res = await api.post<LicenseKey>(`/platform/orgs/${detail!.id}/licenses`, {
+        days: Number(genDays),
+        plan: genPlan || undefined,
+        note: genNote || undefined,
+        machineId: genMachine || undefined,
+      });
+      return res.data as LicenseKey;
+    },
+    onSuccess: (data) => {
+      toast.success('License key generated');
+      if (data?.key) setGeneratedKey(data.key);
+      queryClient.invalidateQueries({ queryKey: ['platform-org-licenses', detail!.id] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const revokeLicense = useMutation({
+    mutationFn: async (keyId: string) => {
+      await api.post(`/platform/licenses/${keyId}/revoke`);
+    },
+    onSuccess: () => {
+      toast.success('License key revoked');
+      queryClient.invalidateQueries({ queryKey: ['platform-org-licenses', detail!.id] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const copyGeneratedKey = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedKey);
+      toast.success('License key copied');
+    } catch {
+      toast.error('Could not copy — please copy manually');
+    }
+  };
 
   const enterOrg = async (org: Org) => {
     if (entering) return;
@@ -297,6 +408,16 @@ export default function OrganizationsPage() {
               <div className="flex items-center gap-3 text-[11px] text-slate-400">
                 <span className="inline-flex items-center gap-1"><UsersIcon className="w-3.5 h-3.5" /> {org.memberCount} member{org.memberCount === 1 ? '' : 's'}</span>
                 <span className="inline-flex items-center gap-1"><Shield className="w-3.5 h-3.5" /> {org.adminPermissionSet.length} permissions</span>
+              </div>
+
+              <div className="flex items-center gap-2 text-[11px]">
+                <Badge variant={subscriptionBadgeVariant(org.subscriptionStatus)} size="sm">
+                  {org.subscriptionStatus}
+                </Badge>
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  <CalendarClock className="w-3.5 h-3.5" />
+                  {formatSubscription(org.subscriptionEndsAt, org.subscriptionStatus)}
+                </span>
               </div>
 
               <div className="flex flex-wrap gap-2 mt-auto pt-1">
@@ -391,6 +512,135 @@ export default function OrganizationsPage() {
                   ))}
                 </>
               )}
+            </div>
+
+            {/* subscription & licenses */}
+            <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs font-semibold text-white uppercase tracking-wide inline-flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5" /> Subscription &amp; Licenses
+                </h4>
+                <div className="flex items-center gap-2">
+                  <Badge variant={subscriptionBadgeVariant(detail.subscriptionStatus)} size="sm">
+                    {detail.subscriptionStatus}
+                  </Badge>
+                  <span className="text-[11px] text-slate-400">
+                    {formatSubscription(detail.subscriptionEndsAt, detail.subscriptionStatus)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Direct extension (manual payment) */}
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="w-28">
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide">Extend days</label>
+                  <Input
+                    value={extendDays}
+                    onChange={(e: any) => setExtendDays(e.target.value.replace(/\D/g, ''))}
+                    className="mt-1"
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={extendSubscription.isPending}
+                  disabled={!extendDays}
+                  onClick={() => extendSubscription.mutate()}
+                >
+                  Extend subscription
+                </Button>
+              </div>
+
+              {/* Generate a redeemable key */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                <div>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide">Key days</label>
+                  <Input
+                    value={genDays}
+                    onChange={(e: any) => setGenDays(e.target.value.replace(/\D/g, ''))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide">Plan</label>
+                  <Input value={genPlan} onChange={(e: any) => setGenPlan(e.target.value)} className="mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide">Machine ID</label>
+                  <Input
+                    value={genMachine}
+                    onChange={(e: any) => setGenMachine(e.target.value.toUpperCase())}
+                    placeholder="optional"
+                    className="mt-1"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                  loading={generateLicense.isPending}
+                  disabled={!genDays}
+                  onClick={() => generateLicense.mutate()}
+                >
+                  Generate key
+                </Button>
+              </div>
+              <Input
+                value={genNote}
+                onChange={(e: any) => setGenNote(e.target.value)}
+                placeholder="Note (optional)"
+              />
+
+              {generatedKey && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                  <code className="font-mono text-sm text-emerald-300">{generatedKey}</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<Copy className="w-3.5 h-3.5" />}
+                    onClick={copyGeneratedKey}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              )}
+
+              {/* Issued keys */}
+              <div className="space-y-1.5">
+                {licenses.length === 0 ? (
+                  <p className="text-[11px] text-slate-500">No license keys issued yet.</p>
+                ) : (
+                  licenses.map((k) => (
+                    <div
+                      key={k._id}
+                      className="flex items-center justify-between gap-2 text-[11px] bg-slate-900/60 border border-slate-700/60 rounded-lg px-3 py-2"
+                    >
+                      <code className="font-mono text-slate-300">{k.key}</code>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500">
+                          {k.days}d{k.plan ? ` · ${k.plan}` : ''}
+                        </span>
+                        <Badge
+                          variant={k.status === 'ISSUED' ? 'info' : k.status === 'REDEEMED' ? 'success' : 'danger'}
+                          size="sm"
+                        >
+                          {k.status}
+                        </Badge>
+                        {k.status === 'ISSUED' && (
+                          <button
+                            type="button"
+                            className="text-rose-400 hover:text-rose-300 disabled:opacity-50"
+                            disabled={revokeLicense.isPending}
+                            onClick={() => revokeLicense.mutate(k._id)}
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
             {/* permission envelope */}

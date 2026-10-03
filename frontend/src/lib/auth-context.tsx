@@ -11,6 +11,15 @@ export interface UserMembership {
   isActive: boolean;
 }
 
+export interface UserSubscription {
+  status: 'UNLIMITED' | 'ACTIVE' | 'GRACE' | 'EXPIRED' | string;
+  endsAt: string | null;
+  graceDays: number;
+  daysRemaining: number | null;
+  daysOverdue: number;
+  warnDays: number;
+}
+
 export interface UserProfile {
   id: string;
   userId?: string;
@@ -26,6 +35,7 @@ export interface UserProfile {
   isPlatformSuperAdmin?: boolean;
   activeOrgId?: string;
   orgName?: string;
+  subscription?: UserSubscription | null;
   memberships?: UserMembership[];
 }
 

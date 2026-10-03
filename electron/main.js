@@ -49,6 +49,13 @@ let runtime = { backendPort: 0, frontendPort: 0, mongoMode: 'none' };
 let licenseResolve = null;
 let licenseWatchdog = null;
 
+/**
+ * Expiry of the signed offline licence, mirrored to the backend as
+ * DESKTOP_SUBSCRIPTION_ENDS_AT so the in-app subscription lock lines up with the
+ * desktop key. null / '' means "unlimited" (no in-app lock).
+ */
+let desktopSubscriptionEndsAt = null;
+
 const LOG_PREFIX = '[UniquePOS]';
 
 let logStream = null;
@@ -249,6 +256,9 @@ function backendEnv(ports, mongo) {
     CLIENT_URL: `http://localhost:${ports.frontendPort},http://127.0.0.1:${ports.frontendPort}`,
     SYNC_ENABLED: String(config.syncEnabled && useLocal && Boolean(config.cloudMongoUri)),
     SYNC_INTERVAL_SECONDS: String(config.syncIntervalSeconds),
+    // Mirrors the offline licence term onto the local organization so the
+    // subscription middleware locks the in-app UI at the same moment.
+    DESKTOP_SUBSCRIPTION_ENDS_AT: desktopSubscriptionEndsAt || '',
   };
 }
 
@@ -417,7 +427,12 @@ function startLicenseWatchdog() {
     log(`license became invalid while running: ${state.reason}`);
 
     openActivationWindow({
-      onActivated: (next) => log(`license renewed: serial ${next.info?.n}, expires ${next.info?.e}`),
+      onActivated: (next) => {
+        log(`license renewed: serial ${next.info?.n}, expires ${next.info?.e}`);
+        // The backend read the old term from its env at startup; the renewed
+        // expiry is applied to the local organization on the next restart.
+        desktopSubscriptionEndsAt = next.info?.e ?? desktopSubscriptionEndsAt;
+      },
       onCancelled: () => {
         log('activation dismissed — quitting.');
         app.quit();
@@ -834,6 +849,9 @@ async function boot() {
   }
 
   log(`license ok — serial ${licenceState.info?.n}, expires ${licenceState.info?.e}`);
+
+  // Hand the licence term to the backend so its subscription lock matches.
+  desktopSubscriptionEndsAt = licenceState.info?.e ?? null;
 
   createSplashWindow();
 

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
-import { Organization, IOrganization } from '../models/Organization';
+import { Organization, IOrganization, resolveSubscriptionState } from '../models/Organization';
 import { User } from '../models/User';
 import { Role } from '../models/Role';
 import { Settings } from '../models/Settings';
@@ -32,6 +32,11 @@ export interface OrgListItem {
   adminPermissionSet: string[];
   memberCount: number;
   createdAt: Date;
+  subscriptionEndsAt: Date | null;
+  subscriptionStatus: string;
+  subscriptionPlan: string;
+  subscriptionGraceDays: number;
+  daysRemaining: number | null;
 }
 
 export interface OrgSummary {
@@ -49,6 +54,7 @@ export interface OrgSummary {
 
 export class OrgService {
   private toItem(org: IOrganization, memberCount = 0): OrgListItem {
+    const subscription = resolveSubscriptionState(org);
     return {
       id: org._id.toString(),
       name: org.name,
@@ -60,6 +66,11 @@ export class OrgService {
       adminPermissionSet: org.adminPermissionSet || [],
       memberCount,
       createdAt: org.createdAt,
+      subscriptionEndsAt: subscription.endsAt,
+      subscriptionStatus: subscription.status,
+      subscriptionPlan: org.subscriptionPlan || 'STANDARD',
+      subscriptionGraceDays: subscription.graceDays,
+      daysRemaining: subscription.daysRemaining,
     };
   }
 
@@ -158,6 +169,12 @@ export class OrgService {
     const clash = await Organization.findOne({ slug }).lean();
     if (clash) slug = `${slug}-${Date.now().toString(36)}`;
 
+    const trialDays = env.SUBSCRIPTION_DEFAULT_TRIAL_DAYS;
+    const subscriptionEndsAt =
+      env.SUBSCRIPTION_ENFORCED && trialDays > 0
+        ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000)
+        : null;
+
     const org = await Organization.create({
       name: data.name.trim(),
       slug,
@@ -166,6 +183,9 @@ export class OrgService {
       contactEmail: data.contactEmail,
       address: data.address,
       adminPermissionSet: data.adminPermissionSet,
+      subscriptionEndsAt,
+      subscriptionGraceDays: env.SUBSCRIPTION_DEFAULT_GRACE_DAYS,
+      subscriptionPlan: env.SUBSCRIPTION_ENFORCED ? 'TRIAL' : 'LIFETIME',
     });
 
     await this.provisionOrgRoles(org._id, data.adminPermissionSet);

@@ -53,6 +53,7 @@ export const PERMISSION_GROUPS: Record<string, string[]> = {
     'roles:view',
     'roles:manage',
     'approvals:manage',
+    'subscription:manage',
   ],
 };
 

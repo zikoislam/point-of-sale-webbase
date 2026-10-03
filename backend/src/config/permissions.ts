@@ -74,6 +74,8 @@ export const ALL_PERMISSIONS: string[] = [
   'roles:view',
   'roles:manage',
   'approvals:manage',
+  // Subscription / licensing (org admins redeem license keys)
+  'subscription:manage',
 ];
 
 /** Everything an organization admin may hold at most — the envelope ceiling. */

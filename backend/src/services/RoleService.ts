@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { Role } from '../models/Role';
 import { AppError } from '../utils/app-error';
 import { ALL_PERMISSIONS } from '../config/permissions';
+import { runWithoutScope } from '../middlewares/org.context';
 import { CreateRoleInput, UpdateRoleInput } from '../validators/role.validators';
 
 export interface RoleItem {
@@ -35,7 +36,11 @@ function assertGrantable(permissions: string[], actor: ActorInfo): void {
 
 export class RoleService {
   async listRoles(actor?: ActorInfo): Promise<RoleItem[]> {
-    const roles = await Role.find().sort({ isSystemRole: -1, name: 1 }).lean();
+    // The platform super admin sees every role — including the org-less
+    // templates — even while working inside an organization. Run their query
+    // outside the tenant scope so the plugin does not hide the templates.
+    const runList = () => Role.find().sort({ isSystemRole: -1, name: 1 }).lean();
+    const roles = actor?.isPlatformSuperAdmin ? await runWithoutScope(runList) : await runList();
     return roles
       .filter((r) => {
         // In an org context only that org's roles are visible; platform
@@ -95,8 +100,11 @@ export class RoleService {
     if (!Types.ObjectId.isValid(id)) throw new AppError(400, 'INVALID_ID', 'Invalid role ID');
 
     // In org context the plugin scopes the lookup — a foreign org's role is
-    // simply not found here.
-    const role = await Role.findById(id);
+    // simply not found here. The platform super admin looks up unscoped so a
+    // platform template (orgId: null) can still be edited from inside an org.
+    const role = actor?.isPlatformSuperAdmin
+      ? await runWithoutScope(() => Role.findById(id))
+      : await Role.findById(id);
     if (!role) throw new AppError(404, 'ROLE_NOT_FOUND', 'Role not found');
 
     // Org staff can never touch the platform templates.

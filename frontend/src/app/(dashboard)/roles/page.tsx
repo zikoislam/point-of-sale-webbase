@@ -99,9 +99,10 @@ export default function RolesPage() {
     }
   };
 
-  // A role is editable when the actor holds every permission he would touch —
-  // the server enforces the same cap, the UI just mirrors it.
-  const canEditSelected = !!selectedRole && !!selectedRole.orgId;
+  // A role is editable when it belongs to an org. The platform super admin may
+  // also edit the platform templates — that only changes what NEW organizations
+  // are provisioned with; existing organizations keep their own role copies.
+  const canEditSelected = !!selectedRole && (!!selectedRole.orgId || isSuper);
 
   return (
     <div className="space-y-6">

@@ -5,6 +5,7 @@ import { Truck, Undo2 } from 'lucide-react';
 import { ReportShell, ReportTable, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData, REPORT_API } from '../../../../components/reports/useReportData';
+import { ChartCard, TrendChart, groupByDay } from '../../../../components/reports/charts';
 import { Tabs } from '../../../../components/ui/Tabs';
 import { Badge } from '../../../../components/ui/Badge';
 
@@ -101,6 +102,14 @@ export default function PurchasesReportPage() {
               <KpiCard label="Total Paid" value={money(data?.summary.totalPaid)} tone="emerald" />
               <KpiCard label="Still Owed" value={money(data?.summary.totalDue)} tone="amber" />
             </div>
+
+            <ChartCard title="Purchase value by day" subtitle="Ordered value raised each day" height={260}>
+              <TrendChart
+                data={groupByDay(rows, 'createdAt', 'totalAmount', 'purchase')}
+                xKey="date"
+                series={[{ key: 'purchase', name: 'Purchase value', color: '#6366f1' }]}
+              />
+            </ChartCard>
 
             <ReportTable
               isEmpty={rows.length === 0}

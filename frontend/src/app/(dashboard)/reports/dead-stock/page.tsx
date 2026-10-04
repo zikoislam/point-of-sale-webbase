@@ -5,6 +5,7 @@ import { PackageX, RefreshCw } from 'lucide-react';
 import { ReportShell, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, RankBars } from '../../../../components/reports/charts';
 import { DataTable, Column } from '../../../../components/ui/DataTable';
 import { Badge } from '../../../../components/ui/Badge';
 
@@ -149,6 +150,22 @@ export default function DeadStockPage() {
             <RefreshCw className="w-3 h-3" /> Refresh
           </button>
         </div>
+
+        <ChartCard
+          title="Where the dead capital sits"
+          subtitle="Top 10 items by tied-up value"
+          height={340}
+        >
+          <RankBars
+            data={rows.map((r) => ({
+              name: `${r.productName}${r.variantName ? ` · ${r.variantName}` : ''}`,
+              deadValue: r.deadValue,
+            }))}
+            labelKey="name"
+            valueKey="deadValue"
+            color="#f43f5e"
+          />
+        </ChartCard>
 
         <DataTable<DeadStockRow>
           columns={columns}

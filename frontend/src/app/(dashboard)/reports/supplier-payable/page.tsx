@@ -5,6 +5,7 @@ import { Building } from 'lucide-react';
 import { ReportShell, ReportTable, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, RankBars } from '../../../../components/reports/charts';
 
 interface PayablesReport {
   summary: { suppliersWithPayable: number; totalOutstandingPayable: number };
@@ -39,6 +40,15 @@ export default function SupplierPayableReportPage() {
             value={data?.summary.suppliersWithPayable ?? 0}
           />
         </div>
+
+        <ChartCard title="Top vendors by payable" subtitle="Largest balances you owe" height={340}>
+          <RankBars
+            data={rows.map((s: any) => ({ name: s.companyName, payable: s.currentPayableBalance }))}
+            labelKey="name"
+            valueKey="payable"
+            color="#f59e0b"
+          />
+        </ChartCard>
 
         <ReportTable
           isEmpty={rows.length === 0}

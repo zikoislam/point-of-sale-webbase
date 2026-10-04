@@ -5,6 +5,7 @@ import { Truck, PackageSearch, ArrowLeftRight } from 'lucide-react';
 import { ReportShell, ReportTable, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, RankBars, CompareBars } from '../../../../components/reports/charts';
 import { Tabs } from '../../../../components/ui/Tabs';
 import { Badge } from '../../../../components/ui/Badge';
 
@@ -161,6 +162,19 @@ export default function PurchaseAnalysisPage() {
               />
             </div>
 
+            <ChartCard
+              title="Top suppliers by spend"
+              subtitle="Top 10 in the selected period"
+              height={320}
+            >
+              <RankBars
+                data={suppliers.data.map((r) => ({ name: r.supplierName, spend: r.totalAmount }))}
+                labelKey="name"
+                valueKey="spend"
+                color="#6366f1"
+              />
+            </ChartCard>
+
             <ReportTable
               headers={[
                 { label: 'Supplier' },
@@ -271,6 +285,21 @@ export default function PurchaseAnalysisPage() {
                 hint={`Stock value ${money(turnover.summary.stockValue)}`}
               />
             </div>
+
+            <ChartCard
+              title="Purchases vs sales by month"
+              subtitle="Are purchases keeping pace with what we sell?"
+              height={300}
+            >
+              <CompareBars
+                data={turnover.data}
+                xKey="month"
+                series={[
+                  { key: 'salesValue', name: 'Sales', color: '#10b981' },
+                  { key: 'purchaseValue', name: 'Purchases', color: '#6366f1' },
+                ]}
+              />
+            </ChartCard>
 
             <ReportTable
               headers={[

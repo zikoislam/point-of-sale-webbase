@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PieChart } from 'lucide-react';
 import { ReportShell, money } from '../../../../components/reports/ReportShell';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, CompareBars, ShareDonut } from '../../../../components/reports/charts';
 
 interface PnlReport {
   period: { startDate: string; endDate: string };
@@ -50,6 +51,39 @@ export default function PnlReportPage() {
       loading={loading}
       error={error}
     >
+      {data && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <ChartCard title="Revenue, cost & expenses" subtitle="How the profit is built" height={280}>
+            <CompareBars
+              data={[
+                {
+                  name: 'P&L',
+                  Revenue: data.revenue.totalSales,
+                  COGS: data.revenue.cogs,
+                  Expenses: data.expenses.totalExpenses,
+                },
+              ]}
+              xKey="name"
+              series={[
+                { key: 'Revenue', name: 'Revenue', color: '#10b981' },
+                { key: 'COGS', name: 'COGS', color: '#f43f5e' },
+                { key: 'Expenses', name: 'Expenses', color: '#f59e0b' },
+              ]}
+            />
+          </ChartCard>
+          <ChartCard title="Expense breakdown" subtitle="Operating overhead by category" height={280}>
+            <ShareDonut
+              data={Object.entries(data.expenses.breakdown || {}).map(([name, value]) => ({
+                name,
+                value: Number(value) || 0,
+              }))}
+              nameKey="name"
+              valueKey="value"
+            />
+          </ChartCard>
+        </div>
+      )}
+
       {data && (
         <div className="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6 shadow-2xl">
           <div className="text-center border-b border-slate-800 pb-4">

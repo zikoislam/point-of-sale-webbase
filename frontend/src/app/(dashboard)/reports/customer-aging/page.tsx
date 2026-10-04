@@ -5,6 +5,7 @@ import { Users } from 'lucide-react';
 import { ReportShell, ReportTable, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, RankBars } from '../../../../components/reports/charts';
 
 interface DuesReport {
   summary: { customersWithDue: number; totalOutstandingDue: number };
@@ -39,6 +40,15 @@ export default function CustomerAgingReportPage() {
             value={data?.summary.customersWithDue ?? 0}
           />
         </div>
+
+        <ChartCard title="Top debtors" subtitle="Largest outstanding customer balances" height={340}>
+          <RankBars
+            data={rows.map((c: any) => ({ name: c.name, due: c.currentDueBalance }))}
+            labelKey="name"
+            valueKey="due"
+            color="#f43f5e"
+          />
+        </ChartCard>
 
         <ReportTable
           isEmpty={rows.length === 0}

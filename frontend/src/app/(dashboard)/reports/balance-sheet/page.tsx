@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Scale, RefreshCw, Printer, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { api } from '../../../../lib/api-client';
 import { useToast } from '../../../../components/ui';
+import { ChartCard, CompareBars } from '../../../../components/reports/charts';
 
 interface Row {
   code?: string;
@@ -128,6 +129,30 @@ export default function BalanceSheetPage() {
         <div className="py-16 text-center text-slate-500 bg-slate-900 border border-slate-800 rounded-2xl text-sm">No data.</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="lg:col-span-2">
+            <ChartCard
+              title="Assets vs Liabilities vs Equity"
+              subtitle="What the shop owns against what funds it"
+              height={280}
+            >
+              <CompareBars
+                data={[
+                  {
+                    name: 'Balance sheet',
+                    Assets: data.totalAssets,
+                    Liabilities: data.totalLiabilities,
+                    Equity: data.totalEquity,
+                  },
+                ]}
+                xKey="name"
+                series={[
+                  { key: 'Assets', name: 'Assets', color: '#10b981' },
+                  { key: 'Liabilities', name: 'Liabilities', color: '#f43f5e' },
+                  { key: 'Equity', name: 'Equity', color: '#6366f1' },
+                ]}
+              />
+            </ChartCard>
+          </div>
           <Section title="Assets" rows={data.assets} total={data.totalAssets} />
 
           <div className="space-y-6">

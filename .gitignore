@@ -17,6 +17,7 @@ dist-electron-desktop/
 dist-electron-build/
 dist-pos-build/
 dist-electron.zip
+dist-pos-build.zip
 build/
 build-verify/
 

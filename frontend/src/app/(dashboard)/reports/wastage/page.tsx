@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react';
 import { ReportShell, ReportTable, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, TrendChart, RankBars, groupByDay } from '../../../../components/reports/charts';
 
 interface WastageReport {
   summary: { totalWastageEvents: number; totalQty: number; totalLossValue: number };
@@ -51,6 +52,26 @@ export default function WastageReportPage() {
             value={money(data?.summary.totalLossValue)}
             tone="rose"
           />
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2">
+            <ChartCard title="Loss value by day" subtitle="Written-off stock over the period" height={260}>
+              <TrendChart
+                data={groupByDay(rows, 'createdAt', 'lossValue', 'loss')}
+                xKey="date"
+                series={[{ key: 'loss', name: 'Loss value', color: '#f43f5e' }]}
+              />
+            </ChartCard>
+          </div>
+          <ChartCard title="Worst items" subtitle="Top 10 by loss value" height={260}>
+            <RankBars
+              data={rows.map((m: any) => ({ name: m.productName, loss: m.lossValue }))}
+              labelKey="name"
+              valueKey="loss"
+              color="#f59e0b"
+            />
+          </ChartCard>
         </div>
 
         <ReportTable

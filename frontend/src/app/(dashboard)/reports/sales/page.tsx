@@ -5,6 +5,12 @@ import { TrendingUp } from 'lucide-react';
 import { ReportShell, ReportTable, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import {
+  ChartCard,
+  TrendChart,
+  ShareDonut,
+  groupByDay,
+} from '../../../../components/reports/charts';
 
 interface SalesReport {
   summary: {
@@ -63,6 +69,28 @@ export default function SalesReportPage() {
           />
           <KpiCard label="Total Collected" value={money(data?.summary.totalPaid)} tone="emerald" />
           <KpiCard label="Unpaid Dues" value={money(data?.summary.totalDue)} tone="rose" />
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2">
+            <ChartCard title="Net sales by day" subtitle="Invoices in the selected period" height={260}>
+              <TrendChart
+                data={groupByDay(rows, 'createdAt', 'totalAmount', 'net')}
+                xKey="date"
+                series={[{ key: 'net', name: 'Net sales', color: '#10b981' }]}
+              />
+            </ChartCard>
+          </div>
+          <ChartCard title="Pricing tier split" subtitle="Retail vs wholesale" height={260}>
+            <ShareDonut
+              data={(data?.tierBreakdown || []).map((t: any) => ({
+                name: t._id || 'RETAIL',
+                value: t.total,
+              }))}
+              nameKey="name"
+              valueKey="value"
+            />
+          </ChartCard>
         </div>
 
         {/* Staff performance — sales per user within the selected period */}

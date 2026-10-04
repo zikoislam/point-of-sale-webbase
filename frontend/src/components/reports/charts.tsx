@@ -65,6 +65,23 @@ const truncate = (value: any, max = 18): string => {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 };
 
+/**
+ * Groups rows into a per-day series, summing `valueKey` into `outKey`.
+ * Handy for turning a list of invoices / movements into a trend line.
+ */
+export function groupByDay(rows: any[], dateKey: string, valueKey: string, outKey: string) {
+  const map = new Map<string, any>();
+  (rows || []).forEach((r) => {
+    const raw = r?.[dateKey];
+    if (!raw) return;
+    const day = new Date(raw).toISOString().slice(0, 10);
+    const row = map.get(day) || { date: day };
+    row[outKey] = (row[outKey] || 0) + (Number(r?.[valueKey]) || 0);
+    map.set(day, row);
+  });
+  return Array.from(map.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
 function EmptyChart() {
   return (
     <div className="h-full w-full flex items-center justify-center text-xs text-slate-500">

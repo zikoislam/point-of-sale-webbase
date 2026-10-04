@@ -6,6 +6,7 @@ import { ClipboardList, ShoppingCart } from 'lucide-react';
 import { ReportShell, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, RankBars } from '../../../../components/reports/charts';
 import { DataTable, Column } from '../../../../components/ui/DataTable';
 import { Badge } from '../../../../components/ui/Badge';
 
@@ -161,6 +162,22 @@ export default function ReorderPointPage() {
             hint="Suggested qty × last purchase price"
           />
         </div>
+
+        <ChartCard
+          title="Biggest reorders by cost"
+          subtitle="Top 10 items by suggested purchase value"
+          height={340}
+        >
+          <RankBars
+            data={rows.map((r) => ({
+              name: `${r.productName}${r.variantName ? ` · ${r.variantName}` : ''}`,
+              estimatedCost: r.estimatedCost,
+            }))}
+            labelKey="name"
+            valueKey="estimatedCost"
+            color="#6366f1"
+          />
+        </ChartCard>
 
         <DataTable<ReorderRow>
           columns={columns}

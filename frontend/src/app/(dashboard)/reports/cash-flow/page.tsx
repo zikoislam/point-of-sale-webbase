@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Banknote, RefreshCw, Printer, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { api } from '../../../../lib/api-client';
 import { useToast } from '../../../../components/ui';
+import { ChartCard, CompareBars } from '../../../../components/reports/charts';
 
 interface Line {
   date: string;
@@ -141,6 +142,21 @@ export default function CashFlowPage() {
               </div>
             ))}
           </div>
+
+          <ChartCard title="Money in vs out by source" subtitle="Net movement per source" height={300}>
+            <CompareBars
+              data={data.bySource.map((s) => ({
+                name: s.source.replace(/_/g, ' ').toLowerCase(),
+                in: s.in,
+                out: s.out,
+              }))}
+              xKey="name"
+              series={[
+                { key: 'in', name: 'Money in', color: '#10b981' },
+                { key: 'out', name: 'Money out', color: '#f43f5e' },
+              ]}
+            />
+          </ChartCard>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">

@@ -6,6 +6,7 @@ import { Award, RefreshCw, Users, TrendingUp, Flame, Settings } from 'lucide-rea
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { ReportTable, money } from '../../../../components/reports/ReportShell';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, RankBars, ShareDonut } from '../../../../components/reports/charts';
 import { Badge } from '../../../../components/ui/Badge';
 import { Button } from '../../../../components/ui/Button';
 
@@ -148,6 +149,29 @@ export default function LoyaltyAnalyticsPage() {
               tone="amber"
               hint={`${s?.pointsOutstanding ?? 0} points held by ${s?.holders ?? 0} customer(s)`}
             />
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2">
+              <ChartCard title="Top members by points" subtitle="Highest point balances" height={280}>
+                <RankBars
+                  data={(data?.topHolders || []).map((h) => ({ name: h.name, points: h.loyaltyPoints }))}
+                  labelKey="name"
+                  valueKey="points"
+                  valueFormat={(v) => String(v)}
+                  color="#f59e0b"
+                />
+              </ChartCard>
+            </div>
+            <ChartCard title="Customers per tier" subtitle="Loyalty tier distribution" height={280}>
+              <ShareDonut
+                data={(data?.tiers || []).map((t) => ({ name: t.tier, value: t.customers }))}
+                nameKey="name"
+                valueKey="value"
+                valueFormat={(v) => String(v)}
+                colors={['#94a3b8', '#e2e8f0', '#f59e0b', '#06b6d4']}
+              />
+            </ChartCard>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

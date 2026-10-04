@@ -6,6 +6,7 @@ import { AlertTriangle, ShoppingCart, RefreshCw } from 'lucide-react';
 import { ReportShell, money } from '../../../../components/reports/ReportShell';
 import { KpiCard } from '../../../../components/reports/KpiCard';
 import { useReportData } from '../../../../components/reports/useReportData';
+import { ChartCard, RankBars } from '../../../../components/reports/charts';
 import { DataTable, Column } from '../../../../components/ui/DataTable';
 import { Badge } from '../../../../components/ui/Badge';
 
@@ -190,6 +191,23 @@ export default function LowStockPage() {
             Threshold খালি রাখলে প্রতিটি variant-এর নিজের alert qty ব্যবহার হয়
           </span>
         </div>
+
+        <ChartCard
+          title="Biggest shortages"
+          subtitle="Units missing to reach each item's alert level"
+          height={340}
+        >
+          <RankBars
+            data={filtered.map((r) => ({
+              name: `${r.productName}${r.variantName ? ` · ${r.variantName}` : ''}`,
+              shortage: Math.max(0, (r.alertQty || 0) - (r.currentStock || 0)),
+            }))}
+            labelKey="name"
+            valueKey="shortage"
+            valueFormat={(v) => String(v)}
+            color="#f59e0b"
+          />
+        </ChartCard>
 
         <DataTable<LowStockRow>
           columns={columns}

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ReportShell } from '../../../../components/reports/ReportShell';
 import { REPORT_API } from '../../../../components/reports/useReportData';
+import { ChartCard, TrendChart } from '../../../../components/reports/charts';
 
 interface Movement {
   date: string;
@@ -226,6 +227,22 @@ export default function BarcodeTrackerPage() {
                 ))}
               </div>
             </div>
+
+            <ChartCard
+              title="Stock balance over time"
+              subtitle="Running balance after each movement"
+              height={260}
+            >
+              <TrendChart
+                data={[...report.movements].reverse().map((m) => ({
+                  date: new Date(m.date).toISOString().slice(0, 10),
+                  balance: m.balanceAfter,
+                }))}
+                xKey="date"
+                series={[{ key: 'balance', name: 'Balance', color: '#6366f1' }]}
+                valueFormat={(v) => String(v)}
+              />
+            </ChartCard>
 
             {/* Movement table */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">

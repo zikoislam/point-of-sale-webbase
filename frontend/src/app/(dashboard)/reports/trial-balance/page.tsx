@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Scale, RefreshCw, Printer, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { api } from '../../../../lib/api-client';
 import { useToast } from '../../../../components/ui';
+import { ChartCard, CompareBars } from '../../../../components/reports/charts';
 
 interface Row {
   accountId: string;
@@ -108,6 +109,22 @@ export default function TrialBalancePage() {
           Apply
         </button>
       </div>
+
+      {data && !loading && (
+        <ChartCard title="Debit vs credit by account" subtitle="Top 12 accounts by movement" height={320}>
+          <CompareBars
+            data={[...data.rows]
+              .sort((a, b) => b.debit + b.credit - (a.debit + a.credit))
+              .slice(0, 12)
+              .map((r) => ({ name: r.name, Debit: r.debit, Credit: r.credit }))}
+            xKey="name"
+            series={[
+              { key: 'Debit', name: 'Debit', color: '#10b981' },
+              { key: 'Credit', name: 'Credit', color: '#6366f1' },
+            ]}
+          />
+        </ChartCard>
+      )}
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         {loading ? (

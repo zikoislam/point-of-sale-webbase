@@ -338,7 +338,7 @@ export default function OrganizationsPage() {
         sessionStorage.setItem('pos_token', res.data.token);
         queryClient.clear();
         toast.success(`Working inside "${org.name}"`);
-        window.location.href = '/dashboard';
+        window.location.href = '/pos';
       }
     } catch (err: any) {
       toast.error(err.message);

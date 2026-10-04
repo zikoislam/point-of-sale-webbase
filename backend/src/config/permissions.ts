@@ -127,6 +127,8 @@ export const CASHIER_PERMISSIONS: string[] = [
   'customers:pay_due',
   'expenses:create',
   'inv:view',
+  // Cashiers land on the dashboard, so they need to be able to open it.
+  'reports:dashboard',
 ];
 
 /** Validates that every entry is a known permission string. */

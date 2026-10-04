@@ -24,6 +24,13 @@ import {
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../../lib/i18n';
 import { MODULE_DEFS } from '../../../lib/modules';
+import {
+  ChartCard,
+  TrendChart,
+  RankBars,
+  ShareDonut,
+  CompareBars,
+} from '../../../components/reports/charts';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -246,6 +253,84 @@ export default function ReportsPage() {
   const [pnlReport, setPnlReport] = useState<any>(null);
   const [duesReport, setDuesReport] = useState<any>(null);
   const [payablesReport, setPayablesReport] = useState<any>(null);
+
+  // ── Chart data, derived from what each report already returns ────────────
+  const salesByDay = React.useMemo(() => {
+    const map = new Map<string, number>();
+    (salesReport?.data || []).forEach((s: any) => {
+      if (!s?.createdAt) return;
+      const day = new Date(s.createdAt).toISOString().slice(0, 10);
+      map.set(day, (map.get(day) || 0) + (s.totalAmount || 0));
+    });
+    return Array.from(map, ([date, net]) => ({ date, net })).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+  }, [salesReport]);
+
+  const tierSplit = React.useMemo(
+    () =>
+      (salesReport?.tierBreakdown || []).map((t: any) => ({
+        name: t._id || 'RETAIL',
+        value: t.total || 0,
+      })),
+    [salesReport]
+  );
+
+  const topProducts = React.useMemo(
+    () =>
+      (productsReport || []).map((p: any) => ({
+        name: `${p.productName}${p.variantName ? ` · ${p.variantName}` : ''}`,
+        revenue: p.revenue || 0,
+      })),
+    [productsReport]
+  );
+
+  const topInventory = React.useMemo(
+    () =>
+      (inventoryReport?.data || []).map((i: any) => ({
+        name: `${i.productName}${i.variantName ? ` · ${i.variantName}` : ''}`,
+        assetValue: i.assetValue || 0,
+      })),
+    [inventoryReport]
+  );
+
+  const pnlBars = React.useMemo(
+    () =>
+      pnlReport
+        ? [
+            {
+              name: 'P&L',
+              Revenue: pnlReport.revenue.totalSales || 0,
+              COGS: pnlReport.revenue.cogs || 0,
+              Expenses: pnlReport.expenses.totalExpenses || 0,
+            },
+          ]
+        : [],
+    [pnlReport]
+  );
+
+  const expenseSplit = React.useMemo(
+    () =>
+      Object.entries(pnlReport?.expenses?.breakdown || {}).map(([name, value]) => ({
+        name,
+        value: Number(value) || 0,
+      })),
+    [pnlReport]
+  );
+
+  const topDebtors = React.useMemo(
+    () => (duesReport?.data || []).map((c: any) => ({ name: c.name, due: c.currentDueBalance || 0 })),
+    [duesReport]
+  );
+
+  const topVendors = React.useMemo(
+    () =>
+      (payablesReport?.data || []).map((s: any) => ({
+        name: s.companyName,
+        payable: s.currentPayableBalance || 0,
+      })),
+    [payablesReport]
+  );
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -682,6 +767,88 @@ export default function ReportsPage() {
           />
         </div>
       </div>
+
+      {/* ── Charts for the active tab (tables stay below, exact numbers & export) ── */}
+      {!loading && (
+        <div className="space-y-4 print:hidden">
+          {activeTab === 'SALES' && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="xl:col-span-2">
+                <ChartCard
+                  title="Net sales by day"
+                  subtitle="Invoices in the selected period"
+                  height={260}
+                >
+                  <TrendChart
+                    data={salesByDay}
+                    xKey="date"
+                    series={[{ key: 'net', name: 'Net sales', color: '#10b981' }]}
+                  />
+                </ChartCard>
+              </div>
+              <ChartCard title="Pricing tier split" subtitle="Retail vs wholesale" height={260}>
+                <ShareDonut data={tierSplit} nameKey="name" valueKey="value" />
+              </ChartCard>
+            </div>
+          )}
+
+          {activeTab === 'PRODUCTS' && (
+            <ChartCard
+              title="Top products by revenue"
+              subtitle="Best 10 sellers in the selected period"
+              height={340}
+            >
+              <RankBars data={topProducts} labelKey="name" valueKey="revenue" color="#10b981" />
+            </ChartCard>
+          )}
+
+          {activeTab === 'INVENTORY' && (
+            <ChartCard
+              title="Top items by asset value"
+              subtitle="Where the stock value is concentrated"
+              height={340}
+            >
+              <RankBars
+                data={topInventory}
+                labelKey="name"
+                valueKey="assetValue"
+                color="#8b5cf6"
+              />
+            </ChartCard>
+          )}
+
+          {activeTab === 'PNL' && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <ChartCard title="Revenue, cost & expenses" subtitle="How the profit is built" height={280}>
+                <CompareBars
+                  data={pnlBars}
+                  xKey="name"
+                  series={[
+                    { key: 'Revenue', name: 'Revenue', color: '#10b981' },
+                    { key: 'COGS', name: 'COGS', color: '#f43f5e' },
+                    { key: 'Expenses', name: 'Expenses', color: '#f59e0b' },
+                  ]}
+                />
+              </ChartCard>
+              <ChartCard title="Expense breakdown" subtitle="Operating overhead by category" height={280}>
+                <ShareDonut data={expenseSplit} nameKey="name" valueKey="value" />
+              </ChartCard>
+            </div>
+          )}
+
+          {activeTab === 'DUES' && (
+            <ChartCard title="Top debtors" subtitle="Largest outstanding customer balances" height={340}>
+              <RankBars data={topDebtors} labelKey="name" valueKey="due" color="#f43f5e" />
+            </ChartCard>
+          )}
+
+          {activeTab === 'PAYABLES' && (
+            <ChartCard title="Top vendors by payable" subtitle="Largest outstanding balances you owe" height={340}>
+              <RankBars data={topVendors} labelKey="name" valueKey="payable" color="#f59e0b" />
+            </ChartCard>
+          )}
+        </div>
+      )}
 
       {/* Tab 1: Sales Summary Report */}
       {activeTab === 'SALES' && (

@@ -158,7 +158,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check role restrictions
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role) && user.role !== 'SUPER_ADMIN') {
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role) && user.role !== 'SUPER_ADMIN' && !user.isPlatformSuperAdmin) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-100">
         <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center mb-4">
@@ -179,7 +179,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check permission restrictions
-  if (allPermissions.length > 0 && user.role !== 'SUPER_ADMIN') {
+  if (allPermissions.length > 0 && user.role !== 'SUPER_ADMIN' && !user.isPlatformSuperAdmin) {
     const hasAll = allPermissions.every((perm) => user.permissions.includes(perm));
     if (!hasAll) {
       return (

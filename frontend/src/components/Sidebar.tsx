@@ -369,7 +369,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const canAccess = (permission?: string) => {
     if (!permission || !user) return true;
-    if (user.role === 'SUPER_ADMIN') return true;
+    if (user.role === 'SUPER_ADMIN' || user.isPlatformSuperAdmin) return true;
     return user.permissions.includes(permission);
   };
 
@@ -521,7 +521,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             // Handle submenu items
             if (item.subItems) {
               const allowedSubItems = item.subItems.filter(
-                (sub) => canAccess(sub.permission) && (!sub.superAdminOnly || user?.role === 'SUPER_ADMIN')
+                (sub) => canAccess(sub.permission) && (!sub.superAdminOnly || user?.role === 'SUPER_ADMIN' || user?.isPlatformSuperAdmin)
               );
               if (allowedSubItems.length === 0) return null;
 

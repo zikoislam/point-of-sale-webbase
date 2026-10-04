@@ -14,6 +14,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 dist-electron/
 dist-electron-tmp/
 dist-electron-desktop/
+dist-electron-build/
+dist-pos-build/
 dist-electron.zip
 build/
 build-verify/

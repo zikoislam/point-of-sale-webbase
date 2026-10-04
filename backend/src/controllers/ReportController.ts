@@ -29,7 +29,20 @@ function extraExportParams(req: Request): Record<string, string> {
 class ReportController {
   async getDashboard(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await reportService.getDashboardMetrics();
+      const data: any = await reportService.getDashboardMetrics();
+
+      // Cashiers get a LIMITED dashboard: no account balances, no stock-at-cost
+      // valuation and no supplier payables. Users who can see the P&L (managers,
+      // admins) keep the full picture.
+      const canSeeFinancials =
+        !!req.user?.isPlatformSuperAdmin ||
+        (req.user?.permissions || []).includes('reports:pnl');
+      if (!canSeeFinancials && data?.kpis) {
+        delete data.kpis.liquidCapital;
+        delete data.kpis.inventoryValuation;
+        delete data.kpis.supplierPayables;
+      }
+
       sendSuccess(res, 200, 'Dashboard metrics fetched', data);
     } catch (err) { next(err); }
   }

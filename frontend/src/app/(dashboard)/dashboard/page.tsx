@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useBranding } from '../../../hooks/useBranding';
+import { useAuth } from '../../../hooks/useAuth';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, cn } from '../../../lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -67,8 +68,35 @@ interface DashboardResponse {
   topProducts: { name: string; qty: number; revenue: number }[];
 }
 
+/**
+ * Permission each quick-link card needs. Cards are hidden when the signed-in
+ * user does not hold the permission — so a cashier only sees the modules they
+ * can actually use.
+ */
+const CARD_PERMISSION: Record<string, string> = {
+  POS: 'pos:checkout',
+  Products: 'inv:view',
+  Sales: 'sales:view',
+  'Open Invoices': 'sales:view',
+  Categories: 'inv:view',
+  'Gift Cards': 'sales:view',
+  Customers: 'customers:view',
+  Configuration: 'settings:manage',
+  Reports: 'reports:dashboard',
+  Users: 'users:manage',
+  'Audit Logs': 'audit:view',
+  Shifts: 'shifts:operate',
+};
+
 export default function DashboardPage() {
   const branding = useBranding();
+  const { user } = useAuth();
+  const permissions = user?.permissions || [];
+  const isSuper = !!user?.isPlatformSuperAdmin;
+  const canSeeCard = (label: string) => {
+    const perm = CARD_PERMISSION[label];
+    return !perm || isSuper || permissions.includes(perm);
+  };
   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d'>('7d');
 
   // Purchase orders waiting for a manager's approval (Phase 6.3)
@@ -374,7 +402,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5">
-          {metroCards.map((card) => {
+          {metroCards.filter((c) => canSeeCard(c.label)).map((card) => {
             const Icon = card.icon;
             return (
               <Link
@@ -457,21 +485,23 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* 3. Liquid Capital */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md hover:border-slate-700 transition">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium">Liquid Capital</span>
-              <div className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400">
-                <Wallet className="w-4 h-4" />
+          {/* 3. Liquid Capital — hidden for cashiers (no account balances) */}
+          {kpis?.liquidCapital !== undefined && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md hover:border-slate-700 transition">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-medium">Liquid Capital</span>
+                <div className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400">
+                  <Wallet className="w-4 h-4" />
+                </div>
               </div>
+              <p className="text-lg font-bold text-white tracking-tight">
+                {formatCurrency(kpis?.liquidCapital ?? 0)}
+              </p>
+              <p className="text-[11px] text-teal-400 mt-1 font-medium">
+                Cash, Bank &amp; MFS
+              </p>
             </div>
-            <p className="text-lg font-bold text-white tracking-tight">
-              {formatCurrency(kpis?.liquidCapital ?? 0)}
-            </p>
-            <p className="text-[11px] text-teal-400 mt-1 font-medium">
-              Cash, Bank & MFS
-            </p>
-          </div>
+          )}
 
           {/* 4. Customer Receivables */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md hover:border-slate-700 transition">
@@ -493,21 +523,23 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {/* 5. Inventory Asset Value */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md hover:border-slate-700 transition">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium">Inventory Value</span>
-              <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
-                <Boxes className="w-4 h-4" />
+          {/* 5. Inventory Asset Value — hidden for cashiers (stock at cost) */}
+          {kpis?.inventoryValuation !== undefined && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md hover:border-slate-700 transition">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-medium">Inventory Value</span>
+                <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                  <Boxes className="w-4 h-4" />
+                </div>
               </div>
+              <p className="text-lg font-bold text-white tracking-tight">
+                {formatCurrency(kpis?.inventoryValuation ?? 0)}
+              </p>
+              <p className="text-[11px] text-purple-400 mt-1 font-medium">
+                At cost (WAC)
+              </p>
             </div>
-            <p className="text-lg font-bold text-white tracking-tight">
-              {formatCurrency(kpis?.inventoryValuation ?? 0)}
-            </p>
-            <p className="text-[11px] text-purple-400 mt-1 font-medium">
-              At cost (WAC)
-            </p>
-          </div>
+          )}
 
           {/* 6. Low Stock Alert */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md hover:border-slate-700 transition">

@@ -12,6 +12,7 @@
     "license:init": "node tools/license-generator/init-keys.js",
     "license:new": "node tools/license-generator/make-license.js",
     "license:check": "node tools/license-generator/check-license.js",
+    "shop:new": "node tools/license-generator/new-shop.js",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev": "cross-env NODE_ENV=development electron .",
@@ -19,7 +20,13 @@
     "build:frontend": "npm --prefix frontend run build",
     "pack": "npm run build:backend && npm run build:frontend && node scripts/prepare-resources.js",
     "dist": "npm run pack && electron-builder --win",
-    "dist:dir": "npm run pack && electron-builder --win --dir"
+    "dist:dir": "npm run pack && electron-builder --win --dir",
+    "pack:desktop": "npm run build:backend && npm run build:frontend && node scripts/prepare-resources.js --external-db",
+    "dist:desktop": "npm run pack:desktop && electron-builder --win --config electron-builder.desktop.json",
+    "dist:desktop:dir": "npm run pack:desktop && electron-builder --win --dir --config electron-builder.desktop.json",
+    "pack:offline": "npm run build:backend && npm run build:frontend && node scripts/prepare-resources.js --no-cloud",
+    "dist:offline": "npm run pack:offline && electron-builder --win",
+    "dist:offline:dir": "npm run pack:offline && electron-builder --win --dir"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

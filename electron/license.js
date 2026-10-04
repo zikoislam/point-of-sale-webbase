@@ -27,7 +27,7 @@ const { execFileSync } = require('child_process');
 
 /** Printed by `npm run license:init` — replace if you ever make a new keypair. */
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAgBIDQq9hEYxNNMLZlKOReutzCtmdRdx7trfhq/Cuhv4=
+MCowBQYDK2VwAyEAM+iUhXzB8rlbbdB2XrSYAXO0UdJf9w1HbAhV6TgJaoY=
 -----END PUBLIC KEY-----`;
 
 const VERSION_TAG = 'POS1';

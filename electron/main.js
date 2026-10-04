@@ -184,16 +184,38 @@ function waitForHttp(url, timeoutMs, label) {
  * a standalone mongod refuses to provide.
  */
 async function startLocalMongo() {
-  const port = config.localMongoPort;
+  const preferredPort = config.localMongoPort;
+  const externalOnly = config.mongoMode === 'external';
+  const bundledOnly = config.mongoMode === 'bundled';
+  const hasBundled = fs.existsSync(paths.mongodExe);
 
-  if (!fs.existsSync(paths.mongodExe)) {
-    log('no bundled mongod — running against the cloud database only.');
-    return { mode: 'cloud-only', port };
+  // 'auto' reuses a MongoDB that is already running (e.g. a service the shop
+  // installed). The offline edition uses 'bundled' instead so it NEVER shares a
+  // database with another server — that is what keeps a fresh install clean.
+  if (!bundledOnly && (await isPortOpen(preferredPort))) {
+    log(`MongoDB is already listening on port ${preferredPort} — reusing it.`);
+    return { mode: 'reused', port: preferredPort };
   }
 
-  if (await isPortOpen(port)) {
-    log(`port ${port} already has MongoDB listening — reusing it.`);
-    return { mode: 'reused', port };
+  // This edition is built to talk to an installed MongoDB only.
+  if (externalOnly) {
+    log(`external MongoDB mode: nothing is listening on 127.0.0.1:${preferredPort}.`);
+    return { mode: 'external-down', port: preferredPort };
+  }
+
+  if (!hasBundled) {
+    log('no bundled mongod — running against the cloud database only.');
+    return { mode: 'cloud-only', port: preferredPort };
+  }
+
+  // Bundled edition: take our own port, so a MongoDB service already running on
+  // the default port cannot pull us into its old database.
+  let port = preferredPort;
+  if (bundledOnly) {
+    port = await findFreePort(preferredPort).catch(() => preferredPort);
+    if (port !== preferredPort) {
+      log(`port ${preferredPort} is busy — the bundled database will use ${port}.`);
+    }
   }
 
   const dbPath = configModule.dataDir(app);
@@ -856,6 +878,22 @@ async function boot() {
   createSplashWindow();
 
   const mongo = await startLocalMongo();
+
+  // External-database edition: the app refuses to run against a silent/no
+  // database so the shop never starts on an empty store by accident.
+  if (mongo.mode === 'external-down') {
+    closeSplash();
+    dialog.showErrorBox(
+      'MongoDB is not running',
+      `This edition keeps its data in a MongoDB server installed on this PC, but nothing is listening on 127.0.0.1:${mongo.port}.\n\n` +
+        'How to fix:\n' +
+        '  1. Open Windows "Services" (services.msc) and make sure the MongoDB service is running.\n' +
+        '  2. If MongoDB is not installed, install MongoDB Community Server and tick "Install MongoDB as a Service".\n\n' +
+        'Then open Unique POS again.'
+    );
+    app.quit();
+    return;
+  }
 
   const frontendPort = isDev
     ? config.frontendPort

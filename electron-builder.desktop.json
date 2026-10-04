@@ -1,0 +1,58 @@
+{
+  "appId": "com.bdbbc.unique-pos.desktop",
+  "productName": "Unique POS Desktop",
+  "copyright": "Copyright © Bdbbc.com",
+  "directories": {
+    "output": "dist-electron-desktop",
+    "buildResources": "electron/assets"
+  },
+  "files": [
+    "electron/main.js",
+    "electron/preload.js",
+    "electron/config.js",
+    "electron/hardware.js",
+    "electron/license.js",
+    "electron/license.html",
+    "electron/splash.html",
+    "electron/assets/**/*",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "build/backend",
+      "to": "backend"
+    },
+    {
+      "from": "build/frontend",
+      "to": "frontend"
+    },
+    {
+      "from": "build/config",
+      "to": "config"
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "electron/assets/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowElevation": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Unique POS Desktop",
+    "installerIcon": "electron/assets/icon.ico",
+    "uninstallerIcon": "electron/assets/icon.ico",
+    "installerHeaderIcon": "electron/assets/icon.ico",
+    "license": "LICENSE.txt",
+    "deleteAppDataOnUninstall": false
+  },
+  "publish": null
+}

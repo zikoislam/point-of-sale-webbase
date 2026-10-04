@@ -154,6 +154,17 @@ export class OrgService {
     });
   }
 
+  /**
+   * Provisions (or repairs) an organization's roles and baseline data.
+   * Public so first-run bootstrap can prepare the default organization created
+   * on a brand-new install, using the same logic as createOrg().
+   */
+  async provisionOrg(orgId: Types.ObjectId | string, envelope: string[]): Promise<void> {
+    const id = typeof orgId === 'string' ? new Types.ObjectId(orgId) : orgId;
+    await this.provisionOrgRoles(id, envelope);
+    await this.provisionOrgData(id);
+  }
+
   async createOrg(data: {
     name: string;
     contactPhone?: string;

@@ -31,6 +31,17 @@ const FRONTEND_SRC = path.join(ROOT, 'frontend');
 
 const log = (msg) => console.log(`[pack] ${msg}`);
 
+// "Desktop (external MongoDB)" edition: the customer installs MongoDB on their
+// PC; the installer ships no mongod and the app is told to require it.
+const EXTERNAL_DB =
+  process.argv.includes('--external-db') || process.env.DESKTOP_EXTERNAL_DB === '1';
+
+// Force a fully offline build: never seed a cloud URI into the app, regardless
+// of what backend/.env says. Lets us ship a per-shop installer without editing
+// the developer's .env (so the web project on the dev machine is untouched).
+const NO_CLOUD =
+  process.argv.includes('--no-cloud') || process.env.DESKTOP_NO_CLOUD === '1';
+
 function rmrf(target) {
   fs.rmSync(target, { recursive: true, force: true });
 }
@@ -191,10 +202,27 @@ function packConfig() {
   const backendEnv = readEnvFile(path.join(BACKEND_SRC, '.env'));
 
   const config = {
+    // Which build this installer is. The app uses it to reset vendor-controlled
+    // settings (cloud URI / mongo mode) when a PC switches editions, so an old
+    // cloud config cannot drag old data into a fresh offline install.
+    edition: EXTERNAL_DB ? 'external' : NO_CLOUD ? 'offline' : 'standard',
+    // External-database edition connects to the MongoDB installed on this PC;
+    // the standard build reuses one if present, else starts the bundled server;
+    // the offline edition ALWAYS starts its own bundled server on a private port
+    // so a MongoDB service on the PC can never pull in old data.
+    mongoMode: EXTERNAL_DB ? 'external' : NO_CLOUD ? 'bundled' : 'auto',
     // Seeded into %APPDATA%/UniquePos/config.json on first launch. Note that a
     // credential shipped to a customer machine can always be extracted, so the
     // cloud database should use a dedicated low-privilege user.
-    cloudMongoUri: backendEnv.MONGODB_URI || '',
+    //
+    // The external edition only enables online sync when a real CLOUD_MONGODB_URI
+    // is set — backend/.env's MONGODB_URI is normally the local URI and must not
+    // be shipped as if it were a cloud target. --no-cloud always wins.
+    cloudMongoUri: NO_CLOUD
+      ? ''
+      : EXTERNAL_DB
+        ? backendEnv.CLOUD_MONGODB_URI || ''
+        : backendEnv.MONGODB_URI || '',
     localMongoUri: 'mongodb://127.0.0.1:27017/pos_db',
     localMongoPort: 27017,
     backendPort: 5000,
@@ -226,7 +254,11 @@ function main() {
 
   packBackend();
   packFrontend();
-  packMongod();
+  if (EXTERNAL_DB) {
+    log('external MongoDB edition: not bundling mongod.exe (the customer installs MongoDB).');
+  } else {
+    packMongod();
+  }
   packConfig();
 
   log('done — now run: npx electron-builder --win');

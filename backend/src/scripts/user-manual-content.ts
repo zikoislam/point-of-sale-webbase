@@ -28,7 +28,7 @@ export interface Part {
   chapters: Chapter[];
 }
 
-export const MANUAL_VERSION = '১.০ (Version 1.0)';
+export const MANUAL_VERSION = '১.১ (Version 1.1)';
 
 export const PARTS: Part[] = [
   /* ═══════════════════════════ PART A ═══════════════════════════ */
@@ -880,6 +880,112 @@ export const PARTS: Part[] = [
               { bn: 'যে কোনো সংবেদনশীল কাজের (বছর ক্লোজ, পুরনো ভাউচার সংশোধন, ইনডেক্স মাইগ্রেশন) আগে ব্যাকআপ নিন।', en: 'Back up before sensitive operations.' },
               { bn: 'এই ম্যানুয়ালটি সফটওয়্যারের সংস্করণের সাথে বদলায়; নতুন ফিচার যোগ হলে নতুন সংস্করণ দেখে নিন (“Software by” অংশে যোগাযোগের তথ্য থাকে)।', en: 'Ask for the matching manual version after upgrades.' },
             ],
+          },
+        ],
+      },
+    ],
+  },
+  /* ═══════════════════════════ PART E ═══════════════════════════ */
+  {
+    titleBn: 'অংশ ঙ — ডেস্কটপ ইনস্টল, লাইসেন্স ও সাবস্ক্রিপশন',
+    titleEn: 'Part E — Desktop install, licence and subscription',
+    summaryBn:
+      'যে দোকান অনলাইন ছাড়াই নিজের পিসিতে চালাবে — MongoDB ইনস্টল থেকে অ্যাপ ইনস্টল, লাইসেন্স অ্যাক্টিভেশন ও মেয়াদ শেষের সময় কী করতে হবে, সব ধাপে ধাপে।',
+    chapters: [
+      {
+        titleBn: '২৮. ডেস্কটপ অ্যাপ ইনস্টল (Windows)',
+        titleEn: 'Installing the desktop app',
+        blocks: [
+          {
+            kind: 'para',
+            bn: 'ডেস্কটপ সংস্করণ দোকানের নিজের পিসিতে চলে — বিক্রি, স্টক সব লোকালি জমা থাকে, তাই ইন্টারনেট না থাকলেও বিক্রি বন্ধ হয় না। এর জন্য পিসিতে আগে MongoDB (ডেটাবেস) ইনস্টল করতে হয়, তারপর Unique POS Desktop ইনস্টল করতে হয়। অ্যাপ নিজে থেকেই ওই ডেটাবেসের সাথে যুক্ত হয়ে যায়।',
+            en: 'Runs on the shop PC with a local MongoDB, so it keeps selling offline. The app links to that database automatically.',
+          },
+          { kind: 'sub', bn: 'দরকার', en: 'Requirements' },
+          {
+            kind: 'bullets',
+            items: [
+              { bn: 'Windows ১০ বা ১১ (৬৪-বিট)।', en: 'Windows 10/11 (64-bit).' },
+              { bn: '৩টা পোর্ট খালি থাকতে হবে: 27017, 5000, 3000 — অন্য কোনো প্রোগ্রাম যেন এগুলো দখল না করে।', en: 'Ports 27017, 5000, 3000 must be free.' },
+            ],
+          },
+          { kind: 'sub', bn: 'ধাপ ১ — MongoDB ইনস্টল', en: 'Step 1 — Install MongoDB' },
+          {
+            kind: 'steps',
+            items: [
+              { bn: 'MongoDB Community Server (Windows x64) MSI ইনস্টল করুন।', en: 'Install the MongoDB Community Server MSI.' },
+              { bn: 'ইনস্টলের সময় “Install MongoDB as a Service” টিক দিন (সাধারণত ডিফল্ট থাকে)।', en: 'Tick “Install MongoDB as a Service”.' },
+              { bn: 'সার্ভিস চালু আছে কি না দেখুন: Windows Services (services.msc) → MongoDB → Running।', en: 'Confirm the MongoDB service is running.' },
+            ],
+          },
+          { kind: 'sub', bn: 'ধাপ ২ — ডেটাবেসকে replica set বানান (বাধ্যতামূলক)', en: 'Step 2 — replica set (required)' },
+          {
+            kind: 'note',
+            bn: 'সাধারণ MongoDB ইনস্টল standalone হয়, কিন্তু Unique POS-এর বিক্রয়, ফেরত, wastage, ফান্ড ট্রান্সফার — সব অল-অর-নাথিং লেনদেন (transaction) ব্যবহার করে, যা শুধু replica set-এ চলে। তাই এই ধাপ বাদ দিলে প্রথম বিক্রিতেই সমস্যা আসবে।',
+            en: 'Transactions require a replica set — do not skip this step.',
+          },
+          {
+            kind: 'steps',
+            items: [
+              { bn: 'সহজ উপায়: “8-SETUP-MONGODB-REPLSET.bat” ফাইলটি ডান-ক্লিক করে “Run as administrator” দিন — এটা config ঠিক করে, service restart করে, আর replica set চালু করে দেয়।', en: 'Run 8-SETUP-MONGODB-REPLSET.bat as Administrator.' },
+              { bn: 'ম্যানুয়ালি: mongod.cfg-এ replication: replSetName: rs0 যোগ করে MongoDB service restart দিন।', en: 'Or add replication.replSetName: rs0 to mongod.cfg and restart.' },
+              { bn: 'এরপর একবার rs.initiate() চালান।', en: 'Then run rs.initiate() once.' },
+            ],
+          },
+          { kind: 'sub', bn: 'ধাপ ৩ — অ্যাপ ইনস্টল', en: 'Step 3 — Install the app' },
+          {
+            kind: 'steps',
+            items: [
+              { bn: '“Unique POS Desktop Setup.exe” ডাবল-ক্লিক করে Next → Next → Install।', en: 'Run the installer.' },
+              { bn: 'প্রথমবার Windows সতর্কতা এলে “More info → Run anyway” দিন (অ্যাপটা code-signed নয়)।', en: 'Allow the unsigned app.' },
+              { bn: 'ডেস্কটপ শর্টকাট থেকে Unique POS খুলুন।', en: 'Open Unique POS from the shortcut.' },
+            ],
+          },
+          {
+            kind: 'note',
+            bn: 'যদি “MongoDB is not running” লেখা আসে — MongoDB সার্ভিস চালু নেই। ধাপ ১–২ আবার দেখুন।',
+            en: 'If “MongoDB is not running” appears, re-check steps 1–2.',
+          },
+        ],
+      },
+      {
+        titleBn: '২৯. লাইসেন্স অ্যাক্টিভেশন ও সাবস্ক্রিপশন',
+        titleEn: 'Licence activation and subscription',
+        blocks: [
+          {
+            kind: 'para',
+            bn: 'অ্যাপ প্রথমবার খুললে একটা অ্যাক্টিভেশন পর্দা আসে। সরবরাহকারী যে license key দিয়েছেন সেটা পেস্ট করে Activate চাপলে অ্যাপ চালু হয় এবং যত দিনের মেয়াদ কেনা হয়েছে তত দিন চলে।',
+            en: 'Paste the license key your provider gave you, then Activate.',
+          },
+          {
+            kind: 'steps',
+            items: [
+              { bn: 'দেওয়া license.key ফাইলটা Notepad দিয়ে খুলে পুরো লাইনটা কপি করুন।', en: 'Copy the whole key from license.key.' },
+              { bn: 'অ্যাপের অ্যাক্টিভেশন পর্দায় পেস্ট করে “Activate” চাপুন।', en: 'Paste and press Activate.' },
+              { bn: 'এরপর প্রথম লগইন: ব্যবহারকারী admin, পাসওয়ার্ড Admin@123 — সাথে সাথে পাসওয়ার্ড বদলে নিন।', en: 'First login admin / Admin@123 — change it at once.' },
+            ],
+          },
+          { kind: 'sub', bn: 'মেয়াদ শেষ হওয়ার আগে', en: 'Before expiry' },
+          {
+            kind: 'bullets',
+            items: [
+              { bn: 'মেয়াদ শেষ হওয়ার ১৫ দিন আগে থেকে অ্যাপ উপরে একটা হলুদ সতর্কবার্তা দেখায় — তখনই সরবরাহকারীকে জানিয়ে নতুন key নিয়ে নিন।', en: 'A yellow warning appears within 15 days of expiry.' },
+              { bn: 'মেয়াদ শেষ হলেও কয়েক দিনের grace থাকে; তারপর অ্যাপ “Software Locked” পর্দায় চলে যায়।', en: 'A grace window, then the app locks.' },
+            ],
+          },
+          { kind: 'sub', bn: '“Software Locked” পর্দায় কী করবেন', en: 'On the Software Locked screen' },
+          {
+            kind: 'steps',
+            items: [
+              { bn: 'নতুন license key বা renewal key (যেমন POS-XXXXXXXX-30D) হাতে নিন।', en: 'Get the new licence / renewal key.' },
+              { bn: 'Software Locked পর্দায় key পেস্ট করে Activate চাপুন।', en: 'Paste it and Activate.' },
+              { bn: 'সফল হলে মেয়াদ বাড়বে আর অ্যাপ আবার চালু হবে — ডেটা মুছে যাবে না।', en: 'The term extends and the app unlocks; data is untouched.' },
+            ],
+          },
+          {
+            kind: 'note',
+            bn: 'মেয়াদ শেষ মানে শুধু অ্যাপ বন্ধ — আপনার ডেটা কখনো মুছে যায় না। নতুন key দিলেই সব আগের মতো ফিরে আসে।',
+            en: 'Expiry locks access only — your data is never lost.',
           },
         ],
       },

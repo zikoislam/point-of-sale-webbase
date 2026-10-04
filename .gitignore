@@ -13,6 +13,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # dist-electron forces a build into a different folder.
 dist-electron/
 dist-electron-tmp/
+dist-electron-desktop/
+dist-electron.zip
 build/
 build-verify/
 
@@ -23,6 +25,7 @@ electron/mongodb/
 # mint valid licenses, so it must never be committed or packed into an installer.
 tools/license-generator/keys/
 tools/license-generator/issued.csv
+tools/license-generator/shops/
 
 # Runtime data
 pids

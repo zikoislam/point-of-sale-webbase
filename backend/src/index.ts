@@ -217,6 +217,17 @@ const startServer = async (): Promise<void> => {
     console.error('❌ Multi-organization bootstrap failed:', e);
   }
 
+  // First launch on an empty database: create the role templates, the default
+  // organization's roles and an administrator so the shop can log in. This is a
+  // no-op once any user/role exists, so it is safe on every restart and on the
+  // shared SaaS database.
+  try {
+    const { ensureFirstRunSeed } = await import('./services/FirstRunBootstrapService');
+    await ensureFirstRunSeed();
+  } catch (e) {
+    console.error('❌ First-run seed failed:', e);
+  }
+
   // Make sure the chart of accounts exists for every organization before
   // anything can post to it — every money movement writes a balanced voucher,
   // so a missing head would otherwise fail the first sale.

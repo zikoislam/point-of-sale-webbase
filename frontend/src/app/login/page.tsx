@@ -24,6 +24,26 @@ import { SOFTWARE_CREDIT } from '../../lib/constants';
 import { useI18n } from '../../lib/i18n';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 
+/**
+ * Where a freshly signed-in user should land.
+ *  - platform super admin with no active org → the organization manager
+ *  - anyone who can see the dashboard (reports:dashboard) → the dashboard
+ *  - everyone else (e.g. a cashier) → the POS terminal, which they can use
+ */
+function landingRoute(u: {
+  isPlatformSuperAdmin?: boolean;
+  activeOrgId?: string;
+  role?: string;
+  permissions?: string[];
+} | null): string {
+  if (!u) return '/login';
+  if (u.isPlatformSuperAdmin && !u.activeOrgId) return '/organizations';
+  if (u.role === 'SUPER_ADMIN' || (u.permissions || []).includes('reports:dashboard')) {
+    return '/dashboard';
+  }
+  return '/pos';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
@@ -50,12 +70,7 @@ export default function LoginPage() {
   // Redirect once auth check is done and user is already logged in
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated && user) {
-      if (user.isPlatformSuperAdmin && !user.activeOrgId) {
-        router.replace('/organizations');
-      } else {
-        // Everyone lands straight in the POS terminal
-        router.replace('/pos');
-      }
+      router.replace(landingRoute(user));
     }
   }, [isAuthLoading, isAuthenticated, user, router]);
 
@@ -88,13 +103,8 @@ export default function LoginPage() {
 
     try {
       const loggedUser = await login(username.trim(), password, rememberMe);
-      if (loggedUser.isPlatformSuperAdmin && !loggedUser.activeOrgId) {
-        // Platform super admins land on the organization manager first
-        router.replace('/organizations');
-      } else {
-        // Everyone else goes straight into the POS terminal
-        router.replace('/pos');
-      }
+      // Dashboard first, then the user clicks wherever they want to go.
+      router.replace(landingRoute(loggedUser));
     } catch (err: any) {
       if (err.statusCode === 429 || err.code === 'RATE_LIMIT_EXCEEDED') {
         setErrorMsg('Too many attempts. Please try again later.');

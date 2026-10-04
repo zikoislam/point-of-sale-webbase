@@ -40,9 +40,9 @@ export const OrgSwitcher: React.FC = () => {
       await switchOrganization(orgId);
       toast.success('Organization switched');
       setOpen(false);
-      // Org-scoped pages re-fetch from the cleared query cache; drop the user
-      // straight into the POS terminal for the new organization.
-      router.push('/pos');
+      // Org-scoped pages re-fetch from the cleared query cache; land on the
+      // dashboard for the new organization.
+      router.push('/dashboard');
     } catch (err: any) {
       toast.error(err?.message || 'Could not switch organization');
     } finally {

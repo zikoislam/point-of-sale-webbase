@@ -5,7 +5,7 @@
  *
  * Shipping `backend/.env` inside the installer meant database credentials sat
  * inside app.asar, readable by anyone who extracts it. Secrets now live in
- * %APPDATA%/UniquePos/config.json, and the JWT signing key is generated per
+ * %APPDATA%/BDBBCPOS/config.json, and the JWT signing key is generated per
  * install so two installations never share one.
  */
 

@@ -199,7 +199,7 @@ async function resolvePrinterName(printerName?: string): Promise<string | null> 
 export async function printRaw(
   printerName: string | undefined,
   bytes: Uint8Array | number[],
-  docName = 'Unique POS Receipt'
+  docName = 'BDBBC POS Receipt'
 ): Promise<PrintResult> {
   const buffer = Buffer.from(bytes);
 
@@ -213,7 +213,7 @@ export async function printRaw(
     return { success: false, error: 'No printer is installed on this computer.' };
   }
 
-  const tempFile = path.join(os.tmpdir(), `unique-pos-${crypto.randomUUID()}.bin`);
+  const tempFile = path.join(os.tmpdir(), `bdbbc-pos-${crypto.randomUUID()}.bin`);
   fs.writeFileSync(tempFile, buffer);
 
   try {
@@ -253,5 +253,5 @@ Write-Output 'PRINT_OK'
 }
 
 export async function kickCashDrawer(printerName?: string): Promise<PrintResult> {
-  return printRaw(printerName, CASH_DRAWER_KICK, 'Unique POS Cash Drawer');
+  return printRaw(printerName, CASH_DRAWER_KICK, 'BDBBC POS Cash Drawer');
 }

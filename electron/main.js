@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Unique POS desktop shell.
+ * BDBBC POS desktop shell.
  *
  * The window is an ordinary Chromium window pointed at the Next.js server that
  * this process starts, so the shop needs no browser and no Node.js install:
@@ -30,9 +30,9 @@ const SUPPORT = { company: 'Bdbbc.com', phone: '+8801534000350' };
 /** Re-check a running app this often, so an expired key cannot run forever. */
 const LICENSE_WATCH_MS = 60 * 60 * 1000;
 
-// Names the %APPDATA% folder and the installer entry "Unique POS" instead of the
+// Names the %APPDATA% folder and the installer entry "BDBBC POS" instead of the
 // npm package name, so support can point at a path that matches the product.
-app.setName('Unique POS');
+app.setName('BDBBC POS');
 
 /** @type {ReturnType<typeof configModule.loadConfig>} */
 let config;
@@ -56,7 +56,7 @@ let licenseWatchdog = null;
  */
 let desktopSubscriptionEndsAt = null;
 
-const LOG_PREFIX = '[UniquePOS]';
+const LOG_PREFIX = '[BDBBCPOS]';
 
 let logStream = null;
 
@@ -91,7 +91,7 @@ function log(...args) {
 
 process.on('uncaughtException', (error) => {
   log('uncaught exception:', error?.stack || String(error));
-  dialog.showErrorBox('Unique POS crashed', String(error?.stack || error));
+  dialog.showErrorBox('BDBBC POS crashed', String(error?.stack || error));
 });
 
 process.on('unhandledRejection', (reason) => {
@@ -384,7 +384,7 @@ function openActivationWindow(callbacks) {
     maximizable: false,
     fullscreenable: false,
     backgroundColor: '#020617',
-    title: 'Unique POS — License Activation',
+    title: 'BDBBC POS — License Activation',
     icon: path.join(__dirname, 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -531,7 +531,7 @@ function createMainWindow(port) {
     minHeight: 600,
     show: false,
     backgroundColor: '#0f172a',
-    title: 'Unique POS',
+    title: 'BDBBC POS',
     icon: path.join(__dirname, 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -690,7 +690,7 @@ function registerIpcHandlers() {
     const printerName = payload.printerName || config.hardware.printerName || undefined;
     const bytes = Uint8Array.from(payload.bytes || []);
 
-    const result = await hardware.printRaw(printerName, bytes, payload.docName || 'Unique POS Receipt');
+    const result = await hardware.printRaw(printerName, bytes, payload.docName || 'BDBBC POS Receipt');
     if (!result.success) log('print failed:', result.error);
     return result;
   });
@@ -714,7 +714,7 @@ function registerIpcHandlers() {
     const silent =
       payload.silent === undefined ? !config.hardware.showPrintDialog : Boolean(payload.silent);
 
-    const tempFile = path.join(app.getPath('temp'), `unique-pos-${crypto.randomUUID()}.html`);
+    const tempFile = path.join(app.getPath('temp'), `bdbbc-pos-${crypto.randomUUID()}.html`);
     let printWindow = null;
 
     try {
@@ -724,7 +724,7 @@ function registerIpcHandlers() {
         width: 820,
         height: 1000,
         show: false,
-        title: 'Unique POS — Print preview',
+        title: 'BDBBC POS — Print preview',
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
       });
       printWindow.setMenuBarVisibility(false);
@@ -817,7 +817,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('dialog:show-error', (_event, { title, content } = {}) => {
-    dialog.showErrorBox(title || 'Unique POS', content || 'Something went wrong.');
+    dialog.showErrorBox(title || 'BDBBC POS', content || 'Something went wrong.');
   });
 }
 
@@ -889,7 +889,7 @@ async function boot() {
         'How to fix:\n' +
         '  1. Open Windows "Services" (services.msc) and make sure the MongoDB service is running.\n' +
         '  2. If MongoDB is not installed, install MongoDB Community Server and tick "Install MongoDB as a Service".\n\n' +
-        'Then open Unique POS again.'
+        'Then open BDBBC POS again.'
     );
     app.quit();
     return;

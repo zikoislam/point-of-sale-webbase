@@ -1,5 +1,5 @@
 @echo off
-title Unique POS - Setup Daily Auto Backup (Task Scheduler)
+title BDBBC POS - Setup Daily Auto Backup (Task Scheduler)
 color 0E
 
 echo.
@@ -11,7 +11,7 @@ echo.
 set BAT_PATH=%~dp04-BACKUP-NOW.bat
 
 :: Windows Task Scheduler এ ট্যাস্ক তৈরি করো
-schtasks /create /tn "Unique POS Daily Backup" /tr "\"%BAT_PATH%\" silent" /sc daily /st 23:30 /f
+schtasks /create /tn "BDBBC POS Daily Backup" /tr "\"%BAT_PATH%\" silent" /sc daily /st 23:30 /f
 
 if errorlevel 1 (
     echo ❌ Failed to create scheduled task.

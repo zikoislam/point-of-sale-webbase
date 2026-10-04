@@ -1,10 +1,10 @@
 @echo off
-title Unique POS - Server Starting...
+title BDBBC POS - Server Starting...
 color 0A
 
 echo.
 echo ============================================================
-echo    UNIQUE POS SYSTEM - LOCAL SERVER
+echo    BDBBC POS SYSTEM - LOCAL SERVER
 echo    Developed by Bdbbc.com - Zakirul Islam
 echo ============================================================
 echo.
@@ -33,7 +33,7 @@ timeout /t 4 /nobreak >nul
 
 echo.
 echo ============================================================
-echo   ✅ UNIQUE POS IS RUNNING!
+echo   ✅ BDBBC POS IS RUNNING!
 echo.
 echo   📍 LOCAL ACCESS (Same PC):
 echo      http://localhost:3000

@@ -1,17 +1,17 @@
 @echo off
 setlocal EnableDelayedExpansion
-title Unique POS - FULL CLEAN (reliable reset)
+title BDBBC POS - FULL CLEAN (reliable reset)
 
 echo ============================================================
-echo   Unique POS - FULL CLEAN
+echo   BDBBC POS - FULL CLEAN
 echo ============================================================
 echo.
 echo   This makes the app start 100%% empty on THIS PC.
 echo.
 echo   It will:
-echo     - close Unique POS
+echo     - close BDBBC POS
 echo     - drop the external MongoDB database "pos_db"
-echo     - MOVE the whole  %%APPDATA%%\Unique POS  folder to a
+echo     - MOVE the whole  %%APPDATA%%\BDBBC POS  folder to a
 echo       backup  (removes the old database AND the old
 echo       config.json with any cloud setting)
 echo     - keep your installed license.key
@@ -25,13 +25,13 @@ if /i not "%CONFIRM%"=="YES" (
   goto :end
 )
 
-set "APPDIR=%APPDATA%\Unique POS"
-set "BAK=%APPDATA%\Unique POS-backup-%RANDOM%"
+set "APPDIR=%APPDATA%\BDBBC POS"
+set "BAK=%APPDATA%\BDBBC POS-backup-%RANDOM%"
 
 echo.
-echo [1/4] Closing Unique POS...
-taskkill /IM "Unique POS.exe" /F >nul 2>&1
-taskkill /IM "Unique POS Desktop.exe" /F >nul 2>&1
+echo [1/4] Closing BDBBC POS...
+taskkill /IM "BDBBC POS.exe" /F >nul 2>&1
+taskkill /IM "BDBBC POS Desktop.exe" /F >nul 2>&1
 timeout /t 2 /nobreak >nul
 
 echo [2/4] Dropping external MongoDB database "pos_db"...
@@ -65,7 +65,7 @@ if exist "%APPDIR%" (
   move "%APPDIR%" "%BAK%" >nul 2>&1
 )
 if exist "%APPDIR%" (
-  echo      could NOT move it. Close Unique POS completely and run again.
+  echo      could NOT move it. Close BDBBC POS completely and run again.
   echo      Folder: %APPDIR%
 ) else (
   echo      done ^(old data is safe in the backup^).
@@ -83,9 +83,9 @@ if "%HADKEY%"=="1" (
 
 echo.
 echo ============================================================
-echo   DONE.  Unique POS is now 100%% clean.
+echo   DONE.  BDBBC POS is now 100%% clean.
 echo.
-echo   1) Open Unique POS
+echo   1) Open BDBBC POS
 echo   2) It creates a fresh database with the super admin only:
 echo         admin / Admin@123
 echo   3) Change that password right after you sign in.

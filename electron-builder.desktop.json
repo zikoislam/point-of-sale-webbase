@@ -1,6 +1,6 @@
 {
-  "appId": "com.bdbbc.unique-pos.desktop",
-  "productName": "Unique POS Desktop",
+  "appId": "com.bdbbc.pos.desktop",
+  "productName": "BDBBC POS Desktop",
   "copyright": "Copyright © Bdbbc.com",
   "directories": {
     "output": "dist-electron-desktop",
@@ -47,7 +47,7 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Unique POS Desktop",
+    "shortcutName": "BDBBC POS Desktop",
     "installerIcon": "electron/assets/icon.ico",
     "uninstallerIcon": "electron/assets/icon.ico",
     "installerHeaderIcon": "electron/assets/icon.ico",

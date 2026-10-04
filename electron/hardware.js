@@ -204,7 +204,7 @@ async function resolvePrinterName(printerName) {
  * @param {Uint8Array|number[]} bytes
  * @param {string} docName
  */
-async function printRaw(printerName, bytes, docName = 'Unique POS Receipt') {
+async function printRaw(printerName, bytes, docName = 'BDBBC POS Receipt') {
   const buffer = Buffer.from(bytes);
 
   if (buffer.length === 0) {
@@ -217,7 +217,7 @@ async function printRaw(printerName, bytes, docName = 'Unique POS Receipt') {
     return { success: false, error: 'No printer is installed on this computer.' };
   }
 
-  const tempFile = path.join(os.tmpdir(), `unique-pos-${crypto.randomUUID()}.bin`);
+  const tempFile = path.join(os.tmpdir(), `bdbbc-pos-${crypto.randomUUID()}.bin`);
   fs.writeFileSync(tempFile, buffer);
 
   try {
@@ -272,7 +272,7 @@ Write-Output 'PRINT_OK'
  * port, so the pulse is delivered as a raw print job.
  */
 async function kickCashDrawer(printerName) {
-  return printRaw(printerName, CASH_DRAWER_KICK, 'Unique POS Cash Drawer');
+  return printRaw(printerName, CASH_DRAWER_KICK, 'BDBBC POS Cash Drawer');
 }
 
 module.exports = { listPrinters, printRaw, kickCashDrawer, CASH_DRAWER_KICK };

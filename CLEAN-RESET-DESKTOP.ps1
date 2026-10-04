@@ -1,15 +1,15 @@
 # ===========================================================================
-#  Unique POS - clean reset (fresh database, super admin only)
+#  BDBBC POS - clean reset (fresh database, super admin only)
 #  Run on the PC whose data you want to wipe. Best: right-click the .bat ->
 #  "Run as administrator".
 # ===========================================================================
 
 $ErrorActionPreference = 'SilentlyContinue'
-$app   = Join-Path $env:APPDATA 'Unique POS'
+$app   = Join-Path $env:APPDATA 'BDBBC POS'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 
 Write-Host '=================================================='
-Write-Host ' Unique POS - CLEAN RESET'
+Write-Host ' BDBBC POS - CLEAN RESET'
 Write-Host ' This ERASES all shop data on this PC:'
 Write-Host '   products, barcodes, customers, sales, users.'
 Write-Host ' A backup of the local database is kept first.'
@@ -26,7 +26,7 @@ if ($ans -ne 'YES') { Write-Host 'Cancelled - nothing changed.'; return }
 
 # 1) Stop the app so its files are not locked.
 Write-Host ''
-Write-Host 'Stopping Unique POS...'
+Write-Host 'Stopping BDBBC POS...'
 Get-Process | Where-Object { $_.ProcessName -like 'Unique*' } | Stop-Process -Force
 Start-Sleep -Seconds 2
 
@@ -73,7 +73,7 @@ if ($shell -and $up) {
 }
 
 Write-Host ''
-Write-Host 'Done. Open Unique POS now - it builds a clean database:'
+Write-Host 'Done. Open BDBBC POS now - it builds a clean database:'
 Write-Host '   - roles, default organization, settings, chart of accounts'
 Write-Host '   - one super admin:  admin / Admin@123'
 Write-Host '   - no products, no barcodes, no customers, no sales'

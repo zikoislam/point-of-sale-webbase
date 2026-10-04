@@ -1,5 +1,5 @@
 @echo off
-title Unique POS - Switching to Local Database
+title BDBBC POS - Switching to Local Database
 color 0A
 
 echo.

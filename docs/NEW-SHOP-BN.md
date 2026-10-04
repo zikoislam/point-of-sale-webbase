@@ -31,7 +31,7 @@ npm run fetch:mongod
 ```bat
 npm run dist
 ```
-- ফলাফল: `dist-electron\Unique POS Setup <version>.exe` — **এটাই আপনার মাস্টার ফাইল**, কোনো ডেটা নেই।
+- ফলাফল: `dist-electron\BDBBC POS Setup <version>.exe` — **এটাই আপনার মাস্টার ফাইল**, কোনো ডেটা নেই।
 - শুধু টেস্ট করতে চাইলে (installer ছাড়া): `npm run dist:dir`
 
 > ⚠ কোড বদলালে প্রতিবার নতুন করে `npm run build:backend` → `npm run dist` করতে হবে, কারণ packaged অ্যাপ `backend/dist` থেকে চলে।
@@ -58,7 +58,7 @@ npm run shop:new -- --shop "Rahim Store" --months 12
 
 ## ভাগ ২ — দোকানে ইনস্টল ও কোম্পানি-ওয়াইজ সেটআপ
 
-1. **ইনস্টল:** `Unique POS Setup.exe` চালান।
+1. **ইনস্টল:** `BDBBC POS Setup.exe` চালান।
 2. **Activation:** অ্যাপ খুললে activation পর্দা আসবে → আপনার দেওয়া `license.key`-এর পুরো লেখাটা পেস্ট করে **Activate**।
 3. **প্রথম লগইন:** `admin` / `Admin@123` → **সাথে সাথে পাসওয়ার্ড বদলান**।
    (নতুন ভার্সনে প্রথমবার চালালে সিস্টেম নিজেই role + admin + ডিফল্ট অর্গানাইজেশন বানায়।)
@@ -66,7 +66,7 @@ npm run shop:new -- --shop "Rahim Store" --months 12
 5. **ইউজার:** Users → এই কোম্পানির **Manager / Cashier** বানান।
 6. **ডেটা:** Products / Categories / Suppliers / (চাইলে) Opening stock — Import/Export দিয়েও তোলা যায়।
 
-ডেটা থাকে: `%APPDATA%\Unique POS` — নতুন ভার্সন ইনস্টল করলেও ডেটা থেকে যায়।
+ডেটা থাকে: `%APPDATA%\BDBBC POS` — নতুন ভার্সন ইনস্টল করলেও ডেটা থেকে যায়।
 
 ---
 

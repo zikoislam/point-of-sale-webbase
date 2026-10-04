@@ -112,7 +112,7 @@ function main() {
     `Generated : ${new Date().toISOString()}`,
     '',
     'এই দোকানের ইনস্টল ও সেটআপ ধাপ:',
-    '  1. ইনস্টল: Unique POS Setup.exe',
+    '  1. ইনস্টল: BDBBC POS Setup.exe',
     '  2. অ্যাপ খুললে activation পর্দায় এই ফোল্ডারের license.key-এর পুরো লেখাটা পেস্ট করে Activate',
     '  3. প্রথম লগইন: admin / Admin@123  → সাথে সাথে পাসওয়ার্ড বদলান',
     '  4. Settings → দোকানের নাম, ঠিকানা, currency, প্রিন্টার',

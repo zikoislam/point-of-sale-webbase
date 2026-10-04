@@ -14,7 +14,7 @@
 | কমান্ড | `npm run dist` | `npm run dist:desktop` |
 | MongoDB | অ্যাপ নিজের bundled `mongod` চালায় | কাস্টমারের ইনস্টল করা MongoDB ব্যবহার করে |
 | আউটপুট | `dist-electron\` | `dist-electron-desktop\` |
-| appId | `com.bdbbc.unique-pos` | `com.bdbbc.unique-pos.desktop` |
+| appId | `com.bdbbc.pos` | `com.bdbbc.pos.desktop` |
 
 > ⚠ **সবচেয়ে জরুরি:** backend checkout/return/wastage-এ ACID transaction ব্যবহার করে,
 > আর MongoDB transaction শুধু **replica set**-এ কাজ করে। সাধারণ MongoDB MSI ইনস্টল করলে
@@ -67,7 +67,7 @@ npm run license:init
 rem এই এডিশনের installer বানাও
 npm run dist:desktop
 ```
-- ফলাফল: **`dist-electron-desktop\Unique POS Desktop Setup 1.0.0.exe`**
+- ফলাফল: **`dist-electron-desktop\BDBBC POS Desktop Setup 1.0.0.exe`**
 - শুধু টেস্ট করতে (installer ছাড়া, চটজলদি): `npm run dist:desktop:dir`
 - এই build-এ `build/mongodb` কপি হয় না — `.exe` হালকা, আর `app-config.json`-এ
   `mongoMode: "external"` লেখা থাকে, তাই অ্যাপ সবসময় ইনস্টল করা MongoDB-ই ব্যবহার করবে।
@@ -90,10 +90,10 @@ npm run shop:new -- --shop "দোকানের নাম" --expires 2026-12-3
 
 ## ধাপ ৫ — কাস্টমার PC-তে ইনস্টল
 
-USB-তে কপি করুন: **MongoDB MSI** (ধাপ ১–২ যদি আগে করা না থাকে), **`Unique POS Desktop Setup 1.0.0.exe`**, আর ওই দোকানের **`license.key`**।
+USB-তে কপি করুন: **MongoDB MSI** (ধাপ ১–২ যদি আগে করা না থাকে), **`BDBBC POS Desktop Setup 1.0.0.exe`**, আর ওই দোকানের **`license.key`**।
 
 1. MongoDB ইনস্টল + replica set (ধাপ ১–২) — না করা থাকলে।
-2. `Unique POS Desktop Setup 1.0.0.exe` → Install।
+2. `BDBBC POS Desktop Setup 1.0.0.exe` → Install।
 3. অ্যাপ খুলবে → activation পর্দায় `license.key` পেস্ট → **Activate**।
    - যদি "MongoDB is not running" মেসেজ আসে → MongoDB service চালু নেই; ধাপ ২ পুনরায় দেখুন।
 4. লগইন `admin` / `Admin@123` → পাসওয়ার্ড বদলান।
@@ -105,7 +105,7 @@ USB-তে কপি করুন: **MongoDB MSI** (ধাপ ১–২ যদ�
 করতে চাইলে, কাস্টমার PC-তে ফাইল এডিট করুন:
 
 ```
-%APPDATA%\Unique POS\config.json
+%APPDATA%\BDBBC POS\config.json
 ```
 - `"cloudMongoUri": "mongodb+srv://.../<db>"` — একটা **dedicated cloud MongoDB** দিন।
 - `"syncEnabled": true` (default true)
@@ -123,9 +123,9 @@ USB-তে কপি করুন: **MongoDB MSI** (ধাপ ১–২ যদ�
 - **Windows Firewall:** MongoDB `127.0.0.1`-এ bind করা, তাই বাইরে থেকে কেউ ঢুকতে পারবে না — ভালো।
 - **ডেটা কোথায়:** MongoDB-র নিজের `dbPath`-এ (default `C:\Program Files\MongoDB\Server\<v>\data`)।
   তাই uninstall/upgrade-এ ডেটা নিরাপদ। মাঝে মাঝে backup নিন (`mongodump`)।
-- **আপডেট:** অ্যাপ কোড বদলালে নতুন `Unique POS Desktop Setup.x.exe` বানিয়ে দোকানে ইনস্টল করে দিন —
+- **আপডেট:** অ্যাপ কোড বদলালে নতুন `BDBBC POS Desktop Setup.x.exe` বানিয়ে দোকানে ইনস্টল করে দিন —
   ডেটা MongoDB-তে থাকে, হারাবে না।
-- **একই PC-তে দুই এডিশন দিলে** দুটোই `%APPDATA%\Unique POS` শেয়ার করে, তাই সেটা এড়িয়ে চলাই ভালো।
+- **একই PC-তে দুই এডিশন দিলে** দুটোই `%APPDATA%\BDBBC POS` শেয়ার করে, তাই সেটা এড়িয়ে চলাই ভালো।
 - **public key:** `npm run license:init` একবারই; প্রিন্ট হওয়া public key `electron/license.js`-এ
   পেস্ট না করলে activation কাজ করবে না। `private.pem` কখনো শেয়ার করবেন না।
 ```

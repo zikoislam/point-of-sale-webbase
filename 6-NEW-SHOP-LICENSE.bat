@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ============================================
-echo   Unique POS - New Shop License
+echo   BDBBC POS - New Shop License
 echo   (Model C: one install per company)
 echo ============================================
 echo.

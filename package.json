@@ -1,7 +1,7 @@
 {
-  "name": "unique-pos-desktop",
+  "name": "bdbbc-pos-desktop",
   "version": "1.0.0",
-  "description": "Unique POS & Shop Management System — Desktop App",
+  "description": "BDBBC POS & Shop Management System — Desktop App",
   "main": "electron/main.js",
   "author": "Bdbbc.com — Zakirul Islam",
   "private": true,
@@ -34,8 +34,8 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.bdbbc.unique-pos",
-    "productName": "Unique POS",
+    "appId": "com.bdbbc.pos",
+    "productName": "BDBBC POS",
     "copyright": "Copyright © Bdbbc.com",
     "directories": {
       "output": "dist-electron",
@@ -87,7 +87,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Unique POS",
+      "shortcutName": "BDBBC POS",
       "installerIcon": "electron/assets/icon.ico",
       "uninstallerIcon": "electron/assets/icon.ico",
       "installerHeaderIcon": "electron/assets/icon.ico",

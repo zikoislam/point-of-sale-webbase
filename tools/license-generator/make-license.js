@@ -107,7 +107,7 @@ async function main() {
   };
 
   try {
-    console.log('\n─── Unique POS — license key generator ───\n');
+    console.log('\n─── BDBBC POS — license key generator ───\n');
 
     const shop = flag('shop') || (await ask('Shop / customer name: ', ''));
     if (!shop) {

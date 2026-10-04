@@ -211,7 +211,7 @@ function packConfig() {
     // the offline edition ALWAYS starts its own bundled server on a private port
     // so a MongoDB service on the PC can never pull in old data.
     mongoMode: EXTERNAL_DB ? 'external' : NO_CLOUD ? 'bundled' : 'auto',
-    // Seeded into %APPDATA%/UniquePos/config.json on first launch. Note that a
+    // Seeded into %APPDATA%/BDBBCPOS/config.json on first launch. Note that a
     // credential shipped to a customer machine can always be extracted, so the
     // cloud database should use a dedicated low-privilege user.
     //

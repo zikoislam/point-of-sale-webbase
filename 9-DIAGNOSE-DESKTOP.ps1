@@ -1,5 +1,5 @@
 # ===========================================================================
-#  Unique POS - desktop startup diagnosis
+#  BDBBC POS - desktop startup diagnosis
 #  Run on a new PC when the app shows:
 #    "Check that port 5000 is free and that the database is reachable"
 #  Best results: run as Administrator.
@@ -9,7 +9,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 function Head($t) { Write-Host ""; Write-Host "=== $t ===" -ForegroundColor Cyan }
 
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  Unique POS - Startup Diagnosis" -ForegroundColor Cyan
+Write-Host "  BDBBC POS - Startup Diagnosis" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 
 Head "[1] MongoDB Windows service"
@@ -63,7 +63,7 @@ if ($shell -and $reachable) {
 }
 
 Head "[5] App config"
-$cfg = Join-Path $env:APPDATA 'Unique POS\config.json'
+$cfg = Join-Path $env:APPDATA 'BDBBC POS\config.json'
 if (Test-Path $cfg) {
   $j = Get-Content $cfg -Raw | ConvertFrom-Json
   Write-Host ("    file          = {0}" -f $cfg)
@@ -76,7 +76,7 @@ if (Test-Path $cfg) {
 }
 
 Head "[6] Application log (main.log) - last 45 lines"
-$log = Join-Path $env:APPDATA 'Unique POS\logs\main.log'
+$log = Join-Path $env:APPDATA 'BDBBC POS\logs\main.log'
 if (Test-Path $log) {
   Get-Content $log -Tail 45
 } else {

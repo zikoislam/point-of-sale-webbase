@@ -1,10 +1,10 @@
 @echo off
-title Unique POS - Auto Backup
+title BDBBC POS - Auto Backup
 color 0B
 
 echo.
 echo ============================================================
-echo    UNIQUE POS - Daily Backup System
+echo    BDBBC POS - Daily Backup System
 echo    Backup Time: %date% %time%
 echo ============================================================
 echo.

@@ -434,7 +434,7 @@ export function buildTestPageHtml(shopName: string, options: PrintReceiptOptions
 </head>
 <body>
   <div class="box">
-    <div class="shop">${escapeHtml(shopName || 'UNIQUE POS')}</div>
+    <div class="shop">${escapeHtml(shopName || 'BDBBC POS')}</div>
     <h1>Printer test</h1>
     <table>
       <tr><td>Printed at</td><td>${escapeHtml(new Date().toLocaleString())}</td></tr>
@@ -460,7 +460,7 @@ export async function printTestSlip(
   const builder = new EscposBuilder(options.paperWidth || '80mm');
 
   builder.align('center').bold(true).size(true, true);
-  builder.line(shopName || 'UNIQUE POS');
+  builder.line(shopName || 'BDBBC POS');
   builder.bold(false).size(false, false);
   builder.line('Printer test');
   builder.separator('-');

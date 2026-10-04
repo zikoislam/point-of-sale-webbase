@@ -898,7 +898,7 @@ export const PARTS: Part[] = [
         blocks: [
           {
             kind: 'para',
-            bn: 'ডেস্কটপ সংস্করণ দোকানের নিজের পিসিতে চলে — বিক্রি, স্টক সব লোকালি জমা থাকে, তাই ইন্টারনেট না থাকলেও বিক্রি বন্ধ হয় না। এর জন্য পিসিতে আগে MongoDB (ডেটাবেস) ইনস্টল করতে হয়, তারপর Unique POS Desktop ইনস্টল করতে হয়। অ্যাপ নিজে থেকেই ওই ডেটাবেসের সাথে যুক্ত হয়ে যায়।',
+            bn: 'ডেস্কটপ সংস্করণ দোকানের নিজের পিসিতে চলে — বিক্রি, স্টক সব লোকালি জমা থাকে, তাই ইন্টারনেট না থাকলেও বিক্রি বন্ধ হয় না। এর জন্য পিসিতে আগে MongoDB (ডেটাবেস) ইনস্টল করতে হয়, তারপর BDBBC POS Desktop ইনস্টল করতে হয়। অ্যাপ নিজে থেকেই ওই ডেটাবেসের সাথে যুক্ত হয়ে যায়।',
             en: 'Runs on the shop PC with a local MongoDB, so it keeps selling offline. The app links to that database automatically.',
           },
           { kind: 'sub', bn: 'দরকার', en: 'Requirements' },
@@ -921,7 +921,7 @@ export const PARTS: Part[] = [
           { kind: 'sub', bn: 'ধাপ ২ — ডেটাবেসকে replica set বানান (বাধ্যতামূলক)', en: 'Step 2 — replica set (required)' },
           {
             kind: 'note',
-            bn: 'সাধারণ MongoDB ইনস্টল standalone হয়, কিন্তু Unique POS-এর বিক্রয়, ফেরত, wastage, ফান্ড ট্রান্সফার — সব অল-অর-নাথিং লেনদেন (transaction) ব্যবহার করে, যা শুধু replica set-এ চলে। তাই এই ধাপ বাদ দিলে প্রথম বিক্রিতেই সমস্যা আসবে।',
+            bn: 'সাধারণ MongoDB ইনস্টল standalone হয়, কিন্তু BDBBC POS-এর বিক্রয়, ফেরত, wastage, ফান্ড ট্রান্সফার — সব অল-অর-নাথিং লেনদেন (transaction) ব্যবহার করে, যা শুধু replica set-এ চলে। তাই এই ধাপ বাদ দিলে প্রথম বিক্রিতেই সমস্যা আসবে।',
             en: 'Transactions require a replica set — do not skip this step.',
           },
           {
@@ -936,9 +936,9 @@ export const PARTS: Part[] = [
           {
             kind: 'steps',
             items: [
-              { bn: '“Unique POS Desktop Setup.exe” ডাবল-ক্লিক করে Next → Next → Install।', en: 'Run the installer.' },
+              { bn: '“BDBBC POS Desktop Setup.exe” ডাবল-ক্লিক করে Next → Next → Install।', en: 'Run the installer.' },
               { bn: 'প্রথমবার Windows সতর্কতা এলে “More info → Run anyway” দিন (অ্যাপটা code-signed নয়)।', en: 'Allow the unsigned app.' },
-              { bn: 'ডেস্কটপ শর্টকাট থেকে Unique POS খুলুন।', en: 'Open Unique POS from the shortcut.' },
+              { bn: 'ডেস্কটপ শর্টকাট থেকে BDBBC POS খুলুন।', en: 'Open BDBBC POS from the shortcut.' },
             ],
           },
           {

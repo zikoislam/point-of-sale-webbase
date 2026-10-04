@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 rem ===========================================================================
 rem  MongoDB -> single-node replica set (rs0)
 rem
-rem  কেন দরকার: Unique POS checkout/return-এ ACID transaction ব্যবহার করে, আর
+rem  কেন দরকার: BDBBC POS checkout/return-এ ACID transaction ব্যবহার করে, আর
 rem  MongoDB transaction শুধু replica set-এ চলে। সাধারণ MSI ইনস্টল standalone
 rem  হয়, তাই এটা একবার চালিয়ে replica set চালু করতে হয়।
 rem

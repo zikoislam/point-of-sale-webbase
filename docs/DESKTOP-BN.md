@@ -1,4 +1,4 @@
-# ডেস্কটপ অ্যাপ ও অফলাইন গাইড (Unique POS)
+# ডেস্কটপ অ্যাপ ও অফলাইন গাইড (BDBBC POS)
 
 এই ডকুমেন্টটি ডেস্কটপ (.exe) ভার্সন, অফলাইন মোড এবং হার্ডওয়্যার সেটআপের সম্পূর্ণ নির্দেশিকা।
 
@@ -56,7 +56,7 @@ npm run dist:dir         # দ্রুত টেস্টের জন্য �
 3. `node scripts/prepare-resources.js` — `build/` ফোল্ডারে রানটাইম ফাইল সাজায়
 4. `electron-builder --win` — ইনস্টলার তৈরি করে `dist-electron/`
 
-ফলাফল: `dist-electron/Unique POS Setup 1.0.0.exe`
+ফলাফল: `dist-electron/BDBBC POS Setup 1.0.0.exe`
 
 ### ইনস্টলারে কী কী যায়
 
@@ -73,7 +73,7 @@ npm run dist:dir         # দ্রুত টেস্টের জন্য �
 
 ## ৪. রানটাইম কনফিগারেশন
 
-সব সেটিং থাকে: `%APPDATA%\Unique POS\config.json`
+সব সেটিং থাকে: `%APPDATA%\BDBBC POS\config.json`
 
 প্রথমবার চালু হলে ইনস্টলারের টেমপ্লেট থেকে এটি তৈরি হয়।
 
@@ -98,7 +98,7 @@ npm run dist:dir         # দ্রুত টেস্টের জন্য �
 ## ৫. অফলাইন মোড কীভাবে কাজ করে
 
 1. অ্যাপ চালু হলে Electron শেল বান্ডল করা `mongod.exe` চালায়:
-   `--dbpath "%APPDATA%\Unique POS\db" --port 27017 --replSet rs0`
+   `--dbpath "%APPDATA%\BDBBC POS\db" --port 27017 --replSet rs0`
 2. **replica set কেন?** সাধারণ (standalone) MongoDB মাল্টি-ডকুমেন্ট ট্রানজ্যাকশন চায় না। চেকআউট, রিটার্ন, wastage — সবই ACID ট্রানজ্যাকশনে চলে, তাই single-node replica set দরকার। ব্যাকএন্ড প্রথমবার নিজেই `rs.initiate()` করে নেয় (এতে প্রথম চালুতে ৩০-৪০ সেকেন্ড লাগতে পারে; দ্বিতীয়বার থেকে ২ সেকেন্ডের মধ্যে হয়)।
 3. ইন্টারনেট না থাকলেও ব্যাকএন্ড লোকাল ডেটাবেসেই সব লেখে — সেল, স্টক, লেজার, শিফট।
 4. ইন্টারনেট ফিরলে `SyncService` ক্লাউডের সাথে মিলিয়ে নেয়। প্রথম সিংকেই ক্লাউডের সব ডেটা (ইউজার, প্রোডাক্ট, কাস্টমার, সেটিংস) লোকালে নেমে আসে — তাই অফলাইনেও লগইন ও সেল কাজ করে।
@@ -138,7 +138,7 @@ GET  /api/v1/health          # database: local|cloud, syncEnabled
 3. **Test print** চেপে যাচাই করুন — রিসিটে অ্যাপের নাম, সময় আর "ESC/POS ready" ছাপা উচিত।
 4. POS-এ সেল সম্পন্ন করে **Print** চাপলে রিসিট সোজা প্রিন্টারে যায় (কোনো প্রিন্ট ডায়ালগ আসে না)।
 
-সেটিংসটা `%APPDATA%\Unique POS\config.json`-এ `hardware.printerName` ও `hardware.paperWidth` হিসেবে জমা হয়, আর প্রিন্টার না বাছলে Windows-এর ডিফল্ট প্রিন্টার ব্যবহার হয়।
+সেটিংসটা `%APPDATA%\BDBBC POS\config.json`-এ `hardware.printerName` ও `hardware.paperWidth` হিসেবে জমা হয়, আর প্রিন্টার না বাছলে Windows-এর ডিফল্ট প্রিন্টার ব্যবহার হয়।
 
 প্রিন্ট হয় কীভাবে: Electron main process ESC/POS বাইট তৈরি করে Windows spooler-এ `WritePrinter` (winspool.drv) দিয়ে RAW হিসেবে পাঠায়। কোনো নেটিভ নোড মডিউল লাগে না, তাই Electron আপডেটে ভাঙে না।
 
@@ -176,10 +176,10 @@ USB স্ক্যানার কীবোর্ড হিসেবে টা�
 
 | কী | পথ |
 |:---|:---|
-| লোকাল ডেটাবেস | `%APPDATA%\Unique POS\db` |
-| কনফিগ | `%APPDATA%\Unique POS\config.json` |
-| অ্যাপের লগ | `%APPDATA%\Unique POS\logs\main.log` |
-| mongod-এর লগ | `%APPDATA%\Unique POS\logs\mongod.log` |
+| লোকাল ডেটাবেস | `%APPDATA%\BDBBC POS\db` |
+| কনফিগ | `%APPDATA%\BDBBC POS\config.json` |
+| অ্যাপের লগ | `%APPDATA%\BDBBC POS\logs\main.log` |
+| mongod-এর লগ | `%APPDATA%\BDBBC POS\logs\mongod.log` |
 | আপলোড (লোগো, ছবি) | ইনস্টল ফোল্ডারের `resources/backend/uploads` |
 | ক্লাউড কপি | MongoDB Atlas (`cloudMongoUri`) |
 
@@ -221,7 +221,7 @@ API অরিজিন সর্বদা **same-origin প্রক্সি** 
 
 ডেস্কটপ অ্যাপ **লাইসেন্স ছাড়া খোলে না**। কী না থাকলে বা মেয়াদ শেষ হলে ব্যাকএন্ড, ডেটাবেস বা POS উইন্ডো কিছুই শুরু হয় না — শুধু অ্যাক্টিভেশনের পর্দা আসে।
 
-লাইসেন্স কী যাচাই হয় **অফলাইনেই** (Ed25519 সিগনেচার), তাই ইন্টারনেট বা কোনো সার্ভার লাগে না। কী-টি জমা থাকে `%APPDATA%\Unique POS\license.key` ফাইলে, তাই প্রতিবার অ্যাপ খুললে আর দিতে হয় না।
+লাইসেন্স কী যাচাই হয় **অফলাইনেই** (Ed25519 সিগনেচার), তাই ইন্টারনেট বা কোনো সার্ভার লাগে না। কী-টি জমা থাকে `%APPDATA%\BDBBC POS\license.key` ফাইলে, তাই প্রতিবার অ্যাপ খুললে আর দিতে হয় না।
 
 ### গ্রাহকের জন্য
 

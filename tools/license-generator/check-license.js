@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const APP_DIR_NAME = 'Unique POS';
+const APP_DIR_NAME = 'BDBBC POS';
 const LICENSE_FILE = 'license.key';
 
 const license = require(path.join(__dirname, '..', '..', 'electron', 'license.js'));
@@ -37,7 +37,7 @@ const suppliedKey = keyFlagIndex !== -1 ? process.argv[keyFlagIndex + 1] : null;
 const file = licensePath();
 const machineId = license.getMachineId();
 
-console.log('\n── Unique POS license check ──\n');
+console.log('\n── BDBBC POS license check ──\n');
 line('This computer', license.formatMachineId(machineId));
 
 let key = suppliedKey;

@@ -128,7 +128,7 @@ function evaluate(rawKey, machineId = getMachineId(), at = new Date()) {
     return {
       valid: false,
       reason: 'malformed',
-      message: 'This is not a valid Unique POS license key.',
+      message: 'This is not a valid BDBBC POS license key.',
       info: null,
       daysRemaining: null,
     };

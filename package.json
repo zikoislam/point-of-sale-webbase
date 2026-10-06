@@ -26,7 +26,10 @@
     "dist:desktop:dir": "npm run pack:desktop && electron-builder --win --dir --config electron-builder.desktop.json",
     "pack:offline": "npm run build:backend && npm run build:frontend && node scripts/prepare-resources.js --no-cloud",
     "dist:offline": "npm run pack:offline && electron-builder --win",
-    "dist:offline:dir": "npm run pack:offline && electron-builder --win --dir"
+    "dist:offline:dir": "npm run pack:offline && electron-builder --win --dir",
+    "license-manager:dev": "electron tools/license-manager",
+    "license-manager:dist": "electron-builder --win --config license-manager-builder.json",
+    "license-manager:dir": "electron-builder --win --dir --config license-manager-builder.json"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

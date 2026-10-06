@@ -17,6 +17,8 @@ dist-electron-desktop/
 dist-electron-build/
 dist-pos-build/
 dist-offline-build/
+dist-final-build/
+dist-license-manager/
 dist-electron.zip
 dist-pos-build.zip
 build/

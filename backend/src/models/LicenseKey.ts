@@ -11,6 +11,8 @@ export interface ILicenseKey extends Document {
   /** Days added to the subscription when redeemed. */
   days: number;
   plan?: string;
+  /** When the key came from a Plan, the plan it was issued for. */
+  planId?: Types.ObjectId;
   status: LicenseKeyStatus;
   issuedBy: Types.ObjectId;
   issuedAt: Date;
@@ -49,6 +51,10 @@ const LicenseKeySchema = new Schema<ILicenseKey>(
     plan: {
       type: String,
       trim: true,
+    },
+    planId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Plan',
     },
     status: {
       type: String,

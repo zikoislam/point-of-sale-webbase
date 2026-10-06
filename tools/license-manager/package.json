@@ -1,0 +1,9 @@
+{
+  "name": "bdbbc-license-manager",
+  "version": "1.0.0",
+  "description": "BDBBC License Manager — issue offline shop license keys",
+  "main": "main.js",
+  "private": true,
+  "author": "Bdbbc.com",
+  "license": "UNLICENSED"
+}

@@ -7,6 +7,7 @@ import './register-org-scope-plugin';
 export * from './Counter';
 export * from './Organization';
 export * from './LicenseKey';
+export * from './Plan';
 export * from './Role';
 export * from './User';
 export * from './TokenBlacklist';

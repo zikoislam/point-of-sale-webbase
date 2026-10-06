@@ -27,7 +27,7 @@ import { Spinner } from '../../../components/ui/Spinner';
 import { Input } from '../../../components/ui/Input';
 import { useToast } from '../../../components/ui/Toast';
 import { useAuth } from '../../../hooks/useAuth';
-import { PERMISSION_GROUPS } from '../../../lib/permissions';
+import { PermissionChecklist } from '../../../components/admin/PermissionChecklist';
 
 interface Org {
   id: string;
@@ -57,6 +57,14 @@ interface LicenseKey {
   note?: string;
   redeemedAt?: string;
   createdAt: string;
+}
+
+interface Plan {
+  _id: string;
+  name: string;
+  code: string;
+  durationDays: number;
+  price: number;
 }
 
 function subscriptionBadgeVariant(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
@@ -91,59 +99,6 @@ interface OrgSummaryData {
   };
 }
 
-const PermissionChecklist: React.FC<{
-  selected: string[];
-  onChange: (next: string[]) => void;
-  disabled?: boolean;
-}> = ({ selected, onChange, disabled }) => (
-  <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
-    {Object.entries(PERMISSION_GROUPS).map(([group, perms]) => (
-      <div key={group}>
-        <div className="flex items-center justify-between mb-1.5">
-          <h4 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{group}</h4>
-          <button
-            type="button"
-            disabled={disabled}
-            className="text-[10px] text-blue-400 hover:text-blue-300 disabled:opacity-40"
-            onClick={() => {
-              const allOn = perms.every((p) => selected.includes(p));
-              onChange(allOn ? selected.filter((p) => !perms.includes(p)) : [...selected, ...perms.filter((p) => !selected.includes(p))]);
-            }}
-          >
-            {perms.every((p) => selected.includes(p)) ? 'none' : 'all'}
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {perms.map((perm) => {
-            const on = selected.includes(perm);
-            return (
-              <label
-                key={perm}
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border cursor-pointer transition-colors ${
-                  on
-                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
-                    : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-600'
-                } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  className="accent-emerald-500 w-3 h-3"
-                  checked={on}
-                  disabled={disabled}
-                  onChange={() =>
-                    onChange(on ? selected.filter((p) => p !== perm) : [...selected, perm])
-                  }
-                />
-                {perm}
-              </label>
-            );
-          })}
-        </div>
-      </div>
-    ))}
-  </div>
-);
-
 export default function OrganizationsPage() {
   const { user } = useAuth();
   const toast = useToast();
@@ -171,6 +126,7 @@ export default function OrganizationsPage() {
   const [genNote, setGenNote] = useState('');
   const [genMachine, setGenMachine] = useState('');
   const [generatedKey, setGeneratedKey] = useState('');
+  const [selectedPlanId, setSelectedPlanId] = useState('');
 
   const isSuper = !!user?.isPlatformSuperAdmin;
 
@@ -208,6 +164,15 @@ export default function OrganizationsPage() {
       return Array.isArray(res.data) ? res.data : [];
     },
     enabled: !!detail,
+  });
+
+  const { data: plans = [] } = useQuery<Plan[]>({
+    queryKey: ['platform-plans'],
+    queryFn: async () => {
+      const res = await api.get('/platform/plans');
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: isSuper,
   });
 
   const invalidate = () => {
@@ -294,7 +259,8 @@ export default function OrganizationsPage() {
   const generateLicense = useMutation({
     mutationFn: async () => {
       const res = await api.post<LicenseKey>(`/platform/orgs/${detail!.id}/licenses`, {
-        days: Number(genDays),
+        days: selectedPlanId ? undefined : Number(genDays),
+        planId: selectedPlanId || undefined,
         plan: genPlan || undefined,
         note: genNote || undefined,
         machineId: genMachine || undefined,
@@ -559,10 +525,34 @@ export default function OrganizationsPage() {
                     value={genDays}
                     onChange={(e: any) => setGenDays(e.target.value.replace(/\D/g, ''))}
                     className="mt-1"
+                    disabled={!!selectedPlanId}
                   />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-400 uppercase tracking-wide">Plan</label>
+                  <select
+                    value={selectedPlanId}
+                    onChange={(e: any) => {
+                      const id = e.target.value;
+                      setSelectedPlanId(id);
+                      const plan = plans.find((p) => p._id === id);
+                      if (plan) {
+                        setGenDays(String(plan.durationDays));
+                        setGenPlan(plan.name);
+                      }
+                    }}
+                    className="mt-1 w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm"
+                  >
+                    <option value="">Manual (use days)</option>
+                    {plans.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.name} · {p.durationDays}d{p.price ? ` · ৳${p.price}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide">Label</label>
                   <Input value={genPlan} onChange={(e: any) => setGenPlan(e.target.value)} className="mt-1" />
                 </div>
                 <div>

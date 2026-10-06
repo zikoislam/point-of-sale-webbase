@@ -77,6 +77,7 @@ export const translations: Record<string, Translation> = {
   'nav.balanceSheet': { en: 'Balance Sheet', bn: 'উদ্বৃত্তপত্র' },
   'nav.cashFlow': { en: 'Cash Flow', bn: 'নগদ প্রবাহ' },
   'nav.organizations': { en: 'Organizations', bn: 'প্রতিষ্ঠান' },
+  'nav.plans': { en: 'Plans', bn: 'প্ল্যান' },
   'nav.users': { en: 'Users', bn: 'ব্যবহারকারী' },
   'nav.roles': { en: 'Roles', bn: 'রোল' },
   'nav.auditLogs': { en: 'Audit Logs', bn: 'অডিট লগ' },

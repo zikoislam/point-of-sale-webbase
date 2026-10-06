@@ -1,0 +1,38 @@
+{
+  "appId": "com.bdbbc.license-manager",
+  "productName": "BDBBC License Manager",
+  "copyright": "Copyright © Bdbbc.com",
+  "directories": {
+    "app": ".",
+    "output": "dist-license-manager",
+    "buildResources": "electron/assets"
+  },
+  "extraMetadata": {
+    "main": "tools/license-manager/main.js"
+  },
+  "files": [
+    "tools/license-manager/**/*",
+    "tools/license-generator/sign.js",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowElevation": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "BDBBC License Manager",
+    "deleteAppDataOnUninstall": false
+  },
+  "publish": null
+}

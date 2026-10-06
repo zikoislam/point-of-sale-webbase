@@ -8,9 +8,8 @@
  *   npm run shop:new -- --shop "Rahim Store" --months 12
  *   npm run shop:new -- --shop "Karim Traders" --months 12 --machine AB12-CD34-EF56
  *
- * It reuses make-license.js to sign the key (so signing and the issued.csv
- * ledger stay in ONE place), then drops everything for that shop into
- * tools/license-generator/shops/<shop>/ :
+ * Signs with keys/private.pem (via sign.js, shared with the License Manager app)
+ * and drops everything for that shop into tools/license-generator/shops/<shop>/ :
  *
  *   license.key    ← the file the shop pastes into the activation screen
  *   shop-info.txt  ← your record + the install/setup checklist for that shop
@@ -24,14 +23,16 @@
  *   --contact "phone/email"   kept in shop-info.txt only
  */
 
-const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { signKey, nextSerial, appendIssued } = require('./sign');
 
 const HERE = __dirname;
-const MAKE_LICENSE = path.join(HERE, 'make-license.js');
 const PRIVATE_KEY = path.join(HERE, 'keys', 'private.pem');
+const LEDGER = path.join(HERE, 'issued.csv');
 const SHOPS_DIR = path.join(HERE, 'shops');
+
+const csv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 function flag(name) {
   const i = process.argv.lastIndexOf(`--${name}`);
@@ -71,44 +72,49 @@ function main() {
   const expires = flag('expires');
   const contact = flag('contact') || '';
 
-  const args = [MAKE_LICENSE, '--shop', shop, '--months', String(months), '--grace', String(grace)];
-  if (machine) args.push('--machine', machine);
-  if (expires) args.push('--expires', expires);
-
-  let output;
+  let result;
   try {
-    // stdin closed → make-license runs non-interactively and takes every value
-    // from the flags we built. stdout is captured; make-license's banners are
-    // suppressed so we print our own clean summary.
-    output = execFileSync(process.execPath, args, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'inherit'],
-    });
+    result = signKey(
+      {
+        shop,
+        months: Number(months),
+        machine,
+        expires,
+        grace: Number(grace),
+        serial: nextSerial(LEDGER),
+      },
+      fs.readFileSync(PRIVATE_KEY, 'utf8')
+    );
   } catch (err) {
-    console.error(`\n✗ License generation failed${err.status ? ` (exit ${err.status})` : ''}.`);
-    if (err.stdout) process.stdout.write(String(err.stdout));
+    console.error(`\n✗ ${err.message}\n`);
     process.exit(1);
   }
 
-  const match = String(output).match(/POS1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
-  if (!match) {
-    console.error('\n✗ Could not read the license key from the generator output.');
-    process.exit(1);
-  }
-  const key = match[0];
+  appendIssued(LEDGER, [
+    csv(result.serial),
+    csv(result.body.i),
+    csv(result.body.e),
+    csv(months),
+    csv(shop),
+    csv(result.machine || 'ANYP'),
+    csv(grace),
+    csv(result.key),
+  ]);
 
   const dir = path.join(SHOPS_DIR, slugify(shop));
   fs.mkdirSync(dir, { recursive: true });
   const keyFile = path.join(dir, 'license.key');
   const infoFile = path.join(dir, 'shop-info.txt');
-  fs.writeFileSync(keyFile, key + '\n', 'utf8');
+  fs.writeFileSync(keyFile, result.key + '\n', 'utf8');
 
   const info = [
     `Shop      : ${shop}`,
     contact ? `Contact   : ${contact}` : 'Contact   :',
+    `Serial    : ${result.serial}`,
     `Months    : ${months}${expires ? `  (expires ${expires})` : ''}`,
+    `Expires   : ${result.body.e}`,
     `Grace     : ${grace} day(s)`,
-    `Machine   : ${machine || 'any PC'}`,
+    `Machine   : ${result.machine || 'any PC'}`,
     `Generated : ${new Date().toISOString()}`,
     '',
     'এই দোকানের ইনস্টল ও সেটআপ ধাপ:',
@@ -117,7 +123,7 @@ function main() {
     '  3. প্রথম লগইন: admin / Admin@123  → সাথে সাথে পাসওয়ার্ড বদলান',
     '  4. Settings → দোকানের নাম, ঠিকানা, currency, প্রিন্টার',
     '  5. Users → এই কোম্পানির Manager / Cashier বানান',
-    '  6. Products / Categories / Suppliers → ডেটা তোলা',
+    '  6. Products / Categories / Suppliers → ডেটা ঢোকানো',
     '',
     'রিনিউ করতে: এই দোকানের জন্য আবার `npm run shop:new -- --shop "' + shop + '"` চালিয়ে',
     'নতুন license.key কাস্টমারকে দিন (পুরনো ফাইল replace হবে, ডেটা মুছবে না)।',
@@ -130,6 +136,7 @@ function main() {
   console.log('════════════════════════════════════════════════════════════');
   console.log(`  license.key : ${rel(keyFile)}`);
   console.log(`  shop-info   : ${rel(infoFile)}`);
+  console.log(`  Expires     : ${result.body.e}`);
   console.log('\nওই license.key ফাইলটা কাস্টমারকে দিন; shop-info.txt আপনার রেকর্ডে রাখুন।\n');
 }
 

@@ -1,8 +1,10 @@
 import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { LicenseKey, ILicenseKey, LicenseKeyStatus } from '../models/LicenseKey';
+import { Plan } from '../models/Plan';
 import { AppError } from '../utils/app-error';
 import { subscriptionService, SubscriptionDescriptor } from './SubscriptionService';
+import { orgService } from './OrgService';
 
 // Unambiguous alphabet (no 0/O/1/I) for keys that get read aloud or typed.
 const KEY_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -19,8 +21,9 @@ function randomBody(length: number): string {
 
 export interface GenerateLicenseInput {
   orgId: string;
-  days: number;
+  days?: number;
   plan?: string;
+  planId?: string;
   note?: string;
   machineId?: string;
   expiresAt?: Date | string;
@@ -32,13 +35,29 @@ export class LicenseService {
     if (!Types.ObjectId.isValid(input.orgId)) {
       throw new AppError(400, 'INVALID_ID', 'Invalid organization ID');
     }
-    if (!Number.isFinite(input.days) || input.days <= 0) {
+
+    // A plan, when chosen, decides the duration and the display label.
+    let days = input.days;
+    let planLabel = input.plan;
+    let planId: Types.ObjectId | undefined;
+    if (input.planId) {
+      if (!Types.ObjectId.isValid(input.planId)) {
+        throw new AppError(400, 'INVALID_ID', 'Invalid plan ID');
+      }
+      const plan = await Plan.findById(input.planId);
+      if (!plan) throw new AppError(404, 'PLAN_NOT_FOUND', 'Plan not found');
+      days = plan.durationDays;
+      planLabel = plan.name;
+      planId = plan._id as Types.ObjectId;
+    }
+
+    if (!Number.isFinite(days) || (days as number) <= 0) {
       throw new AppError(422, 'INVALID_DURATION', 'License duration must be a positive number of days');
     }
 
     let key = '';
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const candidate = `POS-${randomBody(KEY_BODY_LENGTH)}-${input.days}D`;
+      const candidate = `POS-${randomBody(KEY_BODY_LENGTH)}-${days}D`;
       const clash = await LicenseKey.findOne({ key: candidate }).lean();
       if (!clash) {
         key = candidate;
@@ -54,8 +73,9 @@ export class LicenseService {
     const license = await LicenseKey.create({
       key,
       orgId: new Types.ObjectId(input.orgId),
-      days: input.days,
-      plan: input.plan,
+      days,
+      plan: planLabel,
+      planId,
       status: 'ISSUED',
       issuedBy: new Types.ObjectId(actorId),
       issuedAt: new Date(),
@@ -128,6 +148,16 @@ export class LicenseService {
       actorId,
       { via: 'LICENSE_KEY', plan: license.plan, note: license.note }
     );
+
+    // A plan key also sets the organization's feature envelope — Plan 1 gives a
+    // small set of permissions, Plan 3 the full set. setPermissions() re-caps
+    // every role to the new envelope immediately.
+    if (license.planId) {
+      const plan = await Plan.findById(license.planId).lean();
+      if (plan && plan.applyPermissions && (plan.permissionSet || []).length > 0) {
+        await orgService.setPermissions(String(license.orgId), plan.permissionSet);
+      }
+    }
 
     license.status = 'REDEEMED';
     license.redeemedBy = new Types.ObjectId(actorId);

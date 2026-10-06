@@ -227,6 +227,12 @@ const navItems: NavItem[] = [
     superAdminOnly: true,
   },
   {
+    labelKey: 'nav.plans',
+    icon: Layers,
+    href: '/plans',
+    superAdminOnly: true,
+  },
+  {
     labelKey: 'nav.users',
     icon: UserCog,
     href: '/users',

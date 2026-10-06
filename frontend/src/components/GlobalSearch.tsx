@@ -179,7 +179,15 @@ export const GlobalSearch: React.FC = () => {
     const q = debounced.toLowerCase();
     return COMMANDS.filter((c) => {
       if (c.superAdminOnly && !isSuper) return false;
-      if (c.permission && !isSuper && !(permissions || []).includes(c.permission)) return false;
+      // Mirror the sidebar's canAccess(): a SUPER_ADMIN role gets everything.
+      if (
+        c.permission &&
+        !isSuper &&
+        user?.role !== 'SUPER_ADMIN' &&
+        !(permissions || []).includes(c.permission)
+      ) {
+        return false;
+      }
       return (
         c.label.toLowerCase().includes(q) ||
         c.href.toLowerCase().includes(q) ||
@@ -195,7 +203,7 @@ export const GlobalSearch: React.FC = () => {
         badge: 'Page',
         href: c.href,
       }));
-  }, [debounced, isSuper, permissions]);
+  }, [debounced, isSuper, permissions, user?.role]);
 
   const results = useMemo<SearchResult[]>(() => [...commandHits, ...(data || [])], [commandHits, data]);
 

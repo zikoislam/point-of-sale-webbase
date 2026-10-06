@@ -1,6 +1,6 @@
 {
   "name": "bdbbc-pos-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "BDBBC POS & Shop Management System — Desktop App",
   "main": "electron/main.js",
   "author": "Bdbbc.com — Zakirul Islam",
@@ -26,8 +26,8 @@
     "dist:desktop": "npm run pack:desktop && electron-builder --win --config electron-builder.desktop.json",
     "dist:desktop:dir": "npm run pack:desktop && electron-builder --win --dir --config electron-builder.desktop.json",
     "pack:offline": "npm run build:backend && npm run build:frontend && node scripts/prepare-resources.js --no-cloud",
-    "dist:offline": "npm run pack:offline && electron-builder --win",
-    "dist:offline:dir": "npm run pack:offline && electron-builder --win --dir",
+    "dist:offline": "npm run pack:offline && electron-builder --win -c.directories.output=dist-offline-build -c.compression=store",
+    "dist:offline:dir": "npm run pack:offline && electron-builder --win --dir -c.directories.output=dist-offline-build -c.compression=store",
     "license-manager:dev": "electron tools/license-manager",
     "license-manager:dist": "electron-builder --win --config license-manager-builder.json",
     "license-manager:dir": "electron-builder --win --dir --config license-manager-builder.json"
@@ -79,7 +79,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "electron/assets/icon.ico"

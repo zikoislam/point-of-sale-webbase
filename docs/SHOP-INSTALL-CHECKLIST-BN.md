@@ -30,8 +30,9 @@
 
 ## ৪) Clean (আগের ডেটা থাকলে)
 - [ ] অ্যাপ **বন্ধ** করুন
-- [ ] `CLEAN-RESET-DESKTOP.bat` চালান → `%APPDATA%\BDBBC POS` পুরোটা ব্যাকআপ নিয়ে মুছে দেয়, `license.key` ফিরিয়ে আনে
-- [ ] (external MongoDB হলে) `CLEAN-DATABASE.bat` দিয়ে `pos_db`-ও পরিষ্কার
+- [ ] **`CLEAN-EXE-DB.bat`** চালান (right-click → Run as administrator)
+      → অ্যাপ + বান্ডলড mongod থামায়, `db` ফোল্ডার ব্যাকআপ নিয়ে সরায়, `config.json`-এর cloud URI খালি করে, `license.key` রাখে
+- [ ] (external MongoDB হলে) অতিরিক্ত `CLEAN-DATABASE.bat` দিয়ে `pos_db`-ও পরিষ্কার
 - [ ] নিশ্চিত করুন `%APPDATA%\BDBBC POS\config.json` → `edition: offline`, `mongoMode: bundled`, `cloudMongoUri: ""`
 - [ ] অ্যাপ আবার খুলুন
 

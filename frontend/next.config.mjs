@@ -1,3 +1,5 @@
+import fs from 'fs';
+
 /**
  * The API normally lives on a different host from the site. That makes the auth
  * cookie a *third-party* cookie, and browsers — iOS Safari by default, Chrome
@@ -20,6 +22,14 @@ function apiOrigin(url) {
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+
+  // Surface the product version to the UI (footer). The root package.json drives
+  // the installers; this mirrors the frontend package.json version bumped with it.
+  env: {
+    NEXT_PUBLIC_APP_VERSION: JSON.parse(
+      fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8')
+    ).version,
+  },
 
   async rewrites() {
     // A relative NEXT_PUBLIC_API_URL means "same origin, proxy it" — it must not

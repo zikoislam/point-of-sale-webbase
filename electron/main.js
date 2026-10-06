@@ -513,7 +513,7 @@ function createSplashWindow() {
     webPreferences: { contextIsolation: true },
   });
 
-  splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'), { query: { v: app.getVersion() } });
   splashWindow.once('ready-to-show', () => splashWindow?.show());
   splashWindow.center();
 }

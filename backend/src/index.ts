@@ -119,9 +119,19 @@ app.use('/uploads/backups', (req: Request, res: Response) => {
 });
 app.use('/uploads', express.static(uploadsDir));
 
+// Product version, read from backend/package.json (dev: src/.., packaged: dist/..).
+const APP_VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
+  } catch {
+    return '0.0.0';
+  }
+})();
+
 // Health Check Endpoint — also tells the desktop shell which database is live
 app.get('/api/v1/health', (req: Request, res: Response) => {
   sendSuccess(res, 200, 'Server is running smoothly', {
+    version: APP_VERSION,
     database: getDbMode(),
     databaseReady: isDatabaseReady(),
     syncEnabled: syncService.enabled,

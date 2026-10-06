@@ -1,11 +1,12 @@
 {
   "name": "bdbbc-pos-desktop",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "BDBBC POS & Shop Management System — Desktop App",
   "main": "electron/main.js",
   "author": "Bdbbc.com — Zakirul Islam",
   "private": true,
   "scripts": {
+    "version:set": "node scripts/set-version.js",
     "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
     "make:icon": "node electron/scripts/make-icon.js",
     "fetch:mongod": "node scripts/fetch-mongod.js",

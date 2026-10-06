@@ -333,6 +333,11 @@ export default function LoginPage() {
         <p className="text-center text-xs text-slate-500 mt-6">
           🔒 Secure 256-bit TLS encrypted session · Multi-Document ACID compliant
         </p>
+        {process.env.NEXT_PUBLIC_APP_VERSION && (
+          <p className="text-center text-[11px] text-slate-600 mt-1.5">
+            BDBBC POS v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </p>
+        )}
 
         {/* Software credit */}
         <div className="text-center mt-4 space-y-1">

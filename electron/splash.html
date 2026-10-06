@@ -146,7 +146,13 @@
 
     <p class="status" id="status">Starting services…</p>
 
-    <p class="version">v1.0.0 &nbsp;|&nbsp; Powered by Bdbbc.com</p>
+    <p class="version" id="versionLine">Powered by Bdbbc.com</p>
+
+    <script>
+      const buildVersion = new URLSearchParams(location.search).get('v');
+      document.getElementById('versionLine').textContent =
+        (buildVersion ? 'v' + buildVersion + '  |  ' : '') + 'Powered by Bdbbc.com';
+    </script>
   </div>
 
   <script>

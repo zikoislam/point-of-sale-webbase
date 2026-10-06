@@ -47,40 +47,7 @@ export const seedAdmin = async (): Promise<void> => {
     console.log('ℹ️ Super admin user already exists');
   }
 
-  const adminRoleTemplate = await Role.findOne({ name: 'ADMIN' });
-  if (!adminRoleTemplate) {
-    throw new Error('ADMIN role must be seeded before creating admin user.');
-  }
-
-  const existingNormalAdmin = await User.findOne({ username: 'admin_user' });
-  if (!existingNormalAdmin) {
-    const normalAdmin = new User({
-      username: 'admin_user',
-      fullName: 'Administrator',
-      email: 'admin_user@possystem.com',
-      phone: '+8801700000001',
-      passwordHash: 'Admin@123',
-      pinHash: '1111',
-      roleId: adminRoleTemplate._id,
-      isActive: true,
-      terminalLocked: false,
-      memberships: [],
-    });
-
-    // Member of the first organization with the org-scoped ADMIN role
-    const firstOrg = await Organization.findOne({ status: 'ACTIVE' }).lean();
-    if (firstOrg) {
-      const orgAdminRole = await Role.findOne({ orgId: firstOrg._id, name: 'ADMIN' });
-      normalAdmin.memberships.push({
-        orgId: firstOrg._id,
-        roleId: (orgAdminRole?._id || adminRoleTemplate._id) as any,
-        isActive: true,
-      });
-    }
-
-    await normalAdmin.save();
-    console.log('✅ Default admin user created (Username: "admin_user", Password: "Admin@123", PIN: "1111")');
-  } else {
-    console.log('ℹ️ Admin user already exists');
-  }
+  // A fresh install ships with ONLY the platform Super Admin. Shop users
+  // (cashier / manager) are created from the Users page afterwards, so a new
+  // box never starts with a second administrator nobody asked for.
 };

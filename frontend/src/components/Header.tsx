@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '../hooks/useAuth';
 import { NotificationBell } from './NotificationBell';
 import { OrgSwitcher } from './OrgSwitcher';
+import { openGlobalSearch } from './GlobalSearch';
 import { uploadImage } from '../lib/upload';
 import {
   Menu,
@@ -20,6 +21,7 @@ import {
   Camera,
   X,
   AlertTriangle,
+  Search,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useI18n } from '../lib/i18n';
@@ -234,6 +236,19 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             <span>{t('header.openPos')}</span>
           </Link>
         )}
+
+        {/* Global "jump to anything" search (Ctrl+K) */}
+        <button
+          type="button"
+          onClick={openGlobalSearch}
+          className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
+          title="Search anything — barcode, SKU, invoice, phone (Ctrl+K)"
+          aria-label="Open global search"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span className="text-xs">{t('header.search')}</span>
+          <kbd className="hidden md:inline text-[10px] font-mono text-slate-500 bg-slate-900/80 px-1 rounded">Ctrl K</kbd>
+        </button>
 
         {/* Language: English / বাংলা */}
         <LanguageSwitcher />

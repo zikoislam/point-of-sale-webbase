@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../hooks/useAuth';
@@ -71,6 +71,22 @@ export default function ProductsPage() {
   // Delete Dialog State
   const [deleteTarget, setDeleteTarget] = useState<ProductItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // The global search palette deep-links here as /products?search=<barcode|sku|name>.
+  // Read it on mount (navigating in) and listen for the live event (already here).
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('search');
+    if (fromUrl) setSearch(fromUrl);
+    const onPrefill = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail) {
+        setSearch(detail);
+        setPage(1);
+      }
+    };
+    window.addEventListener('pos:prefill-product-search', onPrefill);
+    return () => window.removeEventListener('pos:prefill-product-search', onPrefill);
+  }, []);
 
   // Helper: extract list from paginated or flat API response
   const extractList = (res: any): any[] => {

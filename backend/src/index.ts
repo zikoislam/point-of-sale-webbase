@@ -75,6 +75,7 @@ import ecommerceRoutes from './routes/ecommerce.routes';
 import storefrontRoutes from './routes/storefront.routes';
 import platformRoutes from './routes/platform.routes';
 import subscriptionRoutes from './routes/subscription.routes';
+import searchRoutes from './routes/search.routes';
 import { requireOrg } from './middlewares/org.middleware';
 import { requireActiveSubscription } from './middlewares/subscription.middleware';
 import { authenticate } from './middlewares/auth.middleware';
@@ -172,6 +173,7 @@ app.use('/api/v1/reports/export', exportLimiter);
 // router so it runs after authenticate (it needs the user + org scope).
 app.use('/api/v1/reports', reportLimiter, orgRouter(reportRoutes));
 app.use('/api/v1/system', orgRouter(systemRoutes));
+app.use('/api/v1/search', orgRouter(searchRoutes));
 app.use('/api/v1/scheduled-reports', orgRouter(scheduledReportRoutes));
 // Delivery integration (Module 10) — the webhook is public: couriers call it
 // without a session, so it authenticates with a shared secret instead.

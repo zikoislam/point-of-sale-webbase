@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
+import { GlobalSearch } from '../../components/GlobalSearch';
 import '../print.css';
 
 /** Path-prefix → required permission (longest prefix wins). */
@@ -89,6 +90,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {children}
           </main>
         </div>
+
+        {/* Global "jump to anything" palette — Ctrl/Cmd + K */}
+        <GlobalSearch />
       </div>
     </ProtectedRoute>
   );

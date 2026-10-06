@@ -175,6 +175,7 @@ export const translations: Record<string, Translation> = {
   'header.openPosHint': { en: 'Open POS Terminal (F9)', bn: 'পিওএস টার্মিনাল খুলুন (F9)' },
   'header.exit': { en: 'Exit', bn: 'বের হন' },
   'header.lockTerminal': { en: 'Lock Terminal', bn: 'টার্মিনাল লক' },
+  'header.search': { en: 'Search', bn: 'সার্চ' },
   'header.lockTerminalHint': { en: 'Lock Terminal (Ctrl+L)', bn: 'টার্মিনাল লক করুন (Ctrl+L)' },
   'header.myProfilePicture': { en: 'My Profile Picture', bn: 'আমার প্রোফাইল ছবি' },
   'header.profileSettings': { en: 'Profile & Settings', bn: 'প্রোফাইল ও সেটিংস' },

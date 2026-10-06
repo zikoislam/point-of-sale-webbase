@@ -21,6 +21,7 @@ dist-final-build/
 dist-license-manager/
 dist-electron.zip
 dist-pos-build.zip
+dist-offline-build.zip
 build/
 build-verify/
 

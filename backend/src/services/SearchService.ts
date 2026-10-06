@@ -1,6 +1,12 @@
-import { Product, Sale, Customer, Supplier, PurchaseOrder } from '../models';
+import { Product, Sale, Customer, Supplier, PurchaseOrder, Organization } from '../models';
 
-export type SearchResultType = 'product' | 'sale' | 'customer' | 'supplier' | 'purchase-order';
+export type SearchResultType =
+  | 'product'
+  | 'sale'
+  | 'customer'
+  | 'supplier'
+  | 'purchase-order'
+  | 'organization';
 
 export interface SearchResult {
   type: SearchResultType;
@@ -148,6 +154,27 @@ class SearchService {
             badge: 'PO',
             href: `/purchase-orders/${o._id}`,
             rank: exact.test(o.poNumber) ? 0 : 1,
+          }));
+        })()
+      );
+    }
+
+    // Platform Super Admin only: find a shop by its organization name/phone.
+    if (opts.isSuper) {
+      jobs.push(
+        (async () => {
+          const orgs = await Organization.find({ $or: [{ name: rx }, { slug: rx }, { contactPhone: rx }] })
+            .select('name slug status contactPhone')
+            .limit(limit)
+            .lean();
+          return orgs.map((o: any) => ({
+            type: 'organization' as const,
+            id: String(o._id),
+            title: o.name,
+            subtitle: [o.slug, o.status].filter(Boolean).join(' · '),
+            badge: 'Organization',
+            href: '/organizations',
+            rank: 1,
           }));
         })()
       );

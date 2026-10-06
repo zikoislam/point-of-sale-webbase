@@ -12,11 +12,14 @@ import {
   FileText,
   CornerDownLeft,
   Loader2,
+  Compass,
+  Building2,
 } from 'lucide-react';
 import { api } from '../lib/api-client';
+import { useAuth } from '../hooks/useAuth';
 
 interface SearchResult {
-  type: 'product' | 'sale' | 'customer' | 'supplier' | 'purchase-order';
+  type: 'product' | 'sale' | 'customer' | 'supplier' | 'purchase-order' | 'organization' | 'page';
   id: string;
   title: string;
   subtitle?: string;
@@ -28,12 +31,80 @@ const TYPE_META: Record<
   SearchResult['type'],
   { label: string; icon: React.ComponentType<{ className?: string }>; color: string }
 > = {
+  page: { label: 'Go to', icon: Compass, color: 'text-cyan-400' },
+  organization: { label: 'Organization', icon: Building2, color: 'text-rose-400' },
   product: { label: 'Product', icon: Package, color: 'text-emerald-400' },
   sale: { label: 'Sale', icon: Receipt, color: 'text-blue-400' },
   customer: { label: 'Customer', icon: Users, color: 'text-amber-400' },
   supplier: { label: 'Supplier', icon: Truck, color: 'text-violet-400' },
-  'purchase-order': { label: 'Purchase Order', icon: FileText, color: 'text-rose-400' },
+  'purchase-order': { label: 'Purchase Order', icon: FileText, color: 'text-fuchsia-400' },
 };
+
+interface Command {
+  label: string;
+  href: string;
+  group: string;
+  permission?: string;
+  superAdminOnly?: boolean;
+  keywords?: string[];
+}
+
+/** Every page/operation reachable by name — mirrors the sidebar. */
+const COMMANDS: Command[] = [
+  { label: 'Dashboard', href: '/dashboard', group: 'Overview', permission: 'reports:dashboard', keywords: ['home', 'overview', 'ড্যাশবোর্ড'] },
+  { label: 'POS Terminal', href: '/pos', group: 'Sales', permission: 'pos:checkout', keywords: ['sale', 'checkout', 'pos', 'বিক্রয়', 'ক্যাশ'] },
+  { label: 'Shifts', href: '/shifts', group: 'Sales', permission: 'shifts:operate', keywords: ['shift'] },
+  { label: 'Sales History', href: '/sales', group: 'Sales', permission: 'sales:view', keywords: ['invoice', 'sales', 'বিক্রয়', 'ইনভয়েস'] },
+  { label: 'My Sales', href: '/my-sales', group: 'Sales', keywords: ['my sales'] },
+  { label: 'Customers', href: '/customers', group: 'Sales', permission: 'customers:view', keywords: ['customer', 'কাস্টমার', 'খদ্দের'] },
+  { label: 'Purchase Orders', href: '/purchase-orders', group: 'Purchase', permission: 'procurement:view', keywords: ['po', 'purchase', 'ক্রয়'] },
+  { label: 'Purchase Receive', href: '/purchase-orders/receive', group: 'Purchase', permission: 'procurement:receive', keywords: ['receive', 'grn'] },
+  { label: 'Purchase Returns', href: '/purchase-orders/returns', group: 'Purchase', permission: 'procurement:view', keywords: ['return'] },
+  { label: 'Suppliers', href: '/suppliers', group: 'Purchase', permission: 'procurement:view', keywords: ['supplier', 'vendor', 'সরবরাহকারী'] },
+  { label: 'Inventory', href: '/inventory', group: 'Inventory', permission: 'inv:view', keywords: ['stock', 'স্টক'] },
+  { label: 'All Products', href: '/products', group: 'Inventory', permission: 'inv:view', keywords: ['product', 'item', 'sku', 'barcode', 'প্রোডাক্ট', 'পণ্য'] },
+  { label: 'Wholesale Price List', href: '/products/wholesale-price-list', group: 'Inventory', permission: 'inv:view', keywords: ['wholesale', 'price'] },
+  { label: 'Categories', href: '/categories', group: 'Inventory', permission: 'inv:view', keywords: ['category', 'ক্যাটাগরি'] },
+  { label: 'Product Groups', href: '/product-groups', group: 'Inventory', permission: 'inv:view', keywords: ['group'] },
+  { label: 'Brands', href: '/brands', group: 'Inventory', permission: 'inv:view', keywords: ['brand', 'ব্র্যান্ড'] },
+  { label: 'Stock Transfers', href: '/stock-transfers', group: 'Inventory', permission: 'inv:view', keywords: ['transfer'] },
+  { label: 'Chain Management', href: '/chain-management', group: 'Inventory', permission: 'reports:dashboard', keywords: ['branch', 'chain'] },
+  { label: 'Barcode Labels', href: '/barcode-labels', group: 'Inventory', permission: 'inv:labels', keywords: ['barcode', 'label', 'print', 'বারকোড'] },
+  { label: 'Price Tiers', href: '/price-tiers', group: 'Wholesale', permission: 'customers:view', keywords: ['tier', 'price'] },
+  { label: 'Volume Pricing', href: '/price-tiers/volume-pricing', group: 'Wholesale', permission: 'pricing:manage', keywords: ['volume'] },
+  { label: 'Import / Export', href: '/import-export', group: 'Operations', permission: 'procurement:view', keywords: ['import', 'export', 'lc'] },
+  { label: 'Approvals', href: '/approvals', group: 'Operations', keywords: ['approval'] },
+  { label: 'Projects', href: '/projects', group: 'Operations', keywords: ['project'] },
+  { label: 'Scheduled Reports', href: '/scheduled-reports', group: 'Reports', permission: 'reports:export', keywords: ['schedule'] },
+  { label: 'Online Orders', href: '/ecommerce/orders', group: 'eCommerce', permission: 'ecom:view', keywords: ['order', 'online'] },
+  { label: 'Courier / Delivery', href: '/courier', group: 'eCommerce', permission: 'ecom:view', keywords: ['courier', 'delivery'] },
+  { label: 'Leads', href: '/leads', group: 'CRM', permission: 'crm:view', keywords: ['lead'] },
+  { label: 'Support Tickets', href: '/support', group: 'CRM', permission: 'crm:view', keywords: ['ticket', 'support'] },
+  { label: 'Leave Requests', href: '/hr/leave', group: 'HR', permission: 'hr:view', keywords: ['leave'] },
+  { label: 'HR & Payroll', href: '/hr', group: 'HR', permission: 'hr:view', keywords: ['hr', 'payroll', 'employee'] },
+  { label: 'Distribution', href: '/distribution', group: 'Distribution', permission: 'sr:view', keywords: ['distribution', 'sr'] },
+  { label: 'Routes & Territories', href: '/distribution/routes', group: 'Distribution', permission: 'distribution:manage', keywords: ['route'] },
+  { label: 'Production', href: '/production', group: 'Production', permission: 'production:view', keywords: ['production', 'manufacture'] },
+  { label: 'CRM', href: '/crm', group: 'CRM', permission: 'crm:view', keywords: ['crm'] },
+  { label: 'Expenses', href: '/expenses', group: 'Finance', permission: 'expenses:view', keywords: ['expense', 'খরচ'] },
+  { label: 'Accounts', href: '/accounts', group: 'Finance', permission: 'accounts:view', keywords: ['account', 'wallet', 'balance', 'হিসাব'] },
+  { label: 'Chart of Accounts', href: '/accounts/chart', group: 'Finance', permission: 'accounts:view', keywords: ['coa', 'chart'] },
+  { label: 'Day Book', href: '/accounts/journal', group: 'Finance', permission: 'accounts:view', keywords: ['journal', 'day book', 'দৈনিক'] },
+  { label: 'Opening Balances', href: '/accounts/opening-balances', group: 'Finance', permission: 'accounts:view', superAdminOnly: true, keywords: ['opening'] },
+  { label: 'Year-End Closing', href: '/accounts/year-close', group: 'Finance', permission: 'accounts:view', superAdminOnly: true, keywords: ['year close'] },
+  { label: 'New Journal Voucher', href: '/accounts/journal/new', group: 'Finance', permission: 'accounts:manage', superAdminOnly: true, keywords: ['voucher', 'journal'] },
+  { label: 'All Reports', href: '/reports', group: 'Reports', permission: 'reports:dashboard', keywords: ['report', 'রিপোর্ট'] },
+  { label: 'Trial Balance', href: '/reports/trial-balance', group: 'Reports', permission: 'accounts:view', keywords: ['trial balance', 'রেওয়ামিল'] },
+  { label: 'Balance Sheet', href: '/reports/balance-sheet', group: 'Reports', permission: 'accounts:view', keywords: ['balance sheet', 'উদ্বৃত্তপত্র'] },
+  { label: 'Cash Flow', href: '/reports/cash-flow', group: 'Reports', permission: 'accounts:view', keywords: ['cash flow', 'নগদ প্রবাহ'] },
+  { label: 'Organizations', href: '/organizations', group: 'Platform', superAdminOnly: true, keywords: ['organization', 'company', 'shop', 'tenant', 'প্রতিষ্ঠান', 'দোকান'] },
+  { label: 'Plans', href: '/plans', group: 'Platform', superAdminOnly: true, keywords: ['plan', 'subscription', 'license', 'প্ল্যান'] },
+  { label: 'Users', href: '/users', group: 'Admin', permission: 'users:manage', keywords: ['user', 'staff', 'ব্যবহারকারী'] },
+  { label: 'Roles', href: '/roles', group: 'Admin', permission: 'roles:view', keywords: ['role', 'permission', 'রোল'] },
+  { label: 'Audit Logs', href: '/audit-logs', group: 'Admin', permission: 'audit:view', keywords: ['audit', 'log'] },
+  { label: 'Backup', href: '/backup', group: 'Admin', permission: 'settings:manage', keywords: ['backup', 'ব্যাকআপ'] },
+  { label: 'Settings', href: '/settings', group: 'Admin', permission: 'settings:manage', keywords: ['settings', 'config', 'সেটিংস'] },
+];
 
 /** Open the palette from anywhere (e.g. the Header search button). */
 export function openGlobalSearch() {
@@ -44,6 +115,9 @@ const OPEN_EVENT = 'pos:open-search';
 
 export const GlobalSearch: React.FC = () => {
   const router = useRouter();
+  const { user } = useAuth();
+  const isSuper = !!user?.isPlatformSuperAdmin;
+  const permissions = user?.permissions;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -98,7 +172,32 @@ export const GlobalSearch: React.FC = () => {
     staleTime: 15_000,
   });
 
-  const results = useMemo(() => data || [], [data]);
+  // Pages/operations match instantly on the client (no round-trip); data
+  // results come from the API and are appended after them.
+  const commandHits = useMemo<SearchResult[]>(() => {
+    if (debounced.length < 2) return [];
+    const q = debounced.toLowerCase();
+    return COMMANDS.filter((c) => {
+      if (c.superAdminOnly && !isSuper) return false;
+      if (c.permission && !isSuper && !(permissions || []).includes(c.permission)) return false;
+      return (
+        c.label.toLowerCase().includes(q) ||
+        c.href.toLowerCase().includes(q) ||
+        (c.keywords || []).some((k) => k.toLowerCase().includes(q))
+      );
+    })
+      .slice(0, 8)
+      .map((c) => ({
+        type: 'page' as const,
+        id: c.href,
+        title: c.label,
+        subtitle: c.group,
+        badge: 'Page',
+        href: c.href,
+      }));
+  }, [debounced, isSuper, permissions]);
+
+  const results = useMemo<SearchResult[]>(() => [...commandHits, ...(data || [])], [commandHits, data]);
 
   useEffect(() => {
     setActiveIndex(0);

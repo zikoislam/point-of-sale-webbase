@@ -241,6 +241,12 @@ function packConfig() {
     },
   };
 
+  if (!NO_CLOUD && !EXTERNAL_DB && config.cloudMongoUri) {
+    log('⚠ STANDARD build: a cloud database is embedded (cloudMongoUri) and sync is ON.');
+    log('  Two PCs installed from this build will SHARE customers/stock/ledger.');
+    log('  For per-shop isolation build with:  npm run dist:offline');
+  }
+
   fs.writeFileSync(path.join(dest, 'app-config.json'), JSON.stringify(config, null, 2));
   log('runtime config template written (build/config/app-config.json).');
 }

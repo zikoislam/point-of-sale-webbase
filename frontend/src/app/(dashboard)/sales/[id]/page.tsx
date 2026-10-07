@@ -25,6 +25,7 @@ import { Badge } from '../../../../components/ui/Badge';
 import { useToast } from '../../../../components/ui/Toast';
 import { ReturnModal } from '../../../../components/modals/ReturnModal';
 import { prepareMemoPrint } from '../../../../lib/memo-print';
+import { useBranding } from '../../../../hooks/useBranding';
 
 interface SaleItem {
   variantId: string;
@@ -58,6 +59,7 @@ interface SaleDetail {
 }
 
 export default function SaleInvoiceDetailPage() {
+  const branding = useBranding();
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
@@ -105,6 +107,21 @@ export default function SaleInvoiceDetailPage() {
 
   return (
     <div className="space-y-6 pb-16 print-sale-memo">
+      {/* Print-only letterhead from Settings (shop details + receipt header) */}
+      <div className="hidden print:block text-center border-b border-dashed border-slate-300 pb-3">
+        <div className="text-lg font-black tracking-tight">{branding.shopName || 'BDBBC POS'}</div>
+        {(branding.shopAddress || branding.shopPhone) && (
+          <div className="text-[11px] text-slate-600 mt-0.5">
+            {branding.shopAddress}
+            {branding.shopAddress && branding.shopPhone ? ' · ' : ''}
+            {branding.shopPhone ? `Tel: ${branding.shopPhone}` : ''}
+          </div>
+        )}
+        {branding.receiptHeader && (
+          <div className="text-[11px] text-slate-600 mt-0.5 whitespace-pre-line">{branding.receiptHeader}</div>
+        )}
+      </div>
+
       {/* Header Bar */}
       <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
         <div className="flex items-center gap-3.5">
@@ -311,6 +328,11 @@ export default function SaleInvoiceDetailPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Print-only footer from Settings */}
+      <div className="hidden print:block text-center text-[11px] text-slate-600 border-t border-dashed border-slate-300 pt-3 whitespace-pre-line">
+        {branding.receiptFooter || 'Thank you for shopping with us!'}
       </div>
 
       {/* Return Modal */}

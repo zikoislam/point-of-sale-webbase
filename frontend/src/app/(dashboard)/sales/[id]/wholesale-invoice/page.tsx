@@ -141,6 +141,9 @@ export default function WholesaleInvoicePage() {
             <h2 className="text-xl font-black tracking-tight">{branding.shopName}</h2>
             {branding.shopAddress && <p className="text-[11px] text-slate-600 mt-1">{branding.shopAddress}</p>}
             {branding.shopPhone && <p className="text-[11px] text-slate-600">Phone: {branding.shopPhone}</p>}
+            {branding.receiptHeader && (
+              <p className="text-[11px] text-slate-600 whitespace-pre-line">{branding.receiptHeader}</p>
+            )}
           </div>
           <div className="text-right">
             <p className="text-lg font-black tracking-wide">WHOLESALE INVOICE</p>
@@ -292,8 +295,8 @@ export default function WholesaleInvoicePage() {
           </div>
         </div>
 
-        <p className="text-[9px] text-slate-400 mt-6 text-center">
-          {branding.shopName} — Invoice {sale.invoiceNo}
+        <p className="text-[9px] text-slate-400 mt-6 text-center whitespace-pre-line">
+          {branding.receiptFooter || `${branding.shopName} — Invoice ${sale.invoiceNo}`}
         </p>
       </div>
     </div>

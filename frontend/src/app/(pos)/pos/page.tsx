@@ -2227,7 +2227,10 @@ export default function POSTerminalPage() {
                 {completedSale.items?.map((item: any, idx: number) => (
                   <div key={idx} className="flex justify-between">
                     <div>
-                      <div>{item.productName}</div>
+                      <div>
+                        {item.productName}
+                        {item.variantName ? ` (${item.variantName})` : ''}
+                      </div>
                       <div className="text-[10px] text-slate-500">
                         {formatQty(item.quantity)} x ৳{item.unitSellingPrice.toFixed(2)}
                       </div>

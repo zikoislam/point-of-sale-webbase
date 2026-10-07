@@ -721,7 +721,10 @@ export default function SalesHistoryPage() {
                 {selectedSale.items?.map((item, idx) => (
                   <div key={idx} className="flex justify-between">
                     <div>
-                      <div>{item.productName}</div>
+                      <div>
+                        {item.productName}
+                        {item.variantName ? ` (${item.variantName})` : ''}
+                      </div>
                       <div className="text-[10px] text-slate-500">
                         {item.quantity} x ৳{item.unitSellingPrice.toFixed(2)}
                       </div>

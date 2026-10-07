@@ -57,6 +57,53 @@ if (fs.existsSync(mongod)) {
   console.log('ℹ  no bundled mongod.exe (expected for a cloud / external-DB build).');
 }
 
+// ── Nothing of our own source may travel to a customer ──────────────────────
+console.log('');
+let leak = false;
+
+for (const p of ['build/backend/src', 'build/frontend/src']) {
+  if (fs.existsSync(path.join(root, p))) {
+    fail(`application source is shipped: ${p}`);
+    leak = true;
+  }
+}
+
+function walkFiles(dir, visit, skipNodeModules) {
+  if (!fs.existsSync(dir)) return;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (skipNodeModules && entry.name === 'node_modules') continue;
+      walkFiles(full, visit, skipNodeModules);
+    } else {
+      visit(full, entry.name);
+    }
+  }
+}
+
+const maps = [];
+const tsFiles = [];
+for (const p of ['build/backend', 'build/frontend']) {
+  walkFiles(
+    path.join(root, p),
+    (full, name) => {
+      if (name.endsWith('.map')) maps.push(path.relative(root, full));
+      if (/\.tsx?$/.test(name) && !name.endsWith('.d.ts')) tsFiles.push(path.relative(root, full));
+    },
+    true // ignore node_modules — those are public packages
+  );
+}
+
+if (maps.length) {
+  fail(`${maps.length} source map(s) shipped (first: ${maps[0]})`);
+  leak = true;
+}
+if (tsFiles.length) {
+  fail(`${tsFiles.length} TypeScript source file(s) shipped (first: ${tsFiles[0]})`);
+  leak = true;
+}
+if (!leak) ok('no application source or source maps are shipped — compiled output only.');
+
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 console.log('\nInstallers found:');
 let any = false;

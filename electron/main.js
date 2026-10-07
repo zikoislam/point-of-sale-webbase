@@ -390,6 +390,9 @@ function openActivationWindow(callbacks) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // DevTools stays available while developing; on a shipped build it is
+      // disabled so the app's internals cannot be inspected.
+      devTools: !app.isPackaged,
     },
   });
 
@@ -538,8 +541,22 @@ function createMainWindow(port) {
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: true,
+      // No DevTools / Ctrl+Shift+I in a shipped build.
+      devTools: !app.isPackaged,
     },
   });
+
+  // Belt and braces: swallow the DevTools / view-source shortcuts too.
+  if (app.isPackaged) {
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      const key = (input.key || '').toUpperCase();
+      const devtoolsCombo =
+        key === 'F12' ||
+        (input.control && input.shift && ['I', 'J', 'C'].includes(key)) ||
+        (input.control && key === 'U');
+      if (devtoolsCombo) event.preventDefault();
+    });
+  }
 
   mainWindow.loadURL(`http://127.0.0.1:${port}`);
 

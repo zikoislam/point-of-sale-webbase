@@ -53,6 +53,25 @@ function copy(from, to) {
   return true;
 }
 
+/**
+ * Copies uploads/ (shop logo, avatars) but NEVER database snapshots. A backup
+ * folder holds another shop's whole ledger, so it must not travel inside an
+ * installer — and the app cannot restore one anyway.
+ */
+function copyUploadsFiltered(from, to) {
+  if (!fs.existsSync(from)) return;
+  fs.mkdirSync(to, { recursive: true });
+  let skipped = 0;
+  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+    if (entry.isDirectory() && (entry.name === 'backups' || entry.name.startsWith('db-backup-'))) {
+      skipped++;
+      continue;
+    }
+    fs.cpSync(path.join(from, entry.name), path.join(to, entry.name), { recursive: true });
+  }
+  if (skipped) log(`uploads: skipped ${skipped} database backup folder(s) — they are not shipped.`);
+}
+
 /** Reads a dotenv file into a plain object, tolerating quotes and comments. */
 function readEnvFile(file) {
   const out = {};
@@ -94,8 +113,9 @@ function packBackend() {
   copy(path.join(BACKEND_SRC, 'dist'), path.join(dest, 'dist'));
 
   // Uploads are user data (shop logo, avatars). Ship whatever exists so an
-  // existing install keeps its branding after an upgrade.
-  copy(path.join(BACKEND_SRC, 'uploads'), path.join(dest, 'uploads'));
+  // existing install keeps its branding after an upgrade — but never ship a
+  // database snapshot (see copyUploadsFiltered).
+  copyUploadsFiltered(path.join(BACKEND_SRC, 'uploads'), path.join(dest, 'uploads'));
   fs.mkdirSync(path.join(dest, 'uploads'), { recursive: true });
 
   // Production-only dependencies. `npm ci --omit=dev` is tried first because it

@@ -107,7 +107,7 @@ if (!leak) ok('no application source or source maps are shipped — compiled out
 const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 console.log('\nInstallers found:');
 let any = false;
-for (const dir of ['dist-offline-build', 'dist-final-build', 'dist-electron', 'dist-electron-desktop']) {
+for (const dir of ['dist-offline-build', 'dist-final-build', 'dist-pos-build', 'dist-electron', 'dist-electron-desktop']) {
   const d = path.join(root, dir);
   if (!fs.existsSync(d)) continue;
   for (const f of fs.readdirSync(d)) {
@@ -123,7 +123,7 @@ if (!any) console.log('   (none yet)');
 // The installer name must carry the package.json version.
 if (any) {
   const names = [];
-  for (const dir of ['dist-offline-build', 'dist-final-build', 'dist-electron', 'dist-electron-desktop']) {
+  for (const dir of ['dist-offline-build', 'dist-final-build', 'dist-pos-build', 'dist-electron', 'dist-electron-desktop']) {
     const d = path.join(root, dir);
     if (!fs.existsSync(d)) continue;
     for (const f of fs.readdirSync(d)) if (/Setup .*\.exe$/i.test(f)) names.push(f);

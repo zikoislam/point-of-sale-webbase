@@ -22,6 +22,8 @@ export interface ProductInput {
   categoryId: string;
   brandId?: string;
   supplierId?: string;
+  /** Optional colour / variant label for quick identification. */
+  color?: string;
   /** Product groups this item belongs to. */
   groups?: string[];
   /** Listed on the public storefront when true. */
@@ -84,7 +86,7 @@ export class ProductService {
 
     if (options.search) {
       const rx = new RegExp(escapeRegex(options.search.trim()), 'i');
-      filter.$or = [{ name: rx }, { 'variants.sku': rx }, { 'variants.barcode': rx }];
+      filter.$or = [{ name: rx }, { color: rx }, { 'variants.sku': rx }, { 'variants.barcode': rx }];
     }
     if (options.categoryId) filter.categoryId = new Types.ObjectId(options.categoryId);
     if (options.brandId) filter.brandId = new Types.ObjectId(options.brandId);
@@ -129,6 +131,7 @@ export class ProductService {
         categoryName: p.categoryId?.name,
         brandId: p.brandId?._id?.toString(),
         brandName: p.brandId?.name,
+        color: p.color,
         unit: p.unit,
         taxType: p.taxType,
         taxRate: p.taxRate,
@@ -202,6 +205,7 @@ export class ProductService {
       categoryId: data.categoryId,
       brandId: data.brandId || null,
       supplierId: data.supplierId || null,
+      color: data.color,
       groups: (data.groups || []).filter((g) => Types.ObjectId.isValid(g)).map((g) => new Types.ObjectId(g)),
       isWebVisible: !!data.isWebVisible,
       unit: data.unit,

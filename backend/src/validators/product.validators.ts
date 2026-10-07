@@ -31,6 +31,8 @@ export const createProductSchema = z.object({
   categoryId: z.string().min(1, 'Category is required'),
   brandId: z.string().optional(),
   supplierId: z.string().optional(),
+  /** Optional colour / variant label for quick identification. */
+  color: z.string().trim().optional(),
   /** Product groups (ref: product_groups). */
   groups: z.array(z.string()).optional().default([]),
   /** Show this product on the public eCommerce storefront. */

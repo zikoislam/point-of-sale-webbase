@@ -34,6 +34,7 @@ interface ProductItem {
   categoryName?: string;
   brandId?: string;
   brandName?: string;
+  color?: string;
   unit: string;
   taxType: string;
   taxRate: number;
@@ -421,6 +422,11 @@ export default function ProductsPage() {
                         {p.brandName && (
                           <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-950/60 border border-blue-800/50 text-blue-300">
                             {p.brandName}
+                          </span>
+                        )}
+                        {p.color && (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-950/50 border border-emerald-800/50 text-emerald-300">
+                            {p.color}
                           </span>
                         )}
                       </div>

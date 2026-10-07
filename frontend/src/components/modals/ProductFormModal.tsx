@@ -86,6 +86,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [taxType, setTaxType] = useState('INCLUSIVE');
   const [taxRate, setTaxRate] = useState<number>(0);
   const [description, setDescription] = useState('');
+  const [color, setColor] = useState('');
   const [isWebVisible, setIsWebVisible] = useState(false);
   const [productGroups, setProductGroups] = useState<Array<{ id: string; name: string; parentGroupId?: string | null }>>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -187,6 +188,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             setTaxType(p.taxType || 'INCLUSIVE');
             setTaxRate(p.taxRate ?? 0);
             setDescription(p.description || '');
+            setColor(p.color || '');
             setIsWebVisible(!!p.isWebVisible);
             setSelectedGroups(Array.isArray(p.groups) ? p.groups.map((g: any) => String(g?._id || g)) : []);
 
@@ -323,6 +325,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const payload = {
       name: name.trim(),
       description: description.trim() || undefined,
+      color: color.trim() || undefined,
       isWebVisible,
       groups: selectedGroups,
       categoryId,
@@ -449,6 +452,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   max={100}
                   value={taxRate}
                   onValueChange={setTaxRate}
+                  className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Color / Variant <span className="text-slate-600 normal-case font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Red, Blue, Black"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
                   className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
                 />
               </div>

@@ -50,9 +50,9 @@ class SearchService {
       jobs.push(
         (async () => {
           const products = await Product.find({
-            $or: [{ name: rx }, { 'variants.sku': rx }, { 'variants.barcode': rx }],
+            $or: [{ name: rx }, { color: rx }, { 'variants.sku': rx }, { 'variants.barcode': rx }],
           })
-            .select('name variants.attributeName variants.sku variants.barcode variants.retailSellingPrice variants.currentStock')
+            .select('name color variants.attributeName variants.sku variants.barcode variants.retailSellingPrice variants.currentStock')
             .limit(limit)
             .lean();
           return products.map((p: any) => {
@@ -69,7 +69,7 @@ class SearchService {
               type: 'product' as const,
               id: String(p._id),
               title: p.name,
-              subtitle: [v.attributeName, v.sku ? `SKU ${v.sku}` : null].filter(Boolean).join(' · '),
+              subtitle: [p.color, v.attributeName, v.sku ? `SKU ${v.sku}` : null].filter(Boolean).join(' · '),
               badge: v.barcode || v.sku,
               href: `/products?search=${encodeURIComponent(token)}`,
               rank: isExact ? 0 : 1,

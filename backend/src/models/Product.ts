@@ -54,6 +54,8 @@ export interface IProduct extends Document {
   /** Product groups this item belongs to (ref: product_groups). */
   groups: Types.ObjectId[];
   unit: 'Pcs' | 'Kg' | 'Gram' | 'Ltr' | 'Ml' | 'Box' | 'Meter' | 'Goj';
+  /** Optional identifier shown at entry, sale and receive (e.g. "Red"). */
+  color?: string;
   imageUrl?: string;
   /** Listed on the organization's public eCommerce storefront when true. */
   isWebVisible?: boolean;
@@ -199,6 +201,10 @@ const ProductSchema = new Schema<IProduct>(
       enum: ['Pcs', 'Kg', 'Gram', 'Ltr', 'Ml', 'Box', 'Meter', 'Goj'],
       required: true,
       default: 'Pcs',
+    },
+    color: {
+      type: String,
+      trim: true,
     },
     imageUrl: {
       type: String,

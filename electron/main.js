@@ -224,38 +224,76 @@ async function startLocalMongo() {
 
   // mongod writes its own log file: its journal output is far too chatty to
   // share the app log, and a support call needs the app log to stay readable.
-  mongodProcess = spawn(
-    paths.mongodExe,
-    [
-      '--dbpath', dbPath,
-      '--port', String(port),
-      '--bind_ip', '127.0.0.1',
-      '--replSet', 'rs0',
-      '--logpath', logPath,
-      '--logappend',
-      '--quiet',
-    ],
-    { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }
-  );
+  const mongodArgs = [
+    '--dbpath', dbPath,
+    '--port', String(port),
+    '--bind_ip', '127.0.0.1',
+    '--replSet', 'rs0',
+    '--logpath', logPath,
+    '--logappend',
+    '--quiet',
+  ];
 
-  mongodProcess.stdout?.on('data', (data) => log('[mongod]', data.toString().trim()));
-  mongodProcess.stderr?.on('data', (data) => log('[mongod]', data.toString().trim()));
+  const launch = () => {
+    mongodProcess = spawn(paths.mongodExe, mongodArgs, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    mongodProcess.stdout?.on('data', (data) => log('[mongod]', data.toString().trim()));
+    mongodProcess.stderr?.on('data', (data) => log('[mongod]', data.toString().trim()));
+    mongodProcess.on('exit', (code) => {
+      log(`mongod exited with code ${code}`);
+      mongodProcess = null;
+    });
+  };
 
-  mongodProcess.on('exit', (code) => {
-    log(`mongod exited with code ${code}`);
-    mongodProcess = null;
-  });
-
-  const deadline = Date.now() + 30000;
-  while (Date.now() < deadline) {
-    if (await isPortOpen(port)) {
-      log('mongod is accepting connections.');
-      return { mode: 'local', port };
+  const waitUntilUp = async () => {
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      if (await isPortOpen(port)) return true;
+      await new Promise((r) => setTimeout(r, 400));
     }
-    await new Promise((r) => setTimeout(r, 400));
+    return false;
+  };
+
+  launch();
+
+  if (await waitUntilUp()) {
+    log('mongod is accepting connections.');
+    return { mode: 'local', port };
   }
 
-  log('mongod did not come up in time — falling back to the cloud database.');
+  // mongod did not come up. On a clean Windows PC the usual cause is the
+  // missing Microsoft Visual C++ Redistributable that MongoDB 7 requires —
+  // mongod exits at once and the API then has no database, which surfaces as
+  // "Internal Server Error" in the window. The redist ships next to mongod, so
+  // install it once and try again.
+  const redist = path.join(path.dirname(paths.mongodExe), 'vc_redist.x64.exe');
+  if (fs.existsSync(redist)) {
+    log('mongod did not start — installing the bundled Visual C++ Redistributable, then retrying…');
+    await new Promise((resolve) => {
+      const child = spawn(redist, ['/install', '/quiet', '/norestart'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      child.on('exit', (code) => {
+        log(`vc_redist exited with code ${code}`);
+        resolve(undefined);
+      });
+      child.on('error', (err) => {
+        log(`could not run vc_redist: ${err.message}`);
+        resolve(undefined);
+      });
+    });
+
+    launch();
+    if (await waitUntilUp()) {
+      log('mongod is accepting connections after installing the redistributable.');
+      return { mode: 'local', port };
+    }
+  }
+
+  log('mongod still did not come up — falling back to the cloud database.');
   return { mode: 'cloud-only', port };
 }
 
@@ -934,9 +972,12 @@ async function boot() {
       'Startup Error',
       `${err.message}.\n\n` +
         (mongo.mode === 'cloud-only' && !config.cloudMongoUri
-          ? 'No local database was bundled and no cloud database is configured, so there is nowhere to store data.\n\n'
+          ? 'The local database could not be started. On a PC that has never run the app, this is\n' +
+            'usually the missing Microsoft Visual C++ Redistributable — run this file and restart:\n' +
+            `   ${path.join(path.dirname(paths.mongodExe), 'vc_redist.x64.exe')}\n\n`
           : '') +
-        `Check that port ${backendPort} is free and that the database is reachable, then restart the app.`
+        `Check that port ${backendPort} is free and that the database is reachable, then restart the app.\n\n` +
+        `Database log: ${path.join(app.getPath('userData'), 'logs', 'mongod.log')}`
     );
     app.quit();
     return;

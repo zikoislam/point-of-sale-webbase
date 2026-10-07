@@ -1,6 +1,6 @@
 {
   "name": "pos-server",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Enterprise Cloud-Based POS & Shop Management System API",
   "main": "dist/index.js",
   "scripts": {

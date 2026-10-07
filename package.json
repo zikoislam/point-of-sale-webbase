@@ -1,6 +1,6 @@
 {
   "name": "bdbbc-pos-desktop",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "BDBBC POS & Shop Management System — Desktop App",
   "main": "electron/main.js",
   "author": "Bdbbc.com — Zakirul Islam",
@@ -99,6 +99,7 @@
       "uninstallerIcon": "electron/assets/icon.ico",
       "installerHeaderIcon": "electron/assets/icon.ico",
       "license": "LICENSE.txt",
+      "include": "electron/installer.nsh",
       "deleteAppDataOnUninstall": false
     },
     "publish": null

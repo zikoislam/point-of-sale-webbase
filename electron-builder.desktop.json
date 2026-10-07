@@ -52,6 +52,7 @@
     "uninstallerIcon": "electron/assets/icon.ico",
     "installerHeaderIcon": "electron/assets/icon.ico",
     "license": "LICENSE.txt",
+    "include": "electron/installer.nsh",
     "deleteAppDataOnUninstall": false
   },
   "publish": null

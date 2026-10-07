@@ -277,6 +277,24 @@ export class ProductService {
     const result = await Product.findByIdAndUpdate(id, { isActive: false });
     if (!result) throw new AppError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
   }
+
+  /** Distinct option lists for the report dropdowns (colour / model / tag). */
+  async filterOptions(): Promise<{ colors: string[]; models: string[]; tags: string[] }> {
+    const [colors, models, tags] = await Promise.all([
+      Product.distinct('color', { color: { $nin: [null, ''] } }),
+      Product.distinct('modelNo', { modelNo: { $nin: [null, ''] } }),
+      Product.distinct('tags'),
+    ]);
+    const clean = (arr: unknown[]) =>
+      Array.from(
+        new Set(
+          arr
+            .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+            .map((v) => v.trim())
+        )
+      ).sort((a, b) => a.localeCompare(b));
+    return { colors: clean(colors), models: clean(models), tags: clean(tags) };
+  }
   /**
    * The trade catalogue: every active product with its wholesale price,
    * grouped by category — what an SR hands to a dealer.

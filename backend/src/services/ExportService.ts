@@ -719,6 +719,32 @@ class ExportService {
         return { title: 'Group-wise Sales Report', content: this.dimensionPdfContent('Product Group', rep, cur) };
       }
 
+      case 'product-analysis': {
+        const rep = await reportService.getProductAnalysis({
+          startDate,
+          endDate,
+          groupBy: extra?.groupBy,
+          categoryId: extra?.categoryId,
+          subCategoryId: extra?.subCategoryId,
+          brandId: extra?.brandId,
+          groupId: extra?.groupId,
+          color: extra?.color,
+          modelNo: extra?.modelNo,
+          tag: extra?.tag,
+          barcode: extra?.barcode,
+        });
+        const labels: Record<string, string> = {
+          product: 'Product',
+          variant: 'Variant',
+          barcode: 'Barcode',
+          category: 'Category',
+          brand: 'Brand',
+          group: 'Product Group',
+        };
+        const label = labels[rep.groupBy] || 'Product';
+        return { title: `Product Analysis — by ${label}`, content: this.dimensionPdfContent(label, rep, cur) };
+      }
+
       case 'barcode-wise': {
         const rep = await reportService.getBarcodeWiseReport(extra?.barcode, startDate, endDate);
         const p = rep.product;
@@ -2086,6 +2112,34 @@ class ExportService {
         const rep = await reportService.getGroupWiseSalesReport(startDate, endDate);
         ws.name = 'Group-wise Sales';
         this.addDimensionExcelRows(ws, 'Product Group', rep, cur);
+        break;
+      }
+
+      case 'product-analysis': {
+        const rep = await reportService.getProductAnalysis({
+          startDate,
+          endDate,
+          groupBy: extra?.groupBy,
+          categoryId: extra?.categoryId,
+          subCategoryId: extra?.subCategoryId,
+          brandId: extra?.brandId,
+          groupId: extra?.groupId,
+          color: extra?.color,
+          modelNo: extra?.modelNo,
+          tag: extra?.tag,
+          barcode: extra?.barcode,
+        });
+        const labels: Record<string, string> = {
+          product: 'Product',
+          variant: 'Variant',
+          barcode: 'Barcode',
+          category: 'Category',
+          brand: 'Brand',
+          group: 'Product Group',
+        };
+        const label = labels[rep.groupBy] || 'Product';
+        ws.name = 'Product Analysis';
+        this.addDimensionExcelRows(ws, label, rep, cur);
         break;
       }
 

@@ -21,6 +21,8 @@ router.get('/my-sales', (req, res, next) => reportController.getMySales(req, res
 router.get('/category-wise-sales', requirePermissions('reports:sales'), (req, res, next) => reportController.getCategoryWiseSales(req, res, next));
 router.get('/brand-wise-sales', requirePermissions('reports:sales'), (req, res, next) => reportController.getBrandWiseSales(req, res, next));
 router.get('/group-wise-sales', requirePermissions('reports:sales'), (req, res, next) => reportController.getGroupWiseSales(req, res, next));
+// Flexible, dropdown-filtered product report (group by product/variant/barcode/category/brand/group).
+router.get('/product-analysis', requirePermissions('reports:sales'), (req, res, next) => reportController.getProductAnalysis(req, res, next));
 // Inventory intelligence — barcode trace, low stock, dead stock, reorder points
 router.get('/barcode-wise', requirePermissions('reports:inventory'), (req, res, next) => reportController.getBarcodeWise(req, res, next));
 router.get('/low-stock', requirePermissions('reports:inventory'), (req, res, next) => reportController.getLowStock(req, res, next));

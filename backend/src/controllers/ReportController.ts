@@ -12,7 +12,13 @@ function extraExportParams(req: Request): Record<string, string> {
     'threshold',
     'days',
     'categoryId',
+    'subCategoryId',
     'brandId',
+    'groupId',
+    'color',
+    'modelNo',
+    'tag',
+    'groupBy',
     'productId',
     'variantId',
     'startDate',
@@ -84,6 +90,32 @@ class ReportController {
         req.user?.orgId
       );
       sendSuccess(res, 200, 'Brand-wise sales report generated', data);
+    } catch (err) { next(err); }
+  }
+
+  /**
+   * Flexible product report: dropdown filters (category / sub-category / brand /
+   * group / colour / model / tag / barcode) plus what to group by (product,
+   * variant, barcode, category, brand, group).
+   */
+  async getProductAnalysis(req: Request, res: Response, next: NextFunction) {
+    try {
+      const q = req.query;
+      const data = await reportService.getProductAnalysis({
+        startDate: q.startDate as string,
+        endDate: q.endDate as string,
+        orgId: req.user?.orgId,
+        groupBy: q.groupBy as string,
+        categoryId: q.categoryId as string,
+        subCategoryId: q.subCategoryId as string,
+        brandId: q.brandId as string,
+        groupId: q.groupId as string,
+        color: q.color as string,
+        modelNo: q.modelNo as string,
+        tag: q.tag as string,
+        barcode: q.barcode as string,
+      });
+      sendSuccess(res, 200, 'Product analysis generated', data);
     } catch (err) { next(err); }
   }
 
@@ -669,6 +701,33 @@ class ReportController {
         csv = 'Employee,Code,Department,Days,Requests,By Type\n';
         for (const r of rep.data as any[]) {
           csv += `"${r.employeeName}","${r.employeeCode}","${r.department}",${r.days},${r.requests},"${Object.entries(r.byType).map(([k, v]) => `${k}:${v}`).join(' ')}"\n`;
+        }
+      } else if (type === 'product-analysis') {
+        const rep = await reportService.getProductAnalysis({
+          startDate: startDate as string,
+          endDate: endDate as string,
+          orgId: req.user?.orgId,
+          groupBy: req.query.groupBy as string,
+          categoryId: req.query.categoryId as string,
+          subCategoryId: req.query.subCategoryId as string,
+          brandId: req.query.brandId as string,
+          groupId: req.query.groupId as string,
+          color: req.query.color as string,
+          modelNo: req.query.modelNo as string,
+          tag: req.query.tag as string,
+          barcode: req.query.barcode as string,
+        });
+        const labelMap: Record<string, string> = {
+          product: 'Product',
+          variant: 'Variant',
+          barcode: 'Barcode',
+          category: 'Category',
+          brand: 'Brand',
+          group: 'Product Group',
+        };
+        csv = `${labelMap[rep.groupBy] || 'Product'},Qty,Revenue,Cost,Gross Profit,Margin %\n`;
+        for (const r of rep.data) {
+          csv += `"${r.name}",${r.totalQty},${r.totalRevenue},${r.totalCost},${r.grossProfit},${r.profitMarginPercent}\n`;
         }
       } else {
         throw new AppError(400, 'UNKNOWN_REPORT_TYPE', `Unknown report type: ${type}`);

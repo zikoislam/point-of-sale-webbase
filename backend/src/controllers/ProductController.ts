@@ -24,6 +24,14 @@ export class ProductController {
   }
 
   /** Trade catalogue — every active product with its wholesale price. */
+  /** Distinct colour / model / tag values for the report dropdowns. */
+  async filterOptions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await productService.filterOptions();
+      sendSuccess(res, 200, 'Product filter options retrieved', data);
+    } catch (error) { next(error); }
+  }
+
   async wholesalePriceList(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const list = await productService.getWholesalePriceList(req.query.categoryId as string | undefined);

@@ -12,6 +12,8 @@ const router = Router();
 router.get('/barcode/:barcode', requirePermissions('pos:checkout'), (req, res, next) => productController.getProductByBarcode(req, res, next));
 
 router.get('/', requirePermissions('inv:view'), (req, res, next) => productController.listProducts(req, res, next));
+// Distinct colour / model / tag lists for report dropdowns (before /:id).
+router.get('/filter-options', requirePermissions('inv:view'), (req, res, next) => productController.filterOptions(req, res, next));
 // Trade catalogue — declared before /:id so the path is not read as a product id.
 router.get('/wholesale-price-list', requirePermissions('inv:view'), (req, res, next) => productController.wholesalePriceList(req, res, next));
 router.get('/wholesale-price-list/pdf', requirePermissions('inv:view'), (req, res, next) => productController.wholesalePriceListPdf(req, res, next));

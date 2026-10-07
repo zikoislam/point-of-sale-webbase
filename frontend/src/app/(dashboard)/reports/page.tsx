@@ -75,6 +75,7 @@ const SALES_COMMERCE_GROUP = [
     links: [
       { label: 'Sales Summary', tab: 'SALES' as ReportTab },
       { label: 'Product Performance', tab: 'PRODUCTS' as ReportTab },
+      { label: 'Product / Barcode Analysis (filters)', href: '/reports/product-analysis' },
       { label: 'Category / Brand / Group Analysis', href: '/reports/category-analysis' },
       { label: 'Daily Register & Top Products', href: '/reports/sales-insights' },
     ],

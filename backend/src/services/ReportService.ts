@@ -317,6 +317,197 @@ class ReportService {
     };
   }
 
+  /**
+   * One flexible product report. Filter by category / sub-category / brand /
+   * group / colour / model / tag / barcode, then group the result by product,
+   * variant, barcode, category, brand or product group.
+   *
+   * Returns the same shape as dimensionSalesReport so the existing PDF / Excel
+   * helpers can render it unchanged.
+   */
+  async getProductAnalysis(filters: {
+    startDate?: string;
+    endDate?: string;
+    orgId?: string;
+    groupBy?: string;
+    categoryId?: string;
+    subCategoryId?: string;
+    brandId?: string;
+    groupId?: string;
+    color?: string;
+    modelNo?: string;
+    tag?: string;
+    barcode?: string;
+  }) {
+    const allowed = ['product', 'variant', 'barcode', 'category', 'brand', 'group'];
+    const groupBy = allowed.includes(String(filters.groupBy)) ? String(filters.groupBy) : 'product';
+
+    const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = (v: string) => new RegExp(esc(v), 'i');
+    const oid = (v?: string) => (v && Types.ObjectId.isValid(v) ? new Types.ObjectId(v) : null);
+
+    const pipeline: any[] = [
+      { $match: this.dimensionMatch(filters.startDate, filters.endDate, filters.orgId) },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'items.variantId',
+          foreignField: 'variants._id',
+          as: 'product',
+        },
+      },
+      { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
+    ];
+
+    // Dropdown filters — only the ones actually supplied are applied.
+    const pMatch: Record<string, any> = {};
+    const categoryId = oid(filters.categoryId);
+    const subCategoryId = oid(filters.subCategoryId);
+    const brandId = oid(filters.brandId);
+    const groupId = oid(filters.groupId);
+    if (categoryId) pMatch['product.categoryId'] = categoryId;
+    if (subCategoryId) pMatch['product.subCategoryId'] = subCategoryId;
+    if (brandId) pMatch['product.brandId'] = brandId;
+    if (groupId) pMatch['product.groups'] = groupId;
+    if (filters.color) pMatch['product.color'] = rx(filters.color);
+    if (filters.modelNo) pMatch['product.modelNo'] = rx(filters.modelNo);
+    if (filters.tag) pMatch['product.tags'] = rx(filters.tag);
+    if (Object.keys(pMatch).length) pipeline.push({ $match: pMatch });
+
+    if (filters.barcode && filters.barcode.trim()) {
+      const code = rx(filters.barcode.trim());
+      pipeline.push({
+        $match: {
+          $or: [
+            { 'items.barcode': code },
+            { 'items.sku': code },
+            { 'product.variants.barcode': code },
+            { 'product.variants.altBarcodes': code },
+          ],
+        },
+      });
+    }
+
+    const totals = {
+      totalQty: { $sum: '$items.quantity' },
+      totalRevenue: { $sum: '$items.lineTotal' },
+      totalCost: { $sum: { $multiply: ['$items.quantity', '$items.unitCostPrice'] } },
+      variantIds: { $addToSet: '$items.variantId' },
+    };
+
+    if (groupBy === 'category' || groupBy === 'brand' || groupBy === 'group') {
+      if (groupBy === 'group') {
+        pipeline.push({ $unwind: { path: '$product.groups', preserveNullAndEmptyArrays: true } });
+        pipeline.push({
+          $lookup: { from: 'product_groups', localField: 'product.groups', foreignField: '_id', as: 'dim' },
+        });
+      } else {
+        const foreignField = groupBy === 'category' ? 'categoryId' : 'brandId';
+        const from = groupBy === 'category' ? 'categories' : 'brands';
+        pipeline.push({
+          $lookup: { from, localField: `product.${foreignField}`, foreignField: '_id', as: 'dim' },
+        });
+      }
+      pipeline.push({ $unwind: { path: '$dim', preserveNullAndEmptyArrays: true } });
+      const fallback =
+        groupBy === 'category' ? 'Uncategorised' : groupBy === 'brand' ? 'No Brand' : 'Ungrouped';
+      pipeline.push({
+        $group: {
+          _id: '$dim._id',
+          name: { $first: { $ifNull: ['$dim.name', fallback] } },
+          ...totals,
+        },
+      });
+    } else if (groupBy === 'barcode') {
+      pipeline.push({
+        $group: {
+          _id: { $ifNull: ['$items.barcode', '$items.sku'] },
+          name: { $first: { $ifNull: ['$items.barcode', '$items.sku'] } },
+          ...totals,
+        },
+      });
+    } else if (groupBy === 'variant') {
+      pipeline.push({
+        $group: {
+          _id: '$items.variantId',
+          name: {
+            $first: {
+              $concat: [
+                { $ifNull: ['$items.productName', ''] },
+                {
+                  $cond: [
+                    { $gt: [{ $strLenCP: { $ifNull: ['$items.variantName', ''] } }, 0] },
+                    { $concat: [' · ', '$items.variantName'] },
+                    '',
+                  ],
+                },
+              ],
+            },
+          },
+          ...totals,
+        },
+      });
+    } else {
+      pipeline.push({
+        $group: {
+          _id: '$product._id',
+          name: { $first: { $ifNull: ['$product.name', '$items.productName'] } },
+          ...totals,
+        },
+      });
+    }
+
+    pipeline.push({
+      $addFields: {
+        grossProfit: { $subtract: ['$totalRevenue', '$totalCost'] },
+        productCount: { $size: '$variantIds' },
+      },
+    });
+    pipeline.push({
+      $addFields: {
+        profitMarginPercent: {
+          $cond: [
+            { $gt: ['$totalRevenue', 0] },
+            { $multiply: [{ $divide: ['$grossProfit', '$totalRevenue'] }, 100] },
+            0,
+          ],
+        },
+      },
+    });
+    pipeline.push({ $sort: { totalRevenue: -1 } });
+
+    const rows: any[] = await Sale.aggregate(pipeline);
+    const round = (n: number) => Math.round((n || 0) * 100) / 100;
+
+    const data = rows.map((r) => ({
+      id: r._id ? String(r._id) : null,
+      name: r.name || '—',
+      totalQty: round(r.totalQty),
+      totalRevenue: round(r.totalRevenue),
+      totalCost: round(r.totalCost),
+      grossProfit: round(r.grossProfit),
+      profitMarginPercent: Math.round((r.profitMarginPercent || 0) * 10) / 10,
+      productCount: r.productCount || 0,
+    }));
+
+    const totalRevenue = round(data.reduce((n: number, r: any) => n + r.totalRevenue, 0));
+    const totalProfit = round(data.reduce((n: number, r: any) => n + r.grossProfit, 0));
+    const totalQty = round(data.reduce((n: number, r: any) => n + r.totalQty, 0));
+
+    return {
+      groupBy,
+      summary: {
+        totalRevenue,
+        totalProfit,
+        totalQty,
+        top: data[0]?.name || null,
+        rows: data.length,
+      },
+      data,
+    };
+  }
+
   /** Sales grouped by product category. */
   async getCategoryWiseSalesReport(startDate?: string, endDate?: string, orgId?: string) {
     return this.dimensionSalesReport('category', startDate, endDate, orgId);

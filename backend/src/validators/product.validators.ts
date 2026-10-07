@@ -4,6 +4,8 @@ export const productVariantSchema = z.object({
   attributeName: z.string().trim().min(1, 'Attribute name is required'),
   sku: z.string().trim().min(1, 'SKU is required'),
   barcode: z.string().trim().optional(),
+  /** Extra barcodes for the same variant (single + carton, etc.). */
+  altBarcodes: z.array(z.string().trim()).optional().default([]),
   costPrice: z.coerce.number().min(0, 'Cost price cannot be negative'),
   retailSellingPrice: z.coerce.number().min(0, 'Retail price cannot be negative'),
   wholesaleSellingPrice: z.coerce.number().min(0, 'Wholesale price cannot be negative'),
@@ -33,6 +35,21 @@ export const createProductSchema = z.object({
   supplierId: z.string().optional(),
   /** Optional colour / variant label for quick identification. */
   color: z.string().trim().optional(),
+  /** Free-form extra attributes, e.g. { size: '500g' }. */
+  attributes: z.record(z.string()).optional(),
+  /** Free labels for grouping / filtering. */
+  tags: z.array(z.string().trim()).optional().default([]),
+  /** Optional sub-category (a child Category). */
+  subCategoryId: z.string().optional(),
+  modelNo: z.string().trim().optional(),
+  partNumber: z.string().trim().optional(),
+  hsCode: z.string().trim().optional(),
+  countryOfOrigin: z.string().trim().optional(),
+  warrantyMonths: z.coerce.number().min(0).optional(),
+  serialTracked: z.boolean().optional().default(false),
+  expiryTracked: z.boolean().optional().default(false),
+  packSize: z.coerce.number().min(0).optional(),
+  searchKeywords: z.array(z.string().trim()).optional().default([]),
   /** Product groups (ref: product_groups). */
   groups: z.array(z.string()).optional().default([]),
   /** Show this product on the public eCommerce storefront. */

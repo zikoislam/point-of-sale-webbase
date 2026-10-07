@@ -29,6 +29,8 @@ export interface IVariant {
   _id: Types.ObjectId;
   sku: string; // Unique, e.g. "SKU-MILK-1000ML"
   barcode?: string; // Unique EAN-13 / Code-128 (sparse)
+  /** Extra barcodes for the same variant (e.g. single + carton barcode). */
+  altBarcodes?: string[];
   attributeName: string; // "1 Liter" | "500g" | "Blue / XL"
   costPrice: number; // Weighted average cost price (WAC)
   retailSellingPrice: number; // Standard retail consumer price (MRP)
@@ -56,6 +58,26 @@ export interface IProduct extends Document {
   unit: 'Pcs' | 'Kg' | 'Gram' | 'Ltr' | 'Ml' | 'Box' | 'Meter' | 'Goj';
   /** Optional identifier shown at entry, sale and receive (e.g. "Red"). */
   color?: string;
+  /** Free-form extra attributes, e.g. { size: '500g', material: 'Cotton' }. */
+  attributes?: Record<string, string>;
+  /** Free labels for grouping / filtering. */
+  tags?: string[];
+  /** Optional sub-category (a child Category). */
+  subCategoryId?: Types.ObjectId;
+  modelNo?: string;
+  partNumber?: string;
+  hsCode?: string;
+  countryOfOrigin?: string;
+  /** Warranty length in months (0 = none). */
+  warrantyMonths?: number;
+  /** Track a unique serial / IMEI per unit. */
+  serialTracked?: boolean;
+  /** Track batch + expiry per lot. */
+  expiryTracked?: boolean;
+  /** Units per pack / carton (e.g. 12). */
+  packSize?: number;
+  /** Extra keywords so search finds this item. */
+  searchKeywords?: string[];
   imageUrl?: string;
   /** Listed on the organization's public eCommerce storefront when true. */
   isWebVisible?: boolean;
@@ -108,6 +130,10 @@ const VariantSchema = new Schema<IVariant>(
       type: String,
       trim: true,
       default: undefined,
+    },
+    altBarcodes: {
+      type: [String],
+      default: [],
     },
     attributeName: {
       type: String,
@@ -205,6 +231,55 @@ const ProductSchema = new Schema<IProduct>(
     color: {
       type: String,
       trim: true,
+    },
+    attributes: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    subCategoryId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+    },
+    modelNo: {
+      type: String,
+      trim: true,
+    },
+    partNumber: {
+      type: String,
+      trim: true,
+    },
+    hsCode: {
+      type: String,
+      trim: true,
+    },
+    countryOfOrigin: {
+      type: String,
+      trim: true,
+    },
+    warrantyMonths: {
+      type: Number,
+      min: 0,
+    },
+    serialTracked: {
+      type: Boolean,
+      default: false,
+    },
+    expiryTracked: {
+      type: Boolean,
+      default: false,
+    },
+    packSize: {
+      type: Number,
+      min: 0,
+    },
+    searchKeywords: {
+      type: [String],
+      default: [],
     },
     imageUrl: {
       type: String,

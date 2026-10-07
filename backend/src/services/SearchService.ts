@@ -50,27 +50,41 @@ class SearchService {
       jobs.push(
         (async () => {
           const products = await Product.find({
-            $or: [{ name: rx }, { color: rx }, { 'variants.sku': rx }, { 'variants.barcode': rx }],
+            $or: [
+              { name: rx },
+              { color: rx },
+              { modelNo: rx },
+              { partNumber: rx },
+              { tags: rx },
+              { searchKeywords: rx },
+              { 'variants.sku': rx },
+              { 'variants.barcode': rx },
+              { 'variants.altBarcodes': rx },
+            ],
           })
-            .select('name color variants.attributeName variants.sku variants.barcode variants.retailSellingPrice variants.currentStock')
+            .select(
+              'name color modelNo partNumber tags variants.attributeName variants.sku variants.barcode variants.altBarcodes variants.retailSellingPrice variants.currentStock'
+            )
             .limit(limit)
             .lean();
           return products.map((p: any) => {
             const variants: any[] = p.variants || [];
-            const v =
-              variants.find((x) => (x.barcode && exact.test(x.barcode)) || (x.sku && exact.test(x.sku))) ||
-              variants.find((x) => (x.barcode && rx.test(x.barcode)) || (x.sku && rx.test(x.sku))) ||
-              variants[0] ||
-              {};
-            const isExact = !!((v.barcode && exact.test(v.barcode)) || (v.sku && exact.test(v.sku)));
+            const matchesId = (x: any, test: RegExp) =>
+              (x.barcode && test.test(x.barcode)) ||
+              (x.sku && test.test(x.sku)) ||
+              (x.altBarcodes || []).some((b: string) => test.test(b));
+            const v = variants.find((x) => matchesId(x, exact)) || variants.find((x) => matchesId(x, rx)) || variants[0] || {};
+            const isExact = variants.some((x) => matchesId(x, exact));
             // Deep-link with the exact identifier so the products list opens on it.
-            const token = v.barcode || v.sku || p.name;
+            const token = v.barcode || (v.altBarcodes || [])[0] || v.sku || p.name;
             return {
               type: 'product' as const,
               id: String(p._id),
               title: p.name,
-              subtitle: [p.color, v.attributeName, v.sku ? `SKU ${v.sku}` : null].filter(Boolean).join(' · '),
-              badge: v.barcode || v.sku,
+              subtitle: [p.color, p.modelNo, v.attributeName, v.sku ? `SKU ${v.sku}` : null]
+                .filter(Boolean)
+                .join(' · '),
+              badge: v.barcode || (v.altBarcodes || [])[0] || v.sku,
               href: `/products?search=${encodeURIComponent(token)}`,
               rank: isExact ? 0 : 1,
             };

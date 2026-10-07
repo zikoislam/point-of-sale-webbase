@@ -24,6 +24,19 @@ export interface ProductInput {
   supplierId?: string;
   /** Optional colour / variant label for quick identification. */
   color?: string;
+  /** Free-form extra attributes, e.g. { size: '500g' }. */
+  attributes?: Record<string, string>;
+  tags?: string[];
+  subCategoryId?: string;
+  modelNo?: string;
+  partNumber?: string;
+  hsCode?: string;
+  countryOfOrigin?: string;
+  warrantyMonths?: number;
+  serialTracked?: boolean;
+  expiryTracked?: boolean;
+  packSize?: number;
+  searchKeywords?: string[];
   /** Product groups this item belongs to. */
   groups?: string[];
   /** Listed on the public storefront when true. */
@@ -86,7 +99,17 @@ export class ProductService {
 
     if (options.search) {
       const rx = new RegExp(escapeRegex(options.search.trim()), 'i');
-      filter.$or = [{ name: rx }, { color: rx }, { 'variants.sku': rx }, { 'variants.barcode': rx }];
+      filter.$or = [
+        { name: rx },
+        { color: rx },
+        { modelNo: rx },
+        { partNumber: rx },
+        { tags: rx },
+        { searchKeywords: rx },
+        { 'variants.sku': rx },
+        { 'variants.barcode': rx },
+        { 'variants.altBarcodes': rx },
+      ];
     }
     if (options.categoryId) filter.categoryId = new Types.ObjectId(options.categoryId);
     if (options.brandId) filter.brandId = new Types.ObjectId(options.brandId);
@@ -132,6 +155,8 @@ export class ProductService {
         brandId: p.brandId?._id?.toString(),
         brandName: p.brandId?.name,
         color: p.color,
+        modelNo: p.modelNo,
+        tags: p.tags,
         unit: p.unit,
         taxType: p.taxType,
         taxRate: p.taxRate,
@@ -206,6 +231,18 @@ export class ProductService {
       brandId: data.brandId || null,
       supplierId: data.supplierId || null,
       color: data.color,
+      attributes: data.attributes || {},
+      tags: (data.tags || []).filter(Boolean),
+      subCategoryId: data.subCategoryId ? new Types.ObjectId(data.subCategoryId) : null,
+      modelNo: data.modelNo,
+      partNumber: data.partNumber,
+      hsCode: data.hsCode,
+      countryOfOrigin: data.countryOfOrigin,
+      warrantyMonths: data.warrantyMonths,
+      serialTracked: !!data.serialTracked,
+      expiryTracked: !!data.expiryTracked,
+      packSize: data.packSize,
+      searchKeywords: (data.searchKeywords || []).filter(Boolean),
       groups: (data.groups || []).filter((g) => Types.ObjectId.isValid(g)).map((g) => new Types.ObjectId(g)),
       isWebVisible: !!data.isWebVisible,
       unit: data.unit,

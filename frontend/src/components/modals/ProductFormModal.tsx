@@ -15,6 +15,8 @@ export interface ProductVariantForm {
   attributeName: string;
   sku: string;
   barcode?: string;
+  /** Extra barcodes for the same variant (single + carton, etc.). */
+  altBarcodes?: string[];
   costPrice: number;
   retailSellingPrice: number;
   wholesaleSellingPrice: number;
@@ -87,6 +89,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [taxRate, setTaxRate] = useState<number>(0);
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('');
+  const [size, setSize] = useState('');
+  const [modelNo, setModelNo] = useState('');
+  const [partNumber, setPartNumber] = useState('');
+  const [hsCode, setHsCode] = useState('');
+  const [countryOfOrigin, setCountryOfOrigin] = useState('');
+  const [warrantyMonths, setWarrantyMonths] = useState('');
+  const [packSize, setPackSize] = useState('');
+  const [tags, setTags] = useState('');
+  const [searchKeywords, setSearchKeywords] = useState('');
+  const [subCategoryId, setSubCategoryId] = useState('');
+  const [serialTracked, setSerialTracked] = useState(false);
+  const [expiryTracked, setExpiryTracked] = useState(false);
   const [isWebVisible, setIsWebVisible] = useState(false);
   const [productGroups, setProductGroups] = useState<Array<{ id: string; name: string; parentGroupId?: string | null }>>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -189,6 +203,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             setTaxRate(p.taxRate ?? 0);
             setDescription(p.description || '');
             setColor(p.color || '');
+            setSize(p.attributes?.size || '');
+            setModelNo(p.modelNo || '');
+            setPartNumber(p.partNumber || '');
+            setHsCode(p.hsCode || '');
+            setCountryOfOrigin(p.countryOfOrigin || '');
+            setWarrantyMonths(p.warrantyMonths != null ? String(p.warrantyMonths) : '');
+            setPackSize(p.packSize != null ? String(p.packSize) : '');
+            setTags(Array.isArray(p.tags) ? p.tags.join(', ') : '');
+            setSearchKeywords(Array.isArray(p.searchKeywords) ? p.searchKeywords.join(', ') : '');
+            setSubCategoryId(p.subCategoryId ? String(p.subCategoryId?._id || p.subCategoryId) : '');
+            setSerialTracked(!!p.serialTracked);
+            setExpiryTracked(!!p.expiryTracked);
             setIsWebVisible(!!p.isWebVisible);
             setSelectedGroups(Array.isArray(p.groups) ? p.groups.map((g: any) => String(g?._id || g)) : []);
 
@@ -198,6 +224,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   attributeName: v.attributeName || 'Standard',
                   sku: v.sku || '',
                   barcode: v.barcode || '',
+                  altBarcodes: Array.isArray(v.altBarcodes) ? v.altBarcodes : [],
                   costPrice: v.costPrice ?? 0,
                   retailSellingPrice: v.retailSellingPrice ?? 0,
                   wholesaleSellingPrice: v.wholesaleSellingPrice ?? 0,
@@ -224,6 +251,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setTaxType('INCLUSIVE');
       setTaxRate(0);
       setDescription('');
+      setColor('');
+      setSize('');
+      setModelNo('');
+      setPartNumber('');
+      setHsCode('');
+      setCountryOfOrigin('');
+      setWarrantyMonths('');
+      setPackSize('');
+      setTags('');
+      setSearchKeywords('');
+      setSubCategoryId('');
+      setSerialTracked(false);
+      setExpiryTracked(false);
       setIsWebVisible(false);
       setSelectedGroups([]);
       setVariants([
@@ -326,6 +366,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       name: name.trim(),
       description: description.trim() || undefined,
       color: color.trim() || undefined,
+      attributes: size.trim() ? { size: size.trim() } : {},
+      modelNo: modelNo.trim() || undefined,
+      partNumber: partNumber.trim() || undefined,
+      hsCode: hsCode.trim() || undefined,
+      countryOfOrigin: countryOfOrigin.trim() || undefined,
+      warrantyMonths: warrantyMonths.trim() === '' ? undefined : Number(warrantyMonths) || 0,
+      packSize: packSize.trim() === '' ? undefined : Number(packSize) || 0,
+      tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+      searchKeywords: searchKeywords.split(',').map((t) => t.trim()).filter(Boolean),
+      subCategoryId: subCategoryId || undefined,
+      serialTracked,
+      expiryTracked,
       isWebVisible,
       groups: selectedGroups,
       categoryId,
@@ -338,6 +390,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         attributeName: v.attributeName.trim(),
         sku: v.sku.trim().toUpperCase(),
         barcode: v.barcode?.trim() || undefined,
+        altBarcodes: (v.altBarcodes || []).map((b) => b.trim()).filter(Boolean),
         costPrice: Number(v.costPrice) || 0,
         retailSellingPrice: Number(v.retailSellingPrice) || 0,
         wholesaleSellingPrice: Number(v.wholesaleSellingPrice) || 0,
@@ -482,6 +535,135 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 />
               </div>
 
+              {/* Optional identification details — safe to leave blank */}
+              <div className="border-t border-slate-800 pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+                  More details <span className="text-slate-600 normal-case font-normal">(all optional)</span>
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Size</label>
+                    <input
+                      type="text"
+                      value={size}
+                      onChange={(e) => setSize(e.target.value)}
+                      placeholder="e.g. 500g, XL, 42"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Model No</label>
+                    <input
+                      type="text"
+                      value={modelNo}
+                      onChange={(e) => setModelNo(e.target.value)}
+                      placeholder="e.g. SM-A155F"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Part Number</label>
+                    <input
+                      type="text"
+                      value={partNumber}
+                      onChange={(e) => setPartNumber(e.target.value)}
+                      placeholder="OEM / manufacturer part no"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">HS Code (import)</label>
+                    <input
+                      type="text"
+                      value={hsCode}
+                      onChange={(e) => setHsCode(e.target.value)}
+                      placeholder="e.g. 8517.12.00"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Country of Origin</label>
+                    <input
+                      type="text"
+                      value={countryOfOrigin}
+                      onChange={(e) => setCountryOfOrigin(e.target.value)}
+                      placeholder="e.g. China"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Warranty (months)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={warrantyMonths}
+                      onChange={(e) => setWarrantyMonths(e.target.value)}
+                      placeholder="e.g. 12"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Pack size (units / carton)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={packSize}
+                      onChange={(e) => setPackSize(e.target.value)}
+                      placeholder="e.g. 12"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <Select
+                    label="Sub-category (optional)"
+                    placeholder="Select sub-category"
+                    options={[{ value: '', label: 'None' }, ...categories]}
+                    value={subCategoryId}
+                    onChange={(val) => setSubCategoryId(String(val))}
+                    searchable
+                  />
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Tags (comma separated)</label>
+                    <input
+                      type="text"
+                      value={tags}
+                      onChange={(e) => setTags(e.target.value)}
+                      placeholder="e.g. imported, seasonal"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Search keywords (comma)</label>
+                    <input
+                      type="text"
+                      value={searchKeywords}
+                      onChange={(e) => setSearchKeywords(e.target.value)}
+                      placeholder="extra words to find this item"
+                      className="w-full h-10 px-3.5 bg-slate-900 text-slate-100 text-sm rounded-lg border border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-5 mt-3">
+                  <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      className="accent-emerald-500 w-4 h-4"
+                      checked={serialTracked}
+                      onChange={(e) => setSerialTracked(e.target.checked)}
+                    />
+                    Track serial / IMEI per unit
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      className="accent-emerald-500 w-4 h-4"
+                      checked={expiryTracked}
+                      onChange={(e) => setExpiryTracked(e.target.checked)}
+                    />
+                    Track expiry / batch
+                  </label>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800 rounded-lg px-3.5 py-2.5">
                 <div>
                   <p className="text-xs font-semibold text-slate-300">Show on online store</p>
@@ -616,6 +798,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         value={v.barcode || ''}
                         onChange={(e) => handleVariantChange(idx, 'barcode', e.target.value)}
                         placeholder="Scan or leave empty for SKU"
+                        className="w-full h-8 px-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                        Alt barcodes (comma)
+                      </label>
+                      <input
+                        type="text"
+                        value={(v.altBarcodes || []).join(', ')}
+                        onChange={(e) =>
+                          handleVariantChange(
+                            idx,
+                            'altBarcodes',
+                            e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                          )
+                        }
+                        placeholder="carton barcode, pack barcode"
                         className="w-full h-8 px-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>

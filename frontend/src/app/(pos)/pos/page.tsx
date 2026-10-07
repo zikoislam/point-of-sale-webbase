@@ -2201,7 +2201,21 @@ export default function POSTerminalPage() {
 
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="text-center border-b border-dashed border-slate-300 pb-3">
-                <h1 className="text-base font-black tracking-tight">POINT OF SALE STORE</h1>
+                <h1 className="text-base font-black tracking-tight">
+                  {branding.shopName || 'BDBBC POS'}
+                </h1>
+                {(branding.shopAddress || branding.shopPhone) && (
+                  <p className="text-[10px] text-slate-600 mt-0.5">
+                    {branding.shopAddress}
+                    {branding.shopAddress && branding.shopPhone ? ' · ' : ''}
+                    {branding.shopPhone ? `Tel: ${branding.shopPhone}` : ''}
+                  </p>
+                )}
+                {branding.receiptHeader && (
+                  <p className="text-[10px] text-slate-600 mt-0.5 whitespace-pre-line">
+                    {branding.receiptHeader}
+                  </p>
+                )}
                 <p className="text-[10px] text-slate-600 mt-0.5">Invoice: {completedSale.invoiceNo}</p>
                 <div className="text-[10px] text-slate-500">
                   {new Date(completedSale.createdAt).toLocaleString()}
@@ -2251,8 +2265,8 @@ export default function POSTerminalPage() {
                 )}
               </div>
 
-              <div className="text-center text-[10px] text-slate-500 pt-2">
-                Thank you for shopping with us! Please come again.
+              <div className="text-center text-[10px] text-slate-500 pt-2 whitespace-pre-line">
+                {branding.receiptFooter || 'Thank you for shopping with us! Please come again.'}
               </div>
             </div>
           </div>

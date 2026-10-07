@@ -20,6 +20,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { prepareMemoPrint } from '../../../lib/memo-print';
+import { useBranding } from '../../../hooks/useBranding';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const authHeader = () => ({
@@ -74,6 +75,7 @@ interface ReturnRecord {
 }
 
 export default function SalesHistoryPage() {
+  const branding = useBranding();
   const [activeTab, setActiveTab] = useState<'SALES' | 'RETURNS'>('SALES');
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
@@ -692,7 +694,17 @@ export default function SalesHistoryPage() {
 
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="text-center border-b border-dashed border-slate-300 pb-3">
-                <h1 className="text-base font-black tracking-tight">POINT OF SALE STORE</h1>
+                <h1 className="text-base font-black tracking-tight">{branding.shopName || 'BDBBC POS'}</h1>
+                {(branding.shopAddress || branding.shopPhone) && (
+                  <p className="text-[10px] text-slate-600 mt-0.5">
+                    {branding.shopAddress}
+                    {branding.shopAddress && branding.shopPhone ? ' · ' : ''}
+                    {branding.shopPhone ? `Tel: ${branding.shopPhone}` : ''}
+                  </p>
+                )}
+                {branding.receiptHeader && (
+                  <p className="text-[10px] text-slate-600 mt-0.5 whitespace-pre-line">{branding.receiptHeader}</p>
+                )}
                 <p className="text-[10px] text-slate-600 mt-0.5">Invoice: {selectedSale.invoiceNo}</p>
                 <div className="text-[10px] text-slate-500">
                   {new Date(selectedSale.createdAt).toLocaleString()}
@@ -747,8 +759,8 @@ export default function SalesHistoryPage() {
                 )}
               </div>
 
-              <div className="text-center text-[10px] text-slate-500 pt-2">
-                Return Policy: 7 days with original receipt.
+              <div className="text-center text-[10px] text-slate-500 pt-2 whitespace-pre-line">
+                {branding.receiptFooter || 'Return Policy: 7 days with original receipt.'}
               </div>
             </div>
           </div>

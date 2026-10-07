@@ -17,6 +17,9 @@ export interface ReceiptBranding {
   shopAddress?: string;
   shopPhone?: string;
   currencySymbol?: string;
+  /** Settings → Receipt header / footer text. */
+  receiptHeader?: string;
+  receiptFooter?: string;
 }
 
 export interface PrintReceiptOptions {
@@ -75,7 +78,8 @@ export function buildReceiptData(
     paidAmount: num(sale?.paidAmount ?? sale?.totalAmount),
     paymentMethod: paymentMethod || 'CASH',
     changeReturned: num(sale?.changeReturned),
-    footerText,
+    headerText: branding.receiptHeader,
+    footerText: footerText || branding.receiptFooter,
   };
 }
 
@@ -258,6 +262,7 @@ export function buildReceiptHtml(
         ${data.shopAddress ? `${escapeHtml(data.shopAddress)}<br />` : ''}
         ${data.shopPhone ? `Tel: ${escapeHtml(data.shopPhone)}` : ''}
       </div>
+      ${data.headerText ? `<div class="shop-detail">${toBreaks(data.headerText)}</div>` : ''}
     </div>
     <div class="meta">
       <div><span class="k">Invoice</span> <strong>${escapeHtml(data.invoiceNo)}</strong></div>

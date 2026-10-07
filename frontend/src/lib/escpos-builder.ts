@@ -15,6 +15,8 @@ export interface ReceiptData {
   shopName: string;
   shopAddress?: string;
   shopPhone?: string;
+  /** Custom line(s) printed under the shop details (Settings → Receipt header). */
+  headerText?: string;
   invoiceNo: string;
   date: string;
   cashierName: string;
@@ -126,6 +128,7 @@ export class EscposBuilder {
 
     if (data.shopAddress) builder.line(data.shopAddress);
     if (data.shopPhone) builder.line(`Tel: ${data.shopPhone}`);
+    if (data.headerText) builder.line(data.headerText);
 
     builder.separator('=');
 

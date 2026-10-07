@@ -27,6 +27,10 @@ export class SettingsController {
         currencySymbol: settings.currencySymbol,
         shopAddress: settings.shopAddress,
         shopPhone: settings.shopPhone,
+        // Receipt header/footer ride with the branding so the POS can print the
+        // shop's own text without a cashier needing the full settings document.
+        receiptHeader: settings.receiptHeader || '',
+        receiptFooter: settings.receiptFooter || '',
       });
     } catch (error) { next(error); }
   }

@@ -9,6 +9,9 @@ export interface Branding {
   currencySymbol: string;
   shopAddress?: string;
   shopPhone?: string;
+  /** Settings → Receipt header / footer text. */
+  receiptHeader?: string;
+  receiptFooter?: string;
 }
 
 const FALLBACK: Branding = { shopName: 'Smart Retail POS', logoUrl: '', currencySymbol: '৳' };

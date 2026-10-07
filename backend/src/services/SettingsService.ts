@@ -85,6 +85,9 @@ export class SettingsService {
       memoPrintMode: settings?.memoPrintMode || 'thermal',
       memoWidthMm: settings?.memoWidthMm || 210,
       memoHeightMm: settings?.memoHeightMm || 297,
+      // Custom header/footer text for the printed memo.
+      receiptHeader: settings?.receiptHeader || '',
+      receiptFooter: settings?.receiptFooter || '',
     };
   }
 }

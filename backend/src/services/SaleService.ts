@@ -802,6 +802,7 @@ class SaleService {
       paidAmount: sale.paidAmount,
       change: sale.changeReturned,
       paymentMethod: sale.payments?.[0]?.method || 'CASH',
+      headerText: settings?.receiptHeader,
       footerText: settings?.receiptFooter,
     };
   }

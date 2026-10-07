@@ -557,6 +557,88 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Live memo preview — reflects the fields above as you type */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-white text-sm">Live memo preview</h2>
+          <span className="text-[11px] text-slate-500">
+            {form.memoPrintMode === 'thermal'
+              ? `${form.thermalPrinterType} thermal roll`
+              : form.memoPrintMode === 'a4'
+                ? 'A4 sheet'
+                : `${form.memoWidthMm} × ${form.memoHeightMm} mm sheet`}
+          </span>
+        </div>
+
+        <div className="flex justify-center bg-slate-950/60 border border-slate-800 rounded-xl p-6">
+          <div
+            className="bg-white text-slate-900 shadow-xl px-4 py-5 font-mono text-[11px] leading-relaxed"
+            style={{
+              width:
+                form.memoPrintMode === 'thermal'
+                  ? form.thermalPrinterType === '58mm'
+                    ? 210
+                    : 285
+                  : form.memoPrintMode === 'a4'
+                    ? 420
+                    : Math.max(190, Math.min(520, Number(form.memoWidthMm) || 210)),
+            }}
+          >
+            <div className="text-center">
+              {form.logoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.logoUrl} alt="logo" className="mx-auto mb-1.5 h-10 w-10 object-contain" />
+              )}
+              <div className="font-black text-[13px] tracking-tight">
+                {form.shopName || 'Your Shop Name'}
+              </div>
+              {(form.shopAddress || form.shopPhone) && (
+                <div className="text-slate-600">
+                  {form.shopAddress}
+                  {form.shopAddress && form.shopPhone ? ' · ' : ''}
+                  {form.shopPhone ? `Tel: ${form.shopPhone}` : ''}
+                </div>
+              )}
+              {form.receiptHeader && (
+                <div className="text-slate-600 whitespace-pre-line">{form.receiptHeader}</div>
+              )}
+            </div>
+
+            <div className="border-t border-dashed border-slate-300 my-2" />
+
+            <div className="flex justify-between">
+              <span>Invoice</span>
+              <span>INV-000123</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Rice (5kg)</span>
+              <span>{form.currencySymbol || '৳'}1,250.00</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Soap</span>
+              <span>{form.currencySymbol || '৳'}95.00</span>
+            </div>
+
+            <div className="border-t border-dashed border-slate-300 my-2" />
+
+            <div className="flex justify-between font-bold">
+              <span>Grand Total</span>
+              <span>{form.currencySymbol || '৳'}1,345.00</span>
+            </div>
+
+            <div className="border-t border-dashed border-slate-300 my-2" />
+
+            <div className="text-center text-slate-600 whitespace-pre-line">
+              {form.receiptFooter || 'Thank you for shopping with us!'}
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-slate-500">
+          Updates as you type — this is exactly how the printed memo is laid out.
+        </p>
+      </div>
+
       {/* License — desktop only. The key lives in the app's own files rather
           than in shop settings, because it belongs to this computer. */}
       {desktop && (

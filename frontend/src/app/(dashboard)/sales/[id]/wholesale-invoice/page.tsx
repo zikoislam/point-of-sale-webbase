@@ -132,29 +132,53 @@ export default function WholesaleInvoicePage() {
       {/* A4 sheet */}
       <div className="bg-white text-slate-900 mx-auto w-full max-w-[210mm] p-10 shadow-2xl rounded-lg print:shadow-none print:rounded-none print:p-0 print:max-w-none">
         {/* Letterhead */}
-        <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4">
-          <div>
-            {branding.logoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={branding.logoUrl} alt={branding.shopName} className="w-14 h-14 object-contain mb-2" />
+        <div className="flex items-start justify-between gap-6 border-b-4 border-slate-900 pb-5">
+          <div className="flex items-start gap-4 min-w-0">
+            {branding.logoUrl ? (
+              <div className="w-20 h-20 shrink-0 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.shopName}
+                  className="w-full h-full object-contain p-1.5"
+                />
+              </div>
+            ) : (
+              <div className="w-20 h-20 shrink-0 rounded-xl bg-slate-900 text-white flex items-center justify-center text-3xl font-black">
+                {(branding.shopName || 'B').charAt(0).toUpperCase()}
+              </div>
             )}
-            <h2 className="text-xl font-black tracking-tight">{branding.shopName}</h2>
-            {branding.shopAddress && <p className="text-[11px] text-slate-600 mt-1">{branding.shopAddress}</p>}
-            {branding.shopPhone && <p className="text-[11px] text-slate-600">Phone: {branding.shopPhone}</p>}
-            {branding.receiptHeader && (
-              <p className="text-[11px] text-slate-600 whitespace-pre-line">{branding.receiptHeader}</p>
-            )}
+            <div className="min-w-0">
+              <h2 className="text-2xl font-black tracking-tight leading-tight">
+                {branding.shopName || 'BDBBC POS'}
+              </h2>
+              {(branding.shopAddress || branding.shopPhone) && (
+                <p className="text-[11px] text-slate-600 mt-1">
+                  {branding.shopAddress}
+                  {branding.shopAddress && branding.shopPhone ? ' · ' : ''}
+                  {branding.shopPhone ? `Tel: ${branding.shopPhone}` : ''}
+                </p>
+              )}
+              {branding.receiptHeader && (
+                <p className="text-[11px] text-slate-500 mt-1 whitespace-pre-line">{branding.receiptHeader}</p>
+              )}
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-lg font-black tracking-wide">WHOLESALE INVOICE</p>
-            <p className="text-[11px] text-slate-500 mt-1">
-              {sale.pricingTier === 'WHOLESALE' ? 'Trade / Dealer Sale' : 'Counter Sale'}
+
+          <div className="text-right shrink-0">
+            <p className="inline-block text-[11px] font-black uppercase tracking-[0.18em] text-white bg-slate-900 px-3 py-1.5 rounded">
+              Wholesale Invoice
             </p>
-            <p className="text-xs font-bold mt-3">Invoice No: {sale.invoiceNo}</p>
-            <p className="text-[11px] text-slate-600">
-              Date: {new Date(sale.createdAt).toLocaleDateString('en-GB')} ·{' '}
-              {new Date(sale.createdAt).toLocaleTimeString('en-GB')}
-            </p>
+            <div className="mt-3 space-y-0.5">
+              <p className="text-sm font-bold">{sale.invoiceNo}</p>
+              <p className="text-[11px] text-slate-600">
+                {new Date(sale.createdAt).toLocaleDateString('en-GB')} ·{' '}
+                {new Date(sale.createdAt).toLocaleTimeString('en-GB')}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {sale.pricingTier === 'WHOLESALE' ? 'Trade / Dealer Sale' : 'Counter Sale'}
+              </p>
+            </div>
           </div>
         </div>
 
